@@ -230,6 +230,7 @@ main() {
     python3-venv \
     python3-pip \
     python3-opencv \
+    opencv-data \
     libatlas-base-dev \
     git \
     cmake \

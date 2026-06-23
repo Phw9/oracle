@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -14,6 +15,13 @@ class FaceDetector(Protocol):
 
 
 _MIN_SCALED_FACE_SIZE_PX = 24
+_HAAR_CASCADE_DIR_ENV = "ORACLE_HAAR_CASCADE_DIR"
+_SYSTEM_HAAR_CASCADE_DIRS = (
+    Path("/usr/share/opencv4/haarcascades"),
+    Path("/usr/share/opencv/haarcascades"),
+    Path("/usr/local/share/opencv4/haarcascades"),
+    Path("/usr/local/share/opencv/haarcascades"),
+)
 
 
 class HaarFaceDetector:
@@ -79,9 +87,42 @@ class HaarFaceDetector:
         return result
 
     def _resolve_cascade_path(self) -> Path:
-        data_dir = Path(self._cv2.data.haarcascades)
-        result = data_dir / "haarcascade_frontalface_default.xml"
+        result = resolve_haar_cascade_path(
+            self._cv2,
+            "haarcascade_frontalface_default.xml",
+        )
         return result
+
+
+def resolve_haar_cascade_path(cv2_module: Any, filename: str) -> Path:
+    result: Path | None = None
+    candidates = _haar_cascade_candidates(cv2_module, filename)
+    for candidate in candidates:
+        if candidate.is_file():
+            result = candidate
+            break
+    if result is None:
+        searched = ", ".join(str(candidate) for candidate in candidates)
+        raise RuntimeError(
+            f"failed to find OpenCV Haar cascade {filename}. "
+            f"Install opencv-data or set {_HAAR_CASCADE_DIR_ENV}. "
+            f"Searched: {searched}",
+        )
+    return result
+
+
+def _haar_cascade_candidates(cv2_module: Any, filename: str) -> tuple[Path, ...]:
+    directories: list[Path] = []
+    configured_dir = os.getenv(_HAAR_CASCADE_DIR_ENV)
+    if configured_dir is not None and configured_dir.strip() != "":
+        directories.append(Path(configured_dir.strip()))
+    cv2_data = getattr(cv2_module, "data", None)
+    cv2_haar_dir = getattr(cv2_data, "haarcascades", "")
+    if isinstance(cv2_haar_dir, str) and cv2_haar_dir.strip() != "":
+        directories.append(Path(cv2_haar_dir))
+    directories.extend(_SYSTEM_HAAR_CASCADE_DIRS)
+    result = tuple(directory / filename for directory in directories)
+    return result
 
 
 def _import_cv2() -> Any:

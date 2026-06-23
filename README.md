@@ -84,9 +84,10 @@ ORACLE_FRAME_HEIGHT=480
 ORACLE_CAMERA_FPS=15
 ORACLE_FACE_DETECTION_SCALE=0.5
 ORACLE_FACE_DETECTION_INTERVAL=2
+ORACLE_HAAR_CASCADE_DIR=/usr/share/opencv4/haarcascades
 ```
 
-더 가볍게 하려면 `ORACLE_FRAME_WIDTH=320`, `ORACLE_FRAME_HEIGHT=240`, `ORACLE_FACE_DETECTION_SCALE=1.0`으로 낮춰도 됩니다. 눈/눈썹 품질검사는 매 프레임이 아니라 얼굴이 2초 이상 유지된 뒤 캡처 직전에만 실행합니다.
+더 가볍게 하려면 `ORACLE_FRAME_WIDTH=320`, `ORACLE_FRAME_HEIGHT=240`, `ORACLE_FACE_DETECTION_SCALE=1.0`으로 낮춰도 됩니다. 눈/눈썹 품질검사는 매 프레임이 아니라 얼굴이 2초 이상 유지된 뒤 캡처 직전에만 실행합니다. apt OpenCV에서 `cv2.data`가 없으면 `opencv-data` 패키지의 `/usr/share/opencv4/haarcascades`를 사용하거나 `ORACLE_HAAR_CASCADE_DIR`로 직접 지정합니다.
 
 캡처만 실행:
 

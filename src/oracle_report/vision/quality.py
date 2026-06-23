@@ -5,7 +5,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from oracle_report.models import FaceBox, FaceQuality
-from oracle_report.vision.detection import _import_cv2
+from oracle_report.vision.detection import _import_cv2, resolve_haar_cascade_path
 
 
 class FaceQualityAnalyzer(Protocol):
@@ -22,11 +22,15 @@ class OpenCvFaceQualityAnalyzer:
         self._cv2 = _import_cv2()
         self._eye_min_count = eye_min_count
         self._eyebrow_min_edge_density = eyebrow_min_edge_density
+        eye_cascade_path = resolve_haar_cascade_path(
+            self._cv2,
+            "haarcascade_eye_tree_eyeglasses.xml",
+        )
         self._eye_cascade = self._cv2.CascadeClassifier(
-            self._cv2.data.haarcascades + "haarcascade_eye_tree_eyeglasses.xml",
+            str(eye_cascade_path),
         )
         if self._eye_cascade.empty():
-            raise RuntimeError("failed to load eye cascade")
+            raise RuntimeError(f"failed to load eye cascade: {eye_cascade_path}")
 
     def analyze(self, frame: np.ndarray, face: FaceBox) -> FaceQuality:
         face_roi = _crop(frame, face)
