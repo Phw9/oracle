@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oracle-report"
+version = "0.1.0"
+description = "Raspberry Pi face-capture, physiognomy, and saju report harness"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Hyunwoo Park" }
+]
+dependencies = [
+    "Flask>=3.0",
+    "numpy>=1.23",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+camera = [
+    "opencv-python>=4.8",
+]
+pi = [
+    "opencv-python>=4.8",
+]
+quality = [
+    "mediapipe>=0.10",
+]
+test = [
+    "pytest>=7.0",
+]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+oracle-report = "oracle_report.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"

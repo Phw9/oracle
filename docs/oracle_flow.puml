@@ -1,0 +1,80 @@
+@startuml
+title Oracle On-Device Flow
+
+start
+:./run.sh 실행;
+:run.sh 상단 설정 적용\n- Flask host/port\n- 로컬 LLM 서버 주소\n- 모델 경로\n- 카메라/DB 경로;
+
+if (llama.cpp 서버 준비됨?) then (yes)
+else (no)
+  if (ORACLE_START_LLAMA_SERVER=1?) then (yes)
+    :llama-server 자동 시작;
+  else (no)
+    :오류 안내 후 종료;
+    stop
+  endif
+endif
+
+:Flask UI 시작;
+:사용자가 메뉴 선택;
+
+if (개인 리포트?) then (yes)
+  :이름, 생년월일, 성별,\n태어난 시간(선택), 추천 대상 성별 입력;
+
+  fork
+    :사주 DB 조회;
+    if (캐시 존재?) then (yes)
+      :캐시된 만세력/사주 정보 사용;
+    else (no)
+      :사주 룰엔진 계산;
+      :SQLite 사주 캐시에 저장;
+    endif
+  fork again
+    repeat
+      :단일 얼굴 카메라 캡처 시도;
+      :OpenCV Haar 얼굴 탐지;
+      :2초 안정화 및 품질 검사;
+    repeat while (얼굴 1명과 품질 통과?) is (no)
+    :capture.jpg 저장;
+  end fork
+
+  :캡처 이미지를 관상 LLM에 입력;
+  :관상정보를 정해진 형식으로 생성;
+  :내부 얼굴 추천 DB 조회;
+  :사주 + 관상정보 + 추천 후보를\n최종 리포트 LLM에 입력;
+  :개인 종합 리포트 저장 및 화면 출력;
+
+else (두 사람 궁합)
+  :두 사람 개인정보 입력\n- 첫 번째 사람\n- 두 번째 사람\n- 궁합 모드;
+
+  fork
+    :첫 번째 사람 사주 DB 조회;
+    :두 번째 사람 사주 DB 조회;
+  fork again
+    repeat
+      :첫 번째 사람 단일 얼굴 캡처 시도;
+      :OpenCV Haar 얼굴 탐지;
+      :2초 안정화 및 품질 검사;
+    repeat while (첫 번째 얼굴 품질 통과?) is (no)
+    :person_1/capture.jpg 저장;
+    :3초 대기;
+    repeat
+      :두 번째 사람 단일 얼굴 캡처 시도;
+      :OpenCV Haar 얼굴 탐지;
+      :2초 안정화 및 품질 검사;
+    repeat while (두 번째 얼굴 품질 통과?) is (no)
+    :person_2/capture.jpg 저장;
+  end fork
+
+  :첫 번째 캡처 이미지를 관상 LLM에 입력;
+  :첫 번째 관상정보 생성;
+  :두 번째 캡처 이미지를 관상 LLM에 입력;
+  :두 번째 관상정보 생성;
+  :두 사람 사주 + 두 사람 관상정보 + 관계 모드를\n최종 리포트 LLM에 입력;
+  :연인/친구/직장동료 궁합 리포트 저장 및 화면 출력;
+endif
+
+:세션 결과는 runs/ 아래 저장;
+stop
+
+@enduml

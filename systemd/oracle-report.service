@@ -1,0 +1,16 @@
+[Unit]
+Description=Oracle on-device Flask app
+After=network-online.target llama-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/willtek/work/oracle
+EnvironmentFile=-/home/willtek/work/oracle/.env
+ExecStart=/home/willtek/work/oracle/run.sh
+Restart=on-failure
+RestartSec=5
+User=willtek
+
+[Install]
+WantedBy=multi-user.target
