@@ -35,6 +35,7 @@ COMPATIBILITY_MODES = ("연인", "친구", "직장동료")
 FACE_ANALYSIS_MODE_LLM_IMAGE = 1
 FACE_ANALYSIS_MODE_LANDMARK_RULE = 2
 FACE_ANALYSIS_MODES = (FACE_ANALYSIS_MODE_LLM_IMAGE, FACE_ANALYSIS_MODE_LANDMARK_RULE)
+_UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
 _T = TypeVar("_T")
 
 
@@ -665,11 +666,7 @@ def _build_birth_profile(
     cleaned_gender = gender.strip()
     if cleaned_gender == "":
         raise ValueError("성별은 남성 또는 여성으로 입력해야 합니다.")
-    cleaned_time = birth_time.strip()
-    birth_time_known = cleaned_time != ""
-    time_text = cleaned_time
-    if not birth_time_known:
-        time_text = "12:00"
+    time_text, birth_time_known = _normalize_birth_time(birth_time)
     birth_datetime = datetime.strptime(
         f"{birth_date.strip()} {time_text}",
         "%Y-%m-%d %H:%M",
@@ -680,6 +677,16 @@ def _build_birth_profile(
         gender=cleaned_gender,
         birth_time_known=birth_time_known,
     )
+    return result
+
+
+def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
+    cleaned_time = birth_time.strip()
+    birth_time_known = cleaned_time.lower() not in _UNKNOWN_BIRTH_TIME_VALUES
+    time_text = cleaned_time
+    if not birth_time_known:
+        time_text = "12:00"
+    result = (time_text, birth_time_known)
     return result
 
 

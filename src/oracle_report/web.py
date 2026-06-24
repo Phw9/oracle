@@ -349,12 +349,13 @@ def _personal_form() -> str:
     mode_options = _face_analysis_mode_options()
     gender_options = _gender_options(required=True)
     target_gender_options = _gender_options(required=False)
+    birth_time_options = _birth_time_options()
     result = f"""
     <form method="post" class="panel workflow-form" data-workflow-api="/api/personal">
       <h2>개인 리포트</h2>
       <label>이름<input name="name" required></label>
       <label>생년월일<input name="birth_date" type="date" required></label>
-      <label>태어난 시간<span class="hint">선택</span><input name="birth_time" type="time"></label>
+      <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="birth_time">{birth_time_options}</select></label>
       <label>성별<select name="gender" required>{gender_options}</select></label>
       <label>추천받고 싶은 얼굴 성별<select name="target_gender">{target_gender_options}</select></label>
       <label>관상 분석 모드<select name="face_analysis_mode">{mode_options}</select></label>
@@ -371,6 +372,7 @@ def _compatibility_form() -> str:
         for mode in COMPATIBILITY_MODES
     )
     gender_options = _gender_options(required=True)
+    birth_time_options = _birth_time_options()
     face_mode_options = _face_analysis_mode_options()
     result = f"""
     <form method="post" class="panel workflow-form" data-workflow-api="/api/compatibility">
@@ -380,14 +382,14 @@ def _compatibility_form() -> str:
           <legend>첫 번째 사람</legend>
           <label>이름<input name="left_name" required></label>
           <label>생년월일<input name="left_birth_date" type="date" required></label>
-          <label>태어난 시간<span class="hint">선택</span><input name="left_birth_time" type="time"></label>
+          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
           <label>성별<select name="left_gender" required>{gender_options}</select></label>
         </fieldset>
         <fieldset>
           <legend>두 번째 사람</legend>
           <label>이름<input name="right_name" required></label>
           <label>생년월일<input name="right_birth_date" type="date" required></label>
-          <label>태어난 시간<span class="hint">선택</span><input name="right_birth_time" type="time"></label>
+          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
           <label>성별<select name="right_gender" required>{gender_options}</select></label>
         </fieldset>
       </div>
@@ -410,6 +412,29 @@ def _gender_options(required: bool) -> str:
       <option value="남성">남성</option>
       <option value="여성">여성</option>
     """
+    return result
+
+
+def _birth_time_options() -> str:
+    options = (
+        ("", "모름"),
+        ("00:00", "자시 (23:00-00:59)"),
+        ("02:00", "축시 (01:00-02:59)"),
+        ("04:00", "인시 (03:00-04:59)"),
+        ("06:00", "묘시 (05:00-06:59)"),
+        ("08:00", "진시 (07:00-08:59)"),
+        ("10:00", "사시 (09:00-10:59)"),
+        ("12:00", "오시 (11:00-12:59)"),
+        ("14:00", "미시 (13:00-14:59)"),
+        ("16:00", "신시 (15:00-16:59)"),
+        ("18:00", "유시 (17:00-18:59)"),
+        ("20:00", "술시 (19:00-20:59)"),
+        ("22:00", "해시 (21:00-22:59)"),
+    )
+    result = "\n".join(
+        f'<option value="{escape(value)}">{escape(label)}</option>'
+        for value, label in options
+    )
     return result
 
 

@@ -104,6 +104,7 @@ def test_personal_workflow_runs_without_real_camera_or_llm(
     assert result.output_path.name == "personal_report.html"
     assert result.report_html.startswith("<!DOCTYPE html>")
     assert "oracle-report" in result.report_fragment_html
+    assert "시간 미상" in result.report_html
     assert "테스트 핵심 문장" in result.report_html
     assert len(result.recommendations) > 0
 
@@ -114,7 +115,7 @@ def test_personal_workflow_uses_rule_based_face_mode(tmp_path: Path) -> None:
     workflow_input = PersonalWorkflowInput(
         name="홍길동",
         birth_date="1995-03-15",
-        birth_time="",
+        birth_time="모름",
         gender="남성",
         target_gender="여성",
         face_analysis_mode=2,
@@ -135,6 +136,7 @@ def test_personal_workflow_uses_rule_based_face_mode(tmp_path: Path) -> None:
     assert "랜드마크 룰 기반" in result.face_analysis
     assert result.output_path.suffix == ".html"
     assert "oracle-report" in result.report_html
+    assert "시간 미상" in result.report_html
 
 
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:

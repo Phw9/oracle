@@ -67,7 +67,7 @@ def test_prompt_command_prints_saju_reading(capsys, tmp_path: Path) -> None:
             "--birth-date",
             "1995-03-15",
             "--birth-time",
-            "14:30",
+            "모름",
             "--gender",
             "male",
             "--manse-db",
@@ -96,7 +96,7 @@ def test_prompt_command_prints_personal_final_prompt(
             "--birth-date",
             "1995-03-15",
             "--birth-time",
-            "14:30",
+            "모름",
             "--gender",
             "male",
             "--target-gender",
@@ -114,6 +114,8 @@ def test_prompt_command_prints_personal_final_prompt(
 
     assert result == 0
     assert "1995-03-15" in output
+    assert "미입력" in output
+    assert "정오 기준" in output
     assert "face analysis fixture" in output
 
 
@@ -140,7 +142,7 @@ def test_prompt_command_prints_compatibility_final_prompt(
             "--right-birth-date",
             "1995-03-16",
             "--right-birth-time",
-            "09:00",
+            "모름",
             "--right-gender",
             "female",
             "--mode",
@@ -157,6 +159,8 @@ def test_prompt_command_prints_compatibility_final_prompt(
     assert result == 0
     assert "left" in output
     assert "right" in output
+    assert "미입력" in output
+    assert "정오 기준" in output
     assert "pair face analysis fixture" in output
 
 

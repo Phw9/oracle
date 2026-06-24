@@ -30,6 +30,8 @@ Raspberry Pi에서 얼굴 캡처, 관상 보조 분석, 사주/만세력 조회,
 http://<raspberry-pi-ip>:8501
 ```
 
+태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 이 경우 내부 만세력 조회는 기존 MVP 정책대로 `12:00` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
+
 ## Prompt Debugging
 
 개인 리포트 관상 분석 LLM 프롬프트 확인:
@@ -177,6 +179,11 @@ ORACLE_PROMPTS_PATH=configs/prompts.json
 
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
+
+태어난 시간 선택:
+
+- `모름`: 내부 조회는 `12:00` 오시 대표값, 리포트 표시는 시간 미상
+- `자시`부터 `해시`: 선택한 2시간 단위 시지의 대표시간으로 만세력 DB 조회
 
 ## Verification
 

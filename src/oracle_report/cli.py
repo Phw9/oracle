@@ -29,6 +29,7 @@ from oracle_report.vision.runtime import run_capture
 _DEFAULT_FACE_ANALYSIS_TEXT = "관상 분석 결과를 여기에 넣습니다."
 _DEFAULT_FACE_DB_PATH = "data/face_recommendations.sqlite"
 _DEFAULT_MANSE_DB_PATH = "data/manse.sqlite"
+_UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -214,11 +215,7 @@ def _build_prompt_text(args: argparse.Namespace) -> str:
 
 
 def _build_prompt_birth_profile(args: argparse.Namespace) -> BirthProfile:
-    birth_time = args.birth_time.strip()
-    birth_time_known = birth_time != ""
-    parse_time = birth_time
-    if not birth_time_known:
-        parse_time = "12:00"
+    parse_time, birth_time_known = _normalize_birth_time(args.birth_time)
     birth_datetime = _parse_birth_datetime(args.birth_date, parse_time)
     result = BirthProfile(
         name=args.name.strip(),
@@ -296,11 +293,7 @@ def _build_right_prompt_birth_profile(args: argparse.Namespace) -> BirthProfile:
         raise ValueError("--right-birth-date is required for compatibility-final.")
     if args.right_gender.strip() == "":
         raise ValueError("--right-gender is required for compatibility-final.")
-    birth_time = args.right_birth_time.strip()
-    birth_time_known = birth_time != ""
-    parse_time = birth_time
-    if not birth_time_known:
-        parse_time = "12:00"
+    parse_time, birth_time_known = _normalize_birth_time(args.right_birth_time)
     birth_datetime = _parse_birth_datetime(args.right_birth_date, parse_time)
     result = BirthProfile(
         name=args.right_name.strip(),
@@ -332,6 +325,16 @@ def _read_text_option(
         result = inline_text
     if file_path is not None:
         result = file_path.read_text(encoding="utf-8")
+    return result
+
+
+def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
+    cleaned_time = birth_time.strip()
+    birth_time_known = cleaned_time.lower() not in _UNKNOWN_BIRTH_TIME_VALUES
+    parse_time = cleaned_time
+    if not birth_time_known:
+        parse_time = "12:00"
+    result = (parse_time, birth_time_known)
     return result
 
 

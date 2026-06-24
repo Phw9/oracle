@@ -209,7 +209,11 @@ def _build_personal_report_view(
         f"{_POLARITY_HANJA.get(chart.day.polarity, chart.day.polarity)}"
         f"{_ELEMENT_HANJA[day_element]}"
     )
-    birth_text = profile.birth_datetime.strftime("%Y. %m. %d · %H:%M")
+    birth_date_text = profile.birth_datetime.strftime("%Y. %m. %d")
+    birth_time_text = profile.birth_datetime.strftime("%H:%M")
+    if not profile.birth_time_known:
+        birth_time_text = "시간 미상 (정오 보조 기준)"
+    birth_text = f"{birth_date_text} · {birth_time_text}"
     meta = f"{birth_text} · {profile.gender or '성별 미입력'} · 양력"
     essence = _payload_text(
         payload,
