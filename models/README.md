@@ -6,16 +6,6 @@ existing repo model before attempting any download.
 
 ## Default Runtime Model
 
-- Source: `unsloth/gemma-4-E2B-it-GGUF`
-- File: `gemma-4-E2B-it-UD-IQ2_M.gguf`
-- URL: `https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-IQ2_M.gguf`
-- Size: `2,290,858,112` bytes
-- SHA256: `60f84cb5b9512175f219506da4a5d98d30b112855c474a3a6f06f6596dc7fd9b`
-- License: Apache-2.0
-- Path: `models/model.gguf`
-
-## Extra Raspberry Pi Model
-
 - Source: `unsloth/gemma-3-1b-it-GGUF`
 - File: `gemma-3-1b-it-Q4_0.gguf`
 - URL: `https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_0.gguf`

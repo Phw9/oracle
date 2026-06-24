@@ -21,7 +21,7 @@ RUN_ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS="${RUN_ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS:-
 RUN_ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="${RUN_ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS:-1800}"
 
 RUN_ORACLE_START_LLAMA_SERVER="${RUN_ORACLE_START_LLAMA_SERVER:-1}"
-RUN_ORACLE_LLAMA_MODEL_PATH="${RUN_ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/model.gguf}"
+RUN_ORACLE_LLAMA_MODEL_PATH="${RUN_ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf}"
 RUN_ORACLE_LLAMA_SERVER_BIN="${RUN_ORACLE_LLAMA_SERVER_BIN:-llama-server}"
 RUN_LLAMA_CONTEXT_SIZE="${RUN_LLAMA_CONTEXT_SIZE:-4096}"
 
@@ -45,10 +45,10 @@ DEPS_DIR="${ORACLE_DEPS_DIR:-$ROOT_DIR/.deps}"
 LLAMA_CPP_DIR="${ORACLE_LLAMA_CPP_DIR:-$DEPS_DIR/llama.cpp}"
 LLAMA_LOG_DIR="$ROOT_DIR/runs/logs"
 LLAMA_PID_FILE="$ROOT_DIR/runs/llama-server.pid"
-PACKAGED_MODEL_URL="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-IQ2_M.gguf"
-PACKAGED_MODEL_SHA256="60f84cb5b9512175f219506da4a5d98d30b112855c474a3a6f06f6596dc7fd9b"
 GEMMA3_1B_Q4_MODEL_URL="https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_0.gguf"
 GEMMA3_1B_Q4_MODEL_SHA256="27ee88e03be02e9ba73def9a819d570d8ad73716e50769e87f374ae394b0276e"
+PACKAGED_MODEL_URL="$GEMMA3_1B_Q4_MODEL_URL"
+PACKAGED_MODEL_SHA256="$GEMMA3_1B_Q4_MODEL_SHA256"
 
 log() {
   printf '[run] %s\n' "$*"
@@ -272,10 +272,7 @@ known_repo_model_hash_for_path() {
   model_path="$1"
   model_name="${model_path##*/}"
   result=""
-  if [[ "$model_name" == "model.gguf" ||
-    "$model_name" == "gemma-4-E2B-it-UD-IQ2_M.gguf" ]]; then
-    result="$PACKAGED_MODEL_SHA256"
-  elif [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+  if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
     result="$GEMMA3_1B_Q4_MODEL_SHA256"
   fi
   printf '%s\n' "$result"
@@ -322,7 +319,18 @@ ensure_model_file() {
   if [[ -z "$model_path" ]]; then
     fail "set ORACLE_LLAMA_MODEL_PATH in .env to an existing .gguf model"
   fi
+  if [[ "${model_path##*/}" == "model.gguf" ]]; then
+    log "models/model.gguf is a legacy default; using Gemma 3 1B Q4"
+    model_path="$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf"
+    export ORACLE_LLAMA_MODEL_PATH="$model_path"
+  fi
   if [[ -f "$model_path" ]]; then
+    verify_model_hash "$model_path"
+    return
+  fi
+
+  if [[ "${model_path##*/}" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+    download_model_file "$model_path"
     verify_model_hash "$model_path"
     return
   fi

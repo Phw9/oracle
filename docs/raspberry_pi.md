@@ -51,15 +51,8 @@ ORACLE_SKIP_TESTS=1 ./build.sh
 ```
 
 모델은 `.env`의 URL에서 직접 다운로드합니다. 기본 실행 모델은
-`models/model.gguf`이고, 추가로 더 가벼운 Gemma 3 1B Q4_0 모델을
-`models/gemma-3-1b-it-Q4_0.gguf`에 받습니다. 다운로드가 끊기면 각 `.tmp`
-파일에서 이어받습니다.
-
-Gemma 3 1B Q4_0으로 실행하려면 아래처럼 모델 경로를 바꿉니다.
-
-```bash
-RUN_ORACLE_LLAMA_MODEL_PATH=/home/willtek/work/oracle/models/gemma-3-1b-it-Q4_0.gguf ./run.sh
-```
+Gemma 3 1B Q4_0이고, `models/gemma-3-1b-it-Q4_0.gguf`에 받습니다.
+다운로드가 끊기면 각 `.tmp` 파일에서 이어받습니다.
 
 웹에서 리포트 촬영 시작을 누르면 캡처 루프가 만든 영상을 바로 보여줍니다.
 정면/가림 조건이 좋으면 초록색 `correct`, 정면이 아니거나 가림이 많으면
@@ -71,7 +64,7 @@ MediaPipe FaceMesh 박스와 랜드마크 점을 함께 그립니다.
 텍스트 전용 모델:
 
 ```bash
-llama-server -m /home/willtek/work/oracle/models/model.gguf --host 127.0.0.1 --port 8080 -c 4096
+llama-server -m /home/willtek/work/oracle/models/gemma-3-1b-it-Q4_0.gguf --host 127.0.0.1 --port 8080 -c 4096
 ```
 
 비전 모델을 쓸 때는 해당 모델의 llama.cpp 문서에 맞춰 projector/mmproj 옵션을 함께 지정합니다. 텍스트 전용 서버에서는 `.env`에 아래 값을 둡니다.
