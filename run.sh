@@ -403,8 +403,18 @@ needs_llm_server() {
   result=0
   if [[ "$#" -gt 0 ]]; then
     case "$1" in
-      capture | --help | -h)
+      capture | prompt | --help | -h)
         result=1
+        ;;
+      prompt-run)
+        case "${2:-}" in
+          saju-reading | --help | -h | "")
+            result=1
+            ;;
+          *)
+            result=0
+            ;;
+        esac
         ;;
       *)
         result=0
