@@ -41,18 +41,24 @@ pip install -e ".[test]"
 cp .env.example .env
 ```
 
-모델 다운로드를 나중에 하려면 클론할 때 LFS smudge를 끕니다.
+`./build.sh`를 쓰면 필요한 apt 패키지, Python venv, llama.cpp 빌드, 모델
+다운로드를 한 번에 준비합니다.
 
 ```bash
-GIT_LFS_SKIP_SMUDGE=1 git clone <repo-url> oracle
 cd /home/willtek/work/oracle
-ORACLE_SKIP_MODEL_DOWNLOAD=1 ORACLE_SKIP_TESTS=1 ./build.sh
+ORACLE_SKIP_TESTS=1 ./build.sh
 ```
 
-이 모드는 Git LFS의 `models/model.gguf.part01`, `models/model.gguf.part02`
-다운로드를 건너뜁니다. 앱을 로컬 LLM으로 실행하려면 나중에 `git lfs pull
---include "models/model.gguf.part*"`를 실행하거나 다른 장비에서 준비한
-`models/model.gguf`를 복사해야 합니다.
+모델은 `.env`의 URL에서 직접 다운로드합니다. 기본 실행 모델은
+`models/model.gguf`이고, 추가로 더 가벼운 Gemma 3 1B Q4_0 모델을
+`models/gemma-3-1b-it-Q4_0.gguf`에 받습니다. 다운로드가 끊기면 각 `.tmp`
+파일에서 이어받습니다.
+
+Gemma 3 1B Q4_0으로 실행하려면 아래처럼 모델 경로를 바꿉니다.
+
+```bash
+RUN_ORACLE_LLAMA_MODEL_PATH=/home/willtek/work/oracle/models/gemma-3-1b-it-Q4_0.gguf ./run.sh
+```
 
 ## llama.cpp Server
 

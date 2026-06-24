@@ -7,7 +7,11 @@ cd "$ROOT_DIR"
 VENV_DIR="${ORACLE_VENV_DIR:-$ROOT_DIR/.venv}"
 DEPS_DIR="${ORACLE_DEPS_DIR:-$ROOT_DIR/.deps}"
 LLAMA_CPP_DIR="${ORACLE_LLAMA_CPP_DIR:-$DEPS_DIR/llama.cpp}"
+PACKAGED_MODEL_URL="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-IQ2_M.gguf"
 PACKAGED_MODEL_SHA256="60f84cb5b9512175f219506da4a5d98d30b112855c474a3a6f06f6596dc7fd9b"
+GEMMA3_1B_Q4_MODEL_PATH="$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf"
+GEMMA3_1B_Q4_MODEL_URL="https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_0.gguf"
+GEMMA3_1B_Q4_MODEL_SHA256="27ee88e03be02e9ba73def9a819d570d8ad73716e50769e87f374ae394b0276e"
 
 log() {
   printf '[build] %s\n' "$*"
@@ -189,93 +193,149 @@ ensure_env_file() {
   fi
 }
 
+load_env() {
+  if [[ -f "$ROOT_DIR/.env" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/.env"
+    set +a
+  fi
+}
+
 ensure_runtime_dirs() {
   mkdir -p "$ROOT_DIR/data" "$ROOT_DIR/models" "$ROOT_DIR/runs"
   log "runtime directories ready"
 }
 
-is_lfs_pointer_file() {
-  local file_path
-  file_path="$1"
-  [[ -f "$file_path" ]] &&
-    head -n 1 "$file_path" 2>/dev/null |
-      grep -q 'version https://git-lfs.github.com/spec/v1'
-}
-
-git_lfs_ready() {
-  git lfs version >/dev/null 2>&1
-}
-
-verify_model_hash() {
+default_model_url_for_path() {
   local model_path
-  local actual_hash
+  local model_name
+  local result
   model_path="$1"
+  model_name="${model_path##*/}"
+  result="$PACKAGED_MODEL_URL"
+  if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+    result="$GEMMA3_1B_Q4_MODEL_URL"
+  fi
+  printf '%s\n' "$result"
+}
+
+default_model_hash_for_path() {
+  local model_path
+  local model_name
+  local result
+  model_path="$1"
+  model_name="${model_path##*/}"
+  result="$PACKAGED_MODEL_SHA256"
+  if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+    result="$GEMMA3_1B_Q4_MODEL_SHA256"
+  fi
+  printf '%s\n' "$result"
+}
+
+configured_model_url_for_path() {
+  local model_path
+  local configured_url
+  local result
+  model_path="$1"
+  configured_url="${ORACLE_LLAMA_MODEL_URL:-}"
+  result="$(default_model_url_for_path "$model_path")"
+  if [[ -n "$configured_url" && "$configured_url" != "$PACKAGED_MODEL_URL" ]]; then
+    result="$configured_url"
+  fi
+  printf '%s\n' "$result"
+}
+
+configured_model_hash_for_path() {
+  local model_path
+  local configured_hash
+  local result
+  model_path="$1"
+  configured_hash="${ORACLE_LLAMA_MODEL_SHA256:-}"
+  result="$(default_model_hash_for_path "$model_path")"
+  if [[ -n "$configured_hash" && "$configured_hash" != "$PACKAGED_MODEL_SHA256" ]]; then
+    result="$configured_hash"
+  fi
+  printf '%s\n' "$result"
+}
+
+verify_file_hash() {
+  local file_path
+  local expected_hash
+  local actual_hash
+  file_path="$1"
+  expected_hash="$2"
+  if [[ -z "$expected_hash" ]]; then
+    return
+  fi
   if ! command_exists sha256sum; then
     return
   fi
-  actual_hash="$(sha256sum "$model_path" | awk '{print $1}')"
-  if [[ "$actual_hash" != "$PACKAGED_MODEL_SHA256" ]]; then
-    fail "model checksum mismatch for $model_path"
+  actual_hash="$(sha256sum "$file_path" | awk '{print $1}')"
+  if [[ "$actual_hash" != "$expected_hash" ]]; then
+    fail "checksum mismatch for $file_path; expected $expected_hash, got $actual_hash"
   fi
 }
 
-packaged_model_parts_ready() {
-  local parts=("$ROOT_DIR"/models/model.gguf.part*)
-  local part
-  local result
-  result=0
-  if [[ ! -f "${parts[0]}" ]]; then
-    result=1
-  else
-    for part in "${parts[@]}"; do
-      if is_lfs_pointer_file "$part"; then
-        result=1
-      fi
-    done
-  fi
-  return "$result"
-}
-
-assemble_packaged_model() {
+download_model_file() {
   local model_path
   local model_tmp_path
-  local parts=("$ROOT_DIR"/models/model.gguf.part*)
+  local model_url
+  local model_hash
   model_path="$1"
+  model_url="$2"
+  model_hash="$3"
   model_tmp_path="${model_path}.tmp"
-  packaged_model_parts_ready ||
-    fail "packaged model parts are missing; run git lfs pull --include 'models/model.gguf.part*'"
+  command_exists curl || fail "curl is required to download the packaged GGUF model"
   mkdir -p "$(dirname "$model_path")"
-  log "assembling packaged GGUF model at $model_path"
-  cat "${parts[@]}" >"$model_tmp_path"
+  log "downloading packaged GGUF model from $model_url"
+  curl --fail --location --continue-at - --retry 5 --retry-delay 2 \
+    --retry-all-errors --output "$model_tmp_path" "$model_url"
+  verify_file_hash "$model_tmp_path" "$model_hash"
   mv "$model_tmp_path" "$model_path"
-  verify_model_hash "$model_path"
+  log "model file ready at $model_path"
 }
 
-ensure_model_file() {
+ensure_model_file_at() {
   local model_path
-  model_path="${ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/model.gguf}"
-  if [[ -f "$model_path" ]] && ! is_lfs_pointer_file "$model_path"; then
-    verify_model_hash "$model_path"
+  local model_url
+  local model_hash
+  model_path="$1"
+  model_url="$2"
+  model_hash="$3"
+  if [[ -f "$model_path" ]]; then
+    verify_file_hash "$model_path" "$model_hash"
     log "model file ready at $model_path"
     return
   fi
 
-  if [[ "${ORACLE_SKIP_MODEL_DOWNLOAD:-0}" == "1" ]]; then
-    log "skipping packaged GGUF model download because ORACLE_SKIP_MODEL_DOWNLOAD=1"
+  download_model_file "$model_path" "$model_url" "$model_hash"
+  verify_file_hash "$model_path" "$model_hash"
+}
+
+ensure_model_file() {
+  local model_path
+  local model_url
+  local model_hash
+  model_path="${ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/model.gguf}"
+  model_url="$(configured_model_url_for_path "$model_path")"
+  model_hash="$(configured_model_hash_for_path "$model_path")"
+  ensure_model_file_at "$model_path" "$model_url" "$model_hash"
+}
+
+ensure_gemma3_1b_q4_model_file() {
+  local model_path
+  local model_url
+  local model_hash
+  if [[ "${ORACLE_DOWNLOAD_GEMMA3_1B_Q4_MODEL:-1}" != "1" ]]; then
+    log "skipping Gemma 3 1B Q4 model download"
     return
   fi
 
-  command_exists git || fail "git is required to pull the packaged GGUF model"
-  git_lfs_ready || fail "git-lfs is required to pull the packaged GGUF model"
-
-  log "pulling packaged GGUF model parts with git-lfs"
-  git lfs install --local
-  git lfs pull --include "models/model.gguf.part*"
-
-  if [[ ! -f "$model_path" ]] || is_lfs_pointer_file "$model_path"; then
-    assemble_packaged_model "$model_path"
-  fi
-  verify_model_hash "$model_path"
+  model_path="${ORACLE_GEMMA3_1B_Q4_MODEL_PATH:-$GEMMA3_1B_Q4_MODEL_PATH}"
+  model_url="${ORACLE_GEMMA3_1B_Q4_MODEL_URL:-$GEMMA3_1B_Q4_MODEL_URL}"
+  model_hash="${ORACLE_GEMMA3_1B_Q4_MODEL_SHA256:-$GEMMA3_1B_Q4_MODEL_SHA256}"
+  ensure_model_file_at "$model_path" "$model_url" "$model_hash"
 }
 
 ensure_manse_db() {
@@ -316,7 +376,6 @@ main() {
     python3-pip \
     python3-opencv \
     opencv-data \
-    git-lfs \
     libatlas-base-dev \
     git \
     cmake \
@@ -327,8 +386,10 @@ main() {
   ensure_python_env
   ensure_llama_cpp
   ensure_env_file
+  load_env
   ensure_runtime_dirs
   ensure_model_file
+  ensure_gemma3_1b_q4_model_file
   ensure_manse_db
   run_verification
   log "build complete"

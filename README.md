@@ -41,7 +41,7 @@ cd /home/willtek/work/oracle
 - `data`, `models`, `runs` 디렉터리가 없으면 생성
 - `data/manse.sqlite` 만세력 DB가 설정 범위 기준으로 준비되어 있으면 재생성 생략
 
-테스트까지 생략해야 하는 빠른 재빌드는 `ORACLE_SKIP_TESTS=1 ./build.sh`를 사용할 수 있습니다. 라즈베리파이에서 모델 다운로드까지 건너뛰고 의존성만 빠르게 준비하려면 `ORACLE_SKIP_MODEL_DOWNLOAD=1 ORACLE_SKIP_TESTS=1 ./build.sh`를 사용합니다.
+테스트까지 생략해야 하는 빠른 재빌드는 `ORACLE_SKIP_TESTS=1 ./build.sh`를 사용할 수 있습니다.
 
 레포에는 기본 만세력 DB인 `data/manse.sqlite`가 포함됩니다. 라즈베리파이에서 `/home/willtek/work/oracle`로 클론한 뒤 별도 DB 복사 없이 바로 조회할 수 있고, `./build.sh`는 파일의 범위와 행 수가 맞으면 생성을 건너뜁니다.
 
@@ -62,11 +62,15 @@ cd /home/willtek/work/oracle
 
 `run.sh` 맨 위의 설정 블록에서 Flask host/port, 로컬 LLM 서버 주소, 모델 경로, 카메라 해상도, DB 경로를 수정할 수 있습니다. 기본 UI 주소는 `http://0.0.0.0:8501`입니다.
 
-기본 모델 위치는 `/home/willtek/work/oracle/models/model.gguf`입니다. 레포에는 Gemma 4 E2B 계열의 경량 GGUF인 `unsloth/gemma-4-E2B-it-GGUF`의 `gemma-4-E2B-it-UD-IQ2_M.gguf`를 Git LFS part 파일로 포함합니다. 다른 경로를 쓰려면 `run.sh` 상단의 `RUN_ORACLE_LLAMA_MODEL_PATH`를 수정합니다.
+기본 모델 위치는 `/home/willtek/work/oracle/models/model.gguf`입니다. `./build.sh`는 기본 실행 모델인 Gemma 4 E2B 계열 `gemma-4-E2B-it-UD-IQ2_M.gguf`와 추가 경량 모델인 Gemma 3 1B `gemma-3-1b-it-Q4_0.gguf`를 Hugging Face 직접 URL에서 다운로드하고 SHA256을 검증합니다. 다른 경로를 쓰려면 `run.sh` 상단의 `RUN_ORACLE_LLAMA_MODEL_PATH`를 수정합니다.
 
-모델 파일은 약 2.29GB라 GitHub LFS 단일 파일 한도를 넘습니다. 그래서 `models/model.gguf.part01`, `models/model.gguf.part02`를 LFS로 저장하고, `./build.sh` 또는 `./run.sh`가 `models/model.gguf`로 재조립합니다.
+모델 파일은 기본 E2B가 약 2.29GB, Gemma 3 1B Q4_0이 약 722MB입니다. 다운로드가 중간에 끊기면 각 `.tmp` 파일을 기준으로 이어받고, 완료 후에만 최종 `.gguf`로 교체합니다. 기본 URL이나 해시를 바꾸려면 `.env`의 `ORACLE_LLAMA_MODEL_URL`, `ORACLE_LLAMA_MODEL_SHA256`, `ORACLE_GEMMA3_1B_Q4_MODEL_URL`, `ORACLE_GEMMA3_1B_Q4_MODEL_SHA256`을 수정합니다.
 
-느린 보드에서는 `GIT_LFS_SKIP_SMUDGE=1 git clone <repo-url> oracle`로 LFS 자동 다운로드를 막은 뒤, 필요할 때만 `git lfs pull --include "models/model.gguf.part*"`를 실행하거나 다른 장비에서 받은 `models/model.gguf`를 복사합니다. `ORACLE_SKIP_MODEL_DOWNLOAD=1`을 설정하면 `./build.sh`는 모델 없이 완료되고, `./run.sh`는 모델이 없을 때 자동 다운로드하지 않고 명확히 실패합니다.
+Gemma 3 1B Q4_0을 실행 모델로 쓰려면 아래처럼 경로만 바꿔 실행합니다.
+
+```bash
+RUN_ORACLE_LLAMA_MODEL_PATH=/home/willtek/work/oracle/models/gemma-3-1b-it-Q4_0.gguf ./run.sh
+```
 
 llama.cpp 서버를 직접 실행하려면 아래처럼 실행합니다.
 
