@@ -26,4 +26,7 @@ fi
   -m "$MODEL_PATH" \
   --host 127.0.0.1 \
   --port 8080 \
-  -c "${LLAMA_CONTEXT_SIZE:-4096}"
+  -c "${LLAMA_CONTEXT_SIZE:-4096}" \
+  -fa off \
+  -ctk q4_0 \
+  --reasoning-format none
