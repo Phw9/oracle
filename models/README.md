@@ -1,7 +1,8 @@
 # Oracle Local Model
 
-The GGUF models are downloaded by `./build.sh` when they are missing. `./run.sh`
-can also download the selected runtime model if it is missing.
+The GGUF models are downloaded by `./build.sh` only when no usable `*.gguf`
+model already exists under this `models/` directory. `./run.sh` also reuses an
+existing repo model before attempting any download.
 
 ## Default Runtime Model
 
@@ -25,7 +26,8 @@ can also download the selected runtime model if it is missing.
 
 The model files are not committed to this repository. `*.tmp` files are used for
 resumable downloads, and completed files are moved into place after SHA256
-verification. The default app configuration treats these as text-first models
-and sends capture metadata instead of image bytes. Use a compatible multimodal
-GGUF plus projector before setting
+verification. If a matching GGUF file is already present, the scripts verify the
+known packaged hashes and skip downloading. The default app configuration treats
+these as text-first models and sends capture metadata instead of image bytes.
+Use a compatible multimodal GGUF plus projector before setting
 `ORACLE_FACE_LLM_SEND_IMAGE=1`.

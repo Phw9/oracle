@@ -254,6 +254,51 @@ verify_model_hash() {
   fi
 }
 
+find_repo_model_file() {
+  local model_file
+  model_file=""
+  if [[ -d "$ROOT_DIR/models" ]]; then
+    model_file="$(find "$ROOT_DIR/models" -maxdepth 1 -type f -name '*.gguf' |
+      sort |
+      head -n 1)"
+  fi
+  printf '%s\n' "$model_file"
+}
+
+known_repo_model_hash_for_path() {
+  local model_path
+  local model_name
+  local result
+  model_path="$1"
+  model_name="${model_path##*/}"
+  result=""
+  if [[ "$model_name" == "model.gguf" ||
+    "$model_name" == "gemma-4-E2B-it-UD-IQ2_M.gguf" ]]; then
+    result="$PACKAGED_MODEL_SHA256"
+  elif [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+    result="$GEMMA3_1B_Q4_MODEL_SHA256"
+  fi
+  printf '%s\n' "$result"
+}
+
+verify_repo_model_file_if_known() {
+  local model_path
+  local model_hash
+  model_path="$1"
+  model_hash="$(known_repo_model_hash_for_path "$model_path")"
+  if [[ -z "$model_hash" ]]; then
+    return
+  fi
+  if ! command_exists sha256sum; then
+    return
+  fi
+  local actual_hash
+  actual_hash="$(sha256sum "$model_path" | awk '{print $1}')"
+  if [[ "$actual_hash" != "$model_hash" ]]; then
+    fail "model checksum mismatch for $model_path; expected $model_hash, got $actual_hash"
+  fi
+}
+
 download_model_file() {
   local model_path
   local model_tmp_path
@@ -272,6 +317,7 @@ download_model_file() {
 
 ensure_model_file() {
   local model_path
+  local existing_model_path
   model_path="${ORACLE_LLAMA_MODEL_PATH:-${LLAMA_MODEL:-}}"
   if [[ -z "$model_path" ]]; then
     fail "set ORACLE_LLAMA_MODEL_PATH in .env to an existing .gguf model"
@@ -280,6 +326,15 @@ ensure_model_file() {
     verify_model_hash "$model_path"
     return
   fi
+
+  existing_model_path="$(find_repo_model_file)"
+  if [[ -n "$existing_model_path" ]]; then
+    verify_repo_model_file_if_known "$existing_model_path"
+    export ORACLE_LLAMA_MODEL_PATH="$existing_model_path"
+    log "using existing repo model at $existing_model_path; skipping model download"
+    return
+  fi
+
   download_model_file "$model_path"
   verify_model_hash "$model_path"
 }
@@ -296,8 +351,8 @@ start_llama_server() {
   fi
 
   local model_path
-  model_path="${ORACLE_LLAMA_MODEL_PATH:-${LLAMA_MODEL:-}}"
   ensure_model_file
+  model_path="${ORACLE_LLAMA_MODEL_PATH:-${LLAMA_MODEL:-}}"
 
   local server_bin
   server_bin="$(find_llama_server)" ||

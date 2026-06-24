@@ -278,6 +278,41 @@ verify_file_hash() {
   fi
 }
 
+find_repo_model_file() {
+  local model_file
+  model_file=""
+  if [[ -d "$ROOT_DIR/models" ]]; then
+    model_file="$(find "$ROOT_DIR/models" -maxdepth 1 -type f -name '*.gguf' |
+      sort |
+      head -n 1)"
+  fi
+  printf '%s\n' "$model_file"
+}
+
+known_repo_model_hash_for_path() {
+  local model_path
+  local model_name
+  local result
+  model_path="$1"
+  model_name="${model_path##*/}"
+  result=""
+  if [[ "$model_name" == "model.gguf" ||
+    "$model_name" == "gemma-4-E2B-it-UD-IQ2_M.gguf" ]]; then
+    result="$PACKAGED_MODEL_SHA256"
+  elif [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+    result="$GEMMA3_1B_Q4_MODEL_SHA256"
+  fi
+  printf '%s\n' "$result"
+}
+
+verify_repo_model_file_if_known() {
+  local model_path
+  local model_hash
+  model_path="$1"
+  model_hash="$(known_repo_model_hash_for_path "$model_path")"
+  verify_file_hash "$model_path" "$model_hash"
+}
+
 download_model_file() {
   local model_path
   local model_tmp_path
@@ -318,22 +353,53 @@ ensure_model_file() {
   local model_path
   local model_url
   local model_hash
+  local existing_model_path
   model_path="${ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/model.gguf}"
+  if [[ -f "$model_path" ]]; then
+    model_hash="$(configured_model_hash_for_path "$model_path")"
+    verify_file_hash "$model_path" "$model_hash"
+    log "model file ready at $model_path"
+    return
+  fi
+
+  existing_model_path="$(find_repo_model_file)"
+  if [[ -n "$existing_model_path" ]]; then
+    verify_repo_model_file_if_known "$existing_model_path"
+    export ORACLE_LLAMA_MODEL_PATH="$existing_model_path"
+    log "using existing repo model at $existing_model_path; skipping model download"
+    return
+  fi
+
   model_url="$(configured_model_url_for_path "$model_path")"
   model_hash="$(configured_model_hash_for_path "$model_path")"
-  ensure_model_file_at "$model_path" "$model_url" "$model_hash"
+  download_model_file "$model_path" "$model_url" "$model_hash"
+  verify_file_hash "$model_path" "$model_hash"
 }
 
 ensure_gemma3_1b_q4_model_file() {
   local model_path
   local model_url
   local model_hash
+  local existing_model_path
   if [[ "${ORACLE_DOWNLOAD_GEMMA3_1B_Q4_MODEL:-1}" != "1" ]]; then
     log "skipping Gemma 3 1B Q4 model download"
     return
   fi
 
   model_path="${ORACLE_GEMMA3_1B_Q4_MODEL_PATH:-$GEMMA3_1B_Q4_MODEL_PATH}"
+  if [[ -f "$model_path" ]]; then
+    model_hash="${ORACLE_GEMMA3_1B_Q4_MODEL_SHA256:-$GEMMA3_1B_Q4_MODEL_SHA256}"
+    verify_file_hash "$model_path" "$model_hash"
+    log "model file ready at $model_path"
+    return
+  fi
+
+  existing_model_path="$(find_repo_model_file)"
+  if [[ -n "$existing_model_path" ]]; then
+    log "repo model already exists at $existing_model_path; skipping Gemma 3 1B Q4 model download"
+    return
+  fi
+
   model_url="${ORACLE_GEMMA3_1B_Q4_MODEL_URL:-$GEMMA3_1B_Q4_MODEL_URL}"
   model_hash="${ORACLE_GEMMA3_1B_Q4_MODEL_SHA256:-$GEMMA3_1B_Q4_MODEL_SHA256}"
   ensure_model_file_at "$model_path" "$model_url" "$model_hash"
