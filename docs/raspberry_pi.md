@@ -41,6 +41,19 @@ pip install -e ".[test]"
 cp .env.example .env
 ```
 
+모델 다운로드를 나중에 하려면 클론할 때 LFS smudge를 끕니다.
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone <repo-url> oracle
+cd /home/willtek/work/oracle
+ORACLE_SKIP_MODEL_DOWNLOAD=1 ORACLE_SKIP_TESTS=1 ./build.sh
+```
+
+이 모드는 Git LFS의 `models/model.gguf.part01`, `models/model.gguf.part02`
+다운로드를 건너뜁니다. 앱을 로컬 LLM으로 실행하려면 나중에 `git lfs pull
+--include "models/model.gguf.part*"`를 실행하거나 다른 장비에서 준비한
+`models/model.gguf`를 복사해야 합니다.
+
 ## llama.cpp Server
 
 텍스트 전용 모델:

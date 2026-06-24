@@ -260,6 +260,11 @@ ensure_model_file() {
     return
   fi
 
+  if [[ "${ORACLE_SKIP_MODEL_DOWNLOAD:-0}" == "1" ]]; then
+    log "skipping packaged GGUF model download because ORACLE_SKIP_MODEL_DOWNLOAD=1"
+    return
+  fi
+
   command_exists git || fail "git is required to pull the packaged GGUF model"
   git_lfs_ready || fail "git-lfs is required to pull the packaged GGUF model"
 

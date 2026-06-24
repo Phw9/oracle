@@ -242,6 +242,9 @@ ensure_model_file() {
     verify_model_hash "$model_path"
     return
   fi
+  if [[ "${ORACLE_SKIP_MODEL_DOWNLOAD:-0}" == "1" ]]; then
+    fail "model is missing or still a Git LFS pointer and ORACLE_SKIP_MODEL_DOWNLOAD=1; copy a .gguf model to $model_path or set ORACLE_START_LLAMA_SERVER=0 with a running local server"
+  fi
   if ! command_exists git || ! git lfs version >/dev/null 2>&1; then
     fail "model is missing or still a Git LFS pointer; run ./build.sh first"
   fi
