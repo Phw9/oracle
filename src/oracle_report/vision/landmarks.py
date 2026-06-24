@@ -15,6 +15,17 @@ from oracle_report.vision.physiognomy_rule_repository import (
 
 
 _LANDMARK_MODE_NAME = "랜드마크 룰 기반"
+_AUXILIARY_TEXT_REPLACEMENTS = (
+    ("보조 해석으로 넣습니다", "설명 문장으로 정리합니다"),
+    ("보조 키워드로 넣습니다", "키워드로 정리합니다"),
+    ("보조 키워드로 사용합니다", "키워드로 정리합니다"),
+    ("보조 표현을 사용합니다", "표현으로 정리합니다"),
+    ("보조 소재로 사용합니다", "설명 소재로 사용합니다"),
+    ("보조 소재로 넣습니다", "설명 소재로 정리합니다"),
+    ("보조로 사용합니다", "함께 설명합니다"),
+    ("보조로 넣습니다", "함께 설명합니다"),
+    ("보조 정보", "참고 자료"),
+)
 _MIN_POSE_SCORE = 0.50
 _FRONT_EYE_LEVEL_TOLERANCE = 0.09
 _FRONT_NOSE_CENTER_TOLERANCE = 0.35
@@ -230,19 +241,19 @@ def build_rule_based_face_analysis(metrics: LandmarkMetrics) -> str:
     detail_lines = _format_rule_details(matches)
     auxiliary_text = _format_auxiliary_interpretation(matches)
     unsupported = ", ".join(repository.unsupported_features())
-    safety_note = repository.safety_note()
+    safety_note = _clean_auxiliary_text(repository.safety_note())
     result = f"""
-## 관상정보
+## 얼굴 관찰 메모
 - 분석 모드: {_LANDMARK_MODE_NAME}
 - 참고 기준: 삼정, 오관, 십이궁, 얼굴형, 하관 비율을 랜드마크로 측정 가능한 항목에 맞춰 변환
 - 주요 태그: {tags}
 - 비율 지표: 삼정 상/중/하 {metrics.upper_zone_ratio:.2f}/{metrics.middle_zone_ratio:.2f}/{metrics.lower_zone_ratio:.2f}, 삼정 편차 {metrics.third_balance_error:.2f}, 얼굴 세로/가로 {metrics.face_aspect_ratio:.2f}, 미간 {metrics.eye_spacing_ratio:.2f}, 눈썹/눈 폭 {metrics.brow_eye_span_ratio:.2f}, 코 폭 {metrics.nose_width_ratio:.2f}, 입 폭 {metrics.mouth_width_ratio:.2f}, 하관 폭 {metrics.jaw_width_ratio:.2f}
 - 세부 관찰:
 {detail_lines}
-- 리포트에 넣을 보조 해석: {auxiliary_text}
+- 리포트에 넣을 설명 문장: {auxiliary_text}
 - 적용 제외 기준: {unsupported}은 현재 랜드마크만으로 안정 측정하기 어려워 룰에 넣지 않았습니다.
 - 캡처 신뢰도: 정면 점수 {metrics.frontality_score:.2f}, 랜드마크 배치 점수 {metrics.occlusion_score:.2f}
-- 주의 문구: {safety_note}
+- 참고 고지: {safety_note}
 """.strip()
     return result
 
@@ -298,6 +309,14 @@ def _format_auxiliary_interpretation(
 ) -> str:
     selected = matches[:7]
     result = " ".join(match.interpretation for match in selected)
+    result = _clean_auxiliary_text(result)
+    return result
+
+
+def _clean_auxiliary_text(text: str) -> str:
+    result = text
+    for old_text, new_text in _AUXILIARY_TEXT_REPLACEMENTS:
+        result = result.replace(old_text, new_text)
     return result
 
 

@@ -36,32 +36,32 @@ _DEFAULT_FACE_BLOCKS = (
     {
         "category": "종합 형국",
         "title": "얼굴 비율에서 보이는 첫인상",
-        "summary": "관상 정보는 보조 해석으로만 사용합니다.",
-        "body": "촬영된 얼굴의 랜드마크와 품질 정보를 바탕으로 보이는 인상만 정리했습니다.",
+        "summary": "얼굴의 세로·가로 비율과 좌우 균형을 함께 본 기본 인상입니다.",
+        "body": "얼굴 폭과 높이의 균형이 안정적으로 보이면 사람을 대할 때 정돈되고 차분한 첫인상으로 읽습니다. 어느 한 부위가 강하게 튀기보다 전체 윤곽이 고르게 보이면 리포트에서는 균형감과 신뢰감을 중심 키워드로 설명합니다.",
     },
     {
         "category": "타고난 성향과 심리",
-        "title": "표정과 눈썹 흐름",
-        "summary": "눈, 눈썹, 표정은 현재 보이는 인상입니다.",
-        "body": "얼굴 사진으로 실제 성격을 단정하지 않고, 리포트의 분위기를 보조하는 관찰로만 사용합니다.",
+        "title": "눈과 눈썹이 만드는 집중감",
+        "summary": "눈은 시선의 또렷함, 눈썹은 인상을 정돈하는 선으로 해석합니다.",
+        "body": "눈 주변이 또렷하게 보이면 생각을 빠르게 모으고 반응을 분명하게 드러내는 분위기로 풀이합니다. 눈썹이 눈을 안정적으로 감싸면 감정을 급하게 드러내기보다 정돈해서 표현하는 인상으로 설명할 수 있습니다.",
     },
     {
         "category": "재물운과 적성",
-        "title": "중정과 하관의 균형",
-        "summary": "코와 하관 비율은 전통 관상 기준의 보조 소재입니다.",
-        "body": "사주 결과와 충돌할 때는 사주 데이터가 우선이며, 얼굴 해석은 표현을 돕는 보조 설명입니다.",
+        "title": "코와 하관에서 보는 현실감",
+        "summary": "코는 중심감, 하관은 마무리와 지속성을 보는 기준입니다.",
+        "body": "코가 얼굴 중심에서 안정적으로 보이면 기준을 세우고 현실적으로 판단하려는 인상으로 읽습니다. 하관이 단정하게 이어지면 일을 끝까지 정리하려는 힘과 꾸준함을 더해 주는 요소로 풀이합니다.",
     },
     {
         "category": "연애운과 인간관계",
-        "title": "눈매와 입꼬리의 분위기",
-        "summary": "관계 해석은 실제 미래를 예측하지 않습니다.",
-        "body": "사진에서 보이는 표정 흐름을 바탕으로 편안한 소통 방향만 제안합니다.",
+        "title": "표정 안정성과 소통 방식",
+        "summary": "입꼬리와 얼굴 좌우 균형은 대화할 때의 부드러움을 보는 요소입니다.",
+        "body": "표정이 안정적으로 보이면 상대가 느끼는 긴장감을 낮추고 편안하게 대화를 시작하는 인상으로 해석합니다. 입 주변과 시선이 자연스럽게 정돈되어 보이면 관계에서는 차분하게 분위기를 맞추는 쪽으로 설명할 수 있습니다.",
     },
     {
         "category": "인생의 흐름 · 삼정",
-        "title": "상정, 중정, 하정의 균형",
-        "summary": "삼정 비율은 전체 인상의 균형을 보는 참고값입니다.",
-        "body": "이마, 얼굴 중심부, 하관의 상대 비율을 참고해 리포트의 보조 문맥을 구성합니다.",
+        "title": "이마·중안부·하관의 비율",
+        "summary": "삼정은 얼굴을 위·가운데·아래 세 구역으로 나누어 균형을 보는 전통 기준입니다.",
+        "body": "이마는 계획과 생각의 폭, 중안부는 현실감과 실행력, 하관은 마무리와 지속성을 상징하는 식으로 풀이합니다. 세 구역이 고르게 보이면 특정 시기보다 전체 흐름을 균형 있게 가져가는 인상으로 설명합니다.",
     },
 )
 _DEFAULT_SAJU_BLOCKS = (
@@ -235,7 +235,7 @@ def _build_personal_report_view(
         element_counts=reading.element_counts,
         element_note=element_note,
         pillars=_pillar_views(manse_lookup),
-        face_subtitle=_payload_text(payload, "face_subtitle", "랜드마크 · 관상 보조"),
+        face_subtitle=_payload_text(payload, "face_subtitle", "얼굴 비율 · 인상 관찰"),
         face_blocks=_payload_blocks(payload, "face_blocks", _DEFAULT_FACE_BLOCKS),
         saju_subtitle=_payload_text(
             payload,
@@ -251,7 +251,7 @@ def _build_personal_report_view(
         synth_body=_payload_text(
             payload,
             "synthesis_body",
-            "사주 데이터와 관상 보조 정보가 겹치는 지점을 중심으로 해석합니다.",
+            "사주 데이터와 얼굴 관찰 메모가 같은 방향을 가리키는 지점을 중심으로 해석합니다.",
         ),
         convergence=_payload_convergence(payload, face_analysis, reading.interpretation),
         synth_summary=_payload_text(
@@ -268,13 +268,13 @@ def _build_personal_report_view(
         recommendation_lead=_payload_text(
             payload,
             "recommendation_lead",
-            "내 얼굴과 닮은 사람보다 사주와 인상에서 부족한 리듬을 보완하는 후보를 우선 추천합니다.",
+            "내 얼굴과 닮은 사람보다 사주와 인상에서 부족한 리듬을 채워 주는 후보를 먼저 보여줍니다.",
         ),
         recommendation_cards=_recommendation_cards(recommendations),
         disclaimer=_payload_text(
             payload,
             "disclaimer",
-            "이 리포트는 관상 보조 분석과 사주/만세력 데이터를 바탕으로 생성된 재미용 콘텐츠입니다. 운명을 단정하지 않으며 참고로만 즐겨 주세요.",
+            "이 리포트는 얼굴 관찰과 사주/만세력 데이터를 바탕으로 생성된 재미용 콘텐츠입니다. 운명을 단정하지 않으며 참고로만 즐겨 주세요.",
         ),
     )
     return result
@@ -361,17 +361,17 @@ def _payload_convergence(
             if isinstance(raw_item, dict):
                 items.append(
                     _Convergence(
-                        face=_payload_text(raw_item, "face", "관상 보조 정보"),
+                        face=_payload_text(raw_item, "face", "얼굴 관찰 정보"),
                         saju=_payload_text(raw_item, "saju", "사주 데이터"),
                     ),
                 )
     if not items:
-        face_line = _first_nonempty_line(face_analysis, "관상 보조 정보")
+        face_line = _first_nonempty_line(face_analysis, "얼굴 관찰 정보")
         saju_line = _first_nonempty_line(saju_text, "사주 데이터")
         items = (
             _Convergence(face=face_line, saju=saju_line),
             _Convergence(face="얼굴 비율의 균형", saju="오행 균형의 보완점"),
-            _Convergence(face="현재 표정의 흐름", saju="생활 리듬의 조절"),
+            _Convergence(face="현재 표정의 안정감", saju="생활 리듬의 조절"),
         )
     result = tuple(items[:4])
     return result

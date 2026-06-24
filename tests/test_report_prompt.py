@@ -52,6 +52,8 @@ def test_personal_final_prompt_contains_json_schema() -> None:
     assert "\"saju_blocks\"" in prompt
     assert "사주 입력" in prompt
     assert "관상 입력" in prompt
+    assert "보조 해석" not in prompt
+    assert "주의 문구" not in prompt
 
 
 def test_prompt_template_can_be_overridden_from_json(

@@ -120,9 +120,11 @@ def test_rule_based_face_analysis_includes_auxiliary_interpretation() -> None:
     assert "삼정" in result
     assert "비율 지표" in result
     assert "세부 관찰" in result
-    assert "리포트에 넣을 보조 해석" in result
+    assert "리포트에 넣을 설명 문장" in result
     assert "적용 제외 기준" in result
-    assert "엔터테인먼트 보조 정보" in result
+    assert "엔터테인먼트" in result
+    assert "보조 해석" not in result
+    assert "보조 정보" not in result
 
 
 def _build_centered_face_landmarks(

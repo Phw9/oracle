@@ -727,7 +727,7 @@ def _fallback_personal_markdown(
 ## 사주팔자 핵심
 {saju_text}
 
-## 관상 보조 풀이
+## 얼굴 관찰 풀이
 {face_analysis}
 
 ## 추천받고 싶은 얼굴 성별 기준 추천
@@ -762,7 +762,7 @@ def _fallback_compatibility_markdown(
 ## 두 번째 사람 사주팔자
 {right_saju_text}
 
-## 관상 보조 인상 궁합
+## 얼굴 관찰로 보는 소통 분위기
 {face_analysis}
 
 ## 참고 문구
