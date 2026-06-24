@@ -676,7 +676,7 @@ def _fallback_personal_markdown(
 ## 관상 보조 풀이
 {face_analysis}
 
-## 내 관상과 궁합 좋은 이성 얼굴 추천
+## 추천받고 싶은 얼굴 성별 기준 추천
 {recommendation_text}
 
 ## 참고 문구

@@ -347,14 +347,16 @@ def _face_db_path() -> Path:
 
 def _personal_form() -> str:
     mode_options = _face_analysis_mode_options()
+    gender_options = _gender_options(required=True)
+    target_gender_options = _gender_options(required=False)
     result = f"""
     <form method="post" class="panel workflow-form" data-workflow-api="/api/personal">
       <h2>개인 리포트</h2>
       <label>이름<input name="name" required></label>
       <label>생년월일<input name="birth_date" type="date" required></label>
       <label>태어난 시간<span class="hint">선택</span><input name="birth_time" type="time"></label>
-      <label>성별<input name="gender" placeholder="예: 남성 또는 여성" required></label>
-      <label>추천받고 싶은 이성 얼굴<input name="target_gender" placeholder="예: 남성 또는 여성"></label>
+      <label>성별<select name="gender" required>{gender_options}</select></label>
+      <label>추천받고 싶은 얼굴 성별<select name="target_gender">{target_gender_options}</select></label>
       <label>관상 분석 모드<select name="face_analysis_mode">{mode_options}</select></label>
       <button type="submit">개인 리포트 촬영 시작</button>
     </form>
@@ -368,6 +370,7 @@ def _compatibility_form() -> str:
         f'<option value="{escape(mode)}">{escape(mode)}</option>'
         for mode in COMPATIBILITY_MODES
     )
+    gender_options = _gender_options(required=True)
     face_mode_options = _face_analysis_mode_options()
     result = f"""
     <form method="post" class="panel workflow-form" data-workflow-api="/api/compatibility">
@@ -378,14 +381,14 @@ def _compatibility_form() -> str:
           <label>이름<input name="left_name" required></label>
           <label>생년월일<input name="left_birth_date" type="date" required></label>
           <label>태어난 시간<span class="hint">선택</span><input name="left_birth_time" type="time"></label>
-          <label>성별<input name="left_gender" placeholder="예: 남성 또는 여성" required></label>
+          <label>성별<select name="left_gender" required>{gender_options}</select></label>
         </fieldset>
         <fieldset>
           <legend>두 번째 사람</legend>
           <label>이름<input name="right_name" required></label>
           <label>생년월일<input name="right_birth_date" type="date" required></label>
           <label>태어난 시간<span class="hint">선택</span><input name="right_birth_time" type="time"></label>
-          <label>성별<input name="right_gender" placeholder="예: 남성 또는 여성" required></label>
+          <label>성별<select name="right_gender" required>{gender_options}</select></label>
         </fieldset>
       </div>
       <label>궁합 모드<select name="mode">{mode_options}</select></label>
@@ -394,6 +397,18 @@ def _compatibility_form() -> str:
       <button type="submit">두 사람 궁합 촬영 시작</button>
     </form>
     {_capture_preview_panel()}
+    """
+    return result
+
+
+def _gender_options(required: bool) -> str:
+    first_option = '<option value="">상관없음</option>'
+    if required:
+        first_option = '<option value="" selected disabled>선택</option>'
+    result = f"""
+      {first_option}
+      <option value="남성">남성</option>
+      <option value="여성">여성</option>
     """
     return result
 
