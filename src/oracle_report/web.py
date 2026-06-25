@@ -122,7 +122,12 @@ def create_app() -> Flask:
                 body = _personal_result(workflow_result)
             except Exception as exc:
                 body = _error_panel(exc) + _personal_form()
-        result = _render_page("개인 리포트", body)
+        result = _render_page(
+            "개인 리포트",
+            body,
+            page_class="input-page",
+            show_heading=False,
+        )
         return result
 
     @app.post("/api/personal")
@@ -361,21 +366,57 @@ def _personal_form() -> str:
     target_gender_options = _gender_options(required=False)
     birth_time_options = _birth_time_options()
     result = f"""
-    <form method="post" class="panel workflow-form" data-workflow-api="/api/personal">
-      <h2>개인 리포트</h2>
-      <input type="hidden" name="skip_face" value="0">
-      <label>이름<input name="name" required></label>
-      <label>생년월일<input name="birth_date" type="date" required></label>
-      <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="birth_time">{birth_time_options}</select></label>
-      <label>성별<select name="gender" required>{gender_options}</select></label>
-      <label>추천받고 싶은 얼굴 성별<select name="target_gender">{target_gender_options}</select></label>
-      <label>관상 분석 모드<select name="face_analysis_mode">{mode_options}</select></label>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="submit" onclick="this.form.skip_face.value='0';">개인 리포트 촬영 시작</button>
-        <button type="submit" onclick="this.form.skip_face.value='1';" style="background: #4b5563; border-color: #4b5563;">관상 없이 사주만 보기</button>
+    <div class="oracle-input-shell">
+      <div class="brand">
+        <div class="logo">ORACLE</div>
+        <div class="tag">관상 &amp; 사주 리포트</div>
+        <div class="ornament"></div>
       </div>
-    </form>
-    {_capture_preview_panel()}
+
+      <div class="input-card">
+        <div class="card-head">
+          <h1>개인 리포트</h1>
+          <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
+        </div>
+
+        <form method="post" class="workflow-form input-form" data-workflow-api="/api/personal">
+          <input type="hidden" name="skip_face" value="0">
+          <div class="field lead">
+            <label>이름</label>
+            <input name="name" placeholder="이름을 입력하세요" required>
+          </div>
+          <div class="field-stack">
+            <div class="field">
+              <label>생년월일</label>
+              <input name="birth_date" type="date" required>
+            </div>
+            <div class="field">
+              <label>태어난 시간<span class="hint">모르면 '모름'을 선택하세요</span></label>
+              <select name="birth_time">{birth_time_options}</select>
+            </div>
+            <div class="field">
+              <label>성별</label>
+              <select name="gender" required>{gender_options}</select>
+            </div>
+            <div class="field">
+              <label>추천받고 싶은 얼굴 성별</label>
+              <select name="target_gender">{target_gender_options}</select>
+            </div>
+            <div class="field">
+              <label>관상 분석 모드</label>
+              <select name="face_analysis_mode">{mode_options}</select>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" onclick="this.form.skip_face.value='0';">개인 리포트 촬영 시작</button>
+            <button type="submit" class="btn btn-ghost" onclick="this.form.skip_face.value='1';">관상 없이 사주만 보기</button>
+          </div>
+        </form>
+
+        <p class="footnote">입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.</p>
+      </div>
+      {_capture_preview_panel()}
+    </div>
     """
     return result
 
@@ -465,6 +506,13 @@ def _face_analysis_mode_options() -> str:
 
 def _capture_preview_panel() -> str:
     result = """
+    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="false" hidden>
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <div>
+        <strong id="workflow-loading-title">리포트 생성 중입니다</strong>
+        <p id="workflow-loading-message" class="hint">사주 리포트 생성 중입니다. 잠시만 기다려 주세요.</p>
+      </div>
+    </section>
     <section class="panel capture-preview" hidden>
       <h2>실시간 촬영 상태</h2>
       <img id="capture-preview-image" alt="실시간 촬영 상태">
@@ -496,7 +544,15 @@ def _error_panel(exc: Exception) -> str:
     return result
 
 
-def _render_page(title: str, body: str) -> str:
+def _render_page(
+    title: str,
+    body: str,
+    *,
+    page_class: str = "",
+    show_heading: bool = True,
+) -> str:
+    main_class = f' class="{page_class}"' if page_class != "" else ""
+    heading = "<h1>Oracle</h1>" if show_heading else ""
     result = f"""
     <!doctype html>
     <html lang="ko">
@@ -504,20 +560,46 @@ def _render_page(title: str, body: str) -> str:
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{escape(title)}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Song+Myung&display=swap" rel="stylesheet">
         <style>
           :root {{
             color-scheme: light;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #f5f5f2;
-            color: #202124;
+            --paper: #f6f1e7;
+            --paper-2: #fbf8f1;
+            --ink: #2a2520;
+            --ink-soft: #6b6256;
+            --line: #dad0be;
+            --line-soft: #e7dece;
+            --mok: #3a7d5c;
+            --mok-deep: #2f6549;
+            --hwa: #c25239;
+            --gold: #a8823c;
+            font-family: "Gowun Dodum", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+          }}
+          * {{
+            box-sizing: border-box;
           }}
           body {{
             margin: 0;
+            min-height: 100vh;
+            background: var(--paper);
+            background-image:
+              radial-gradient(circle at 18% 8%, rgba(58, 125, 92, 0.05), transparent 42%),
+              radial-gradient(circle at 86% 26%, rgba(194, 82, 57, 0.045), transparent 42%);
+            -webkit-font-smoothing: antialiased;
           }}
           main {{
             width: min(960px, calc(100vw - 32px));
             margin: 0 auto;
             padding: 32px 0;
+          }}
+          main.input-page {{
+            width: min(860px, calc(100vw - 48px));
+            padding: 24px 0;
           }}
           h1 {{
             margin: 0 0 24px;
@@ -532,9 +614,9 @@ def _render_page(title: str, body: str) -> str:
             gap: 16px;
           }}
           .menu-card, .panel, .error {{
-            border: 1px solid #d7d5cd;
+            border: 1px solid var(--line);
             border-radius: 8px;
-            background: #ffffff;
+            background: var(--paper-2);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
           }}
           .menu-card {{
@@ -551,6 +633,90 @@ def _render_page(title: str, body: str) -> str:
           .panel {{
             padding: 20px;
           }}
+          .oracle-input-shell {{
+            width: 100%;
+          }}
+          .brand {{
+            text-align: center;
+            margin-bottom: 18px;
+          }}
+          .brand .logo {{
+            font-family: "Song Myung", serif;
+            font-size: 31px;
+            letter-spacing: 0.22em;
+            color: var(--ink);
+          }}
+          .brand .tag {{
+            font-size: 12px;
+            letter-spacing: 0.4em;
+            color: var(--gold);
+            text-transform: uppercase;
+            margin-top: 6px;
+          }}
+          .brand .ornament {{
+            margin: 12px auto 0;
+            width: 50px;
+            height: 1px;
+            background: var(--gold);
+            position: relative;
+          }}
+          .brand .ornament::before {{
+            content: "※";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--gold);
+            font-size: 13px;
+            background: var(--paper);
+            padding: 0 8px;
+          }}
+          .input-card {{
+            background: var(--paper-2);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 30px 34px 26px;
+            box-shadow: 0 14px 40px -22px rgba(46, 37, 32, 0.4);
+            position: relative;
+          }}
+          .input-card::before {{
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid var(--line-soft);
+            border-radius: 6px;
+            pointer-events: none;
+          }}
+          .card-head {{
+            position: relative;
+            text-align: center;
+            margin-bottom: 22px;
+          }}
+          .card-head h1 {{
+            font-family: "Gowun Batang", serif;
+            font-size: 23px;
+            font-weight: 700;
+            margin: 0;
+          }}
+          .card-head p {{
+            font-size: 13px;
+            color: var(--ink-soft);
+            margin: 6px 0 0;
+          }}
+          .input-form {{
+            position: relative;
+          }}
+          .field {{
+            margin-bottom: 0;
+          }}
+          .field.lead {{
+            margin-bottom: 16px;
+          }}
+          .field-stack {{
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }}
           .grid {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -562,23 +728,114 @@ def _render_page(title: str, body: str) -> str:
             padding: 16px;
           }}
           label {{
-            display: grid;
-            gap: 6px;
-            margin-bottom: 14px;
+            display: block;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            color: var(--ink);
+            margin-bottom: 8px;
             font-weight: 600;
+          }}
+          label .hint {{
+            display: block;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 11.5px;
+            font-weight: 400;
+            color: var(--ink-soft);
+            margin-top: 2px;
+            letter-spacing: 0.02em;
           }}
           input, select, button {{
             min-height: 42px;
-            border: 1px solid #c7c4bb;
-            border-radius: 6px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
             padding: 8px 10px;
             font: inherit;
           }}
+          input, select {{
+            width: 100%;
+            color: var(--ink);
+            background: #ffffff;
+            padding: 12px 15px;
+            transition: border-color 0.18s, box-shadow 0.18s;
+          }}
+          input::placeholder {{
+            color: #b6ac9c;
+          }}
+          input:focus, select:focus {{
+            outline: none;
+            border-color: var(--mok);
+            box-shadow: 0 0 0 3px rgba(58, 125, 92, 0.13);
+          }}
+          select {{
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%236B6256' stroke-width='1.6' stroke-linecap='round'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            padding-right: 38px;
+            cursor: pointer;
+          }}
+          input[type="date"] {{
+            cursor: text;
+          }}
+          input[type="date"]::-webkit-calendar-picker-indicator {{
+            cursor: pointer;
+            opacity: 0.55;
+          }}
+          .field.lead input {{
+            background: #f1f5f0;
+            border-color: #cadbcf;
+          }}
           button {{
-            border-color: #1f6feb;
-            background: #1f6feb;
-            color: #ffffff;
             font-weight: 700;
+            cursor: pointer;
+          }}
+          button:disabled {{
+            cursor: wait;
+            opacity: 0.72;
+          }}
+          .actions {{
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+          }}
+          .btn {{
+            flex: 1;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+            letter-spacing: 0.02em;
+          }}
+          .btn-primary {{
+            background: var(--mok);
+            color: #ffffff;
+            box-shadow: 0 8px 20px -10px rgba(58, 125, 92, 0.7);
+          }}
+          .btn-primary:hover {{
+            background: var(--mok-deep);
+            transform: translateY(-2px);
+          }}
+          .btn-ghost {{
+            background: transparent;
+            color: var(--ink);
+            border-color: var(--line);
+          }}
+          .btn-ghost:hover {{
+            background: #f0eadc;
+            transform: translateY(-2px);
+          }}
+          button:disabled:hover {{
+            transform: none;
+          }}
+          .footnote {{
+            position: relative;
+            text-align: center;
+            font-size: 11px;
+            color: var(--ink-soft);
+            margin: 16px 0 0;
+            line-height: 1.7;
           }}
           pre {{
             overflow: auto;
@@ -589,7 +846,7 @@ def _render_page(title: str, body: str) -> str:
             padding: 16px;
           }}
           .hint {{
-            color: #6b6f76;
+            color: var(--ink-soft);
             font-size: 13px;
             font-weight: 500;
           }}
@@ -602,6 +859,38 @@ def _render_page(title: str, body: str) -> str:
           .capture-preview {{
             margin-top: 16px;
           }}
+          .workflow-loading {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+            border-color: #b7c7aa;
+            background: #fbfdf8;
+          }}
+          .workflow-loading[hidden] {{
+            display: none;
+          }}
+          .workflow-loading strong {{
+            display: block;
+            margin-bottom: 4px;
+          }}
+          .workflow-loading p {{
+            margin: 0;
+          }}
+          .loading-spinner {{
+            width: 24px;
+            height: 24px;
+            flex: 0 0 24px;
+            border: 3px solid #d9dfd2;
+            border-top-color: #2f7d57;
+            border-radius: 999px;
+            animation: oracle-spin 0.8s linear infinite;
+          }}
+          @keyframes oracle-spin {{
+            to {{
+              transform: rotate(360deg);
+            }}
+          }}
           .capture-preview img {{
             display: block;
             width: 100%;
@@ -610,11 +899,26 @@ def _render_page(title: str, body: str) -> str:
             border-radius: 6px;
             background: #111111;
           }}
+          @media (max-width: 480px) {{
+            main.input-page {{
+              width: min(100vw - 32px, 860px);
+              padding: 34px 0;
+            }}
+            .input-card {{
+              padding: 30px 22px 26px;
+            }}
+            .actions {{
+              flex-direction: column;
+            }}
+            .brand .logo {{
+              font-size: 28px;
+            }}
+          }}
         </style>
       </head>
       <body>
-        <main>
-          <h1>Oracle</h1>
+        <main{main_class}>
+          {heading}
           {body}
         </main>
         <script>
@@ -624,16 +928,25 @@ def _render_page(title: str, body: str) -> str:
               event.preventDefault();
               const skipFaceInput = form.querySelector('[name="skip_face"]');
               const skipFace = skipFaceInput && skipFaceInput.value === "1";
+              const loading = document.getElementById("workflow-loading");
+              const loadingTitle = document.getElementById("workflow-loading-title");
+              const loadingMessage = document.getElementById("workflow-loading-message");
               const preview = document.querySelector(".capture-preview");
               const previewImage = document.getElementById("capture-preview-image");
               const status = document.getElementById("workflow-status");
               const result = document.getElementById("workflow-result");
               result.innerHTML = "";
+              loading.hidden = false;
+              loading.setAttribute("aria-busy", "true");
               if (skipFace) {{
                 preview.hidden = true;
+                loadingTitle.textContent = "사주 리포트 생성 중입니다";
+                loadingMessage.textContent = "입력한 생년월일과 태어난 시간으로 사주 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
                 status.textContent = "리포트 생성 중";
               }} else {{
                 preview.hidden = false;
+                loadingTitle.textContent = "촬영 및 리포트 생성 중입니다";
+                loadingMessage.textContent = "얼굴 촬영과 사주 분석을 진행한 뒤 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
                 status.textContent = "촬영 중";
                 previewImage.src = "/video-feed?ts=" + Date.now();
               }}
@@ -650,6 +963,8 @@ def _render_page(title: str, body: str) -> str:
                 result.innerHTML = '<section class="error"><strong>처리 중 오류가 발생했습니다.</strong><p>' + String(error) + '</p></section>';
                 status.textContent = "오류";
               }} finally {{
+                loading.hidden = true;
+                loading.setAttribute("aria-busy", "false");
                 buttons.forEach(btn => btn.disabled = false);
               }}
             }});
