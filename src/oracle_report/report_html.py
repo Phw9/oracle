@@ -95,6 +95,12 @@ _DEFAULT_SAJU_BLOCKS = (
         "summary": "현재 시점에서 참고할 생활 리듬입니다.",
         "body": "올해의 운세는 재미용 참고이며, 실제 미래를 단정하지 않습니다.",
     },
+    {
+        "category": "총평 및 인생의 조언",
+        "title": "균형을 되찾는 현실적인 조언",
+        "summary": "강점은 살리고 부족한 리듬은 일상에서 보완합니다.",
+        "body": "사주 해석은 정해진 결론이 아니라 현재 성향을 점검하는 참고 자료입니다. 강하게 드러나는 기운은 장점으로 쓰고 부족한 기운은 생활 습관과 관계 방식에서 천천히 보완하는 쪽이 좋습니다.",
+    },
 )
 
 
@@ -706,13 +712,67 @@ def _pillar_views(
 
 
 def _default_saju_blocks(reading) -> tuple[Mapping[str, str], ...]:
-    defaults = list(_DEFAULT_SAJU_BLOCKS)
+    chart = reading.chart
+    counts_text = _element_counts_text(reading.element_counts)
+    day_element = STEM_ELEMENTS[chart.day.stem_index]
+    day_master = f"{chart.day.stem}{day_element}"
+    pillar_text = _pillar_label_text(reading)
     summary = " ".join(reading.summary_lines)
-    defaults[0] = {
-        **defaults[0],
-        "body": f"{summary}\n{reading.interpretation}",
-    }
+    interpretation = _compact_text(reading.interpretation)
+    strongest = _strongest_element(reading.element_counts)
+    weakest = _weakest_element(reading.element_counts)
+    defaults = (
+        {
+            **_DEFAULT_SAJU_BLOCKS[0],
+            "summary": f"{pillar_text}을 기준으로 전체 기운의 흐름을 봅니다.",
+            "body": f"{summary} {interpretation}",
+        },
+        {
+            **_DEFAULT_SAJU_BLOCKS[1],
+            "summary": f"일간 {day_master}을 중심으로 내면의 작동 방식을 읽습니다.",
+            "body": f"{day_master} 일간은 리포트에서 자신을 상징하는 기준점입니다. 오행 분포는 {counts_text}이며, 가장 강한 기운은 {strongest}, 보완하면 좋은 기운은 {weakest}입니다. 강한 기운은 장점으로 쓰되 부족한 기운이 만드는 빈틈은 생활 리듬에서 의식적으로 보완하는 편이 좋습니다.",
+        },
+        {
+            **_DEFAULT_SAJU_BLOCKS[2],
+            "summary": f"{strongest} 기운의 강점과 {weakest} 기운의 보완점을 일과 역할에 연결합니다.",
+            "body": f"{strongest} 기운이 강하게 잡히면 익숙한 방식에서는 추진력이나 안정감이 잘 드러납니다. 다만 {weakest} 기운이 약하면 일의 속도, 표현 방식, 회복 루틴 중 한쪽이 비기 쉬우므로 역할을 넓히기보다 균형을 먼저 맞추는 쪽이 좋습니다. 재물운은 결과 예측이 아니라 돈과 일을 다루는 태도에 대한 참고 조언으로만 봅니다.",
+        },
+        {
+            **_DEFAULT_SAJU_BLOCKS[3],
+            "summary": "강한 기운과 약한 기운의 차이가 관계 표현 방식에도 드러날 수 있습니다.",
+            "body": f"관계에서는 {strongest} 기운이 장점으로 보일 때 자신만의 리듬과 기준이 분명하게 느껴질 수 있습니다. 반대로 {weakest} 기운이 부족하면 상대의 속도나 감정 표현을 세밀하게 맞추는 데 시간이 걸릴 수 있습니다. 중요한 관계일수록 단정적인 판단보다 확인하는 대화와 반복 가능한 약속이 균형을 잡아 줍니다.",
+        },
+        {
+            **_DEFAULT_SAJU_BLOCKS[4],
+            "summary": f"올해는 {strongest} 기운을 과하게 밀기보다 {weakest} 기운을 보완하는 쪽이 핵심입니다.",
+            "body": f"올해의 조언은 특정 사건을 예언하기보다 현재 명식의 균형을 생활에 적용하는 방식으로 보는 것이 좋습니다. 이미 강한 {strongest} 기운을 더 몰아붙이기보다, 약한 {weakest} 기운을 보완하는 휴식, 정리, 표현, 관계 습관을 하나씩 만드는 편이 안정적입니다. 큰 결정보다는 반복 가능한 작은 루틴이 흐름을 바꿉니다.",
+        },
+        {
+            **_DEFAULT_SAJU_BLOCKS[5],
+            "summary": "사주 데이터는 강점과 보완점을 함께 보여주는 참고 지도입니다.",
+            "body": f"{summary} 이 리포트의 핵심은 강한 {strongest} 기운을 억누르는 것이 아니라 잘 쓰는 법을 찾고, 약한 {weakest} 기운은 일상에서 조금씩 채우는 데 있습니다. 사주는 결론을 정하는 도구가 아니라 자신을 점검하는 언어로 활용할 때 가장 현실적으로 도움이 됩니다.",
+        },
+    )
     result = tuple(defaults)
+    return result
+
+
+def _element_counts_text(counts: Mapping[str, int]) -> str:
+    result = ", ".join(f"{element} {counts[element]}" for element in ELEMENTS)
+    return result
+
+
+def _pillar_label_text(reading) -> str:
+    chart = reading.chart
+    result = (
+        f"년주 {chart.year.label}, 월주 {chart.month.label}, "
+        f"일주 {chart.day.label}, 시주 {chart.hour.label}"
+    )
+    return result
+
+
+def _compact_text(text: str) -> str:
+    result = " ".join(line.strip() for line in text.splitlines() if line.strip())
     return result
 
 

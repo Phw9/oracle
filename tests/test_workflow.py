@@ -19,6 +19,21 @@ from oracle_report.workflow import (
 )
 
 
+def _report_blocks(prefix: str, count: int) -> list[dict[str, str]]:
+    result = []
+    for index in range(count):
+        number = index + 1
+        result.append(
+            {
+                "category": f"{prefix} 카테고리 {number}",
+                "title": f"{prefix} 제목 {number}",
+                "summary": f"{prefix} 요약 {number}",
+                "body": f"{prefix} 본문 {number}",
+            },
+        )
+    return result
+
+
 class FakeLlmClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         result = "LLM 결과"
@@ -64,23 +79,9 @@ class FakeLlmClient:
                     "essence": "테스트 핵심 문장",
                     "element_note": "테스트 오행 메모",
                     "face_subtitle": "테스트 관상 소제목",
-                    "face_blocks": [
-                        {
-                            "category": "관상 카테고리",
-                            "title": "관상 제목",
-                            "summary": "관상 요약",
-                            "body": "관상 본문",
-                        },
-                    ],
+                    "face_blocks": _report_blocks("관상", 5),
                     "saju_subtitle": "테스트 사주 소제목",
-                    "saju_blocks": [
-                        {
-                            "category": "사주 카테고리",
-                            "title": "사주 제목",
-                            "summary": "사주 요약",
-                            "body": "사주 본문",
-                        },
-                    ],
+                    "saju_blocks": _report_blocks("사주", 6),
                     "synthesis_title": "종합 제목",
                     "synthesis_body": "종합 본문",
                     "convergence": [
@@ -100,6 +101,27 @@ class FakeLlmClient:
 class FailingFaceClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         raise AssertionError("face LLM must not run in landmark rule mode")
+
+
+class PartialFinalReportClient:
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        del prompt
+        del image_path
+        result = json.dumps(
+            {
+                "essence": "부분 결과",
+                "saju_blocks": [
+                    {
+                        "category": "부분",
+                        "title": "부분 제목",
+                        "summary": "부분 요약",
+                        "body": "부분 본문",
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        )
+        return result
 
 
 def test_personal_workflow_runs_without_real_camera_or_llm(
@@ -301,4 +323,34 @@ def test_personal_workflow_skips_face(tmp_path: Path) -> None:
     assert result.capture_path is None
     assert result.face_analysis == ""
     assert "관상" not in result.report_html
+
+
+def test_personal_workflow_rejects_incomplete_final_json(tmp_path: Path) -> None:
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="",
+        gender="남성",
+        target_gender="여성",
+        skip_face=True,
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        face_llm_config=_llm_config(),
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        face_client=FailingFaceClient(),
+        report_client=PartialFinalReportClient(),
+        capture_runner=None,
+    )
+
+    assert "final report JSON field saju_blocks has 1 blocks" in result.markdown
+    assert "사주 데이터가 보여주는 큰 흐름" in result.report_html
+    assert "오행 분포는" in result.report_html
+    assert "총평 및 인생의 조언" in result.report_html
 

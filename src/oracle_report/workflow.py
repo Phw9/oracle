@@ -3,9 +3,10 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+import json
 import time
 from pathlib import Path
-from typing import Callable, Generic, Protocol, TypeVar
+from typing import Any, Callable, Generic, Protocol, TypeVar
 
 from oracle_report.config import CaptureConfig, LlmConfig
 from oracle_report.llm import LlamaCppChatClient
@@ -39,6 +40,7 @@ FACE_ANALYSIS_MODE_LLM_IMAGE = 1
 FACE_ANALYSIS_MODE_LANDMARK_RULE = 2
 FACE_ANALYSIS_MODES = (FACE_ANALYSIS_MODE_LLM_IMAGE, FACE_ANALYSIS_MODE_LANDMARK_RULE)
 _UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
+_PERSONAL_FINAL_MIN_SAJU_BLOCKS = 6
 _T = TypeVar("_T")
 
 
@@ -610,13 +612,16 @@ def _build_personal_markdown(
         "최종 리포트를 생성하지 못했습니다.",
     )
     markdown = generated.text
-    if generated.error:
+    error = generated.error
+    if error == "":
+        error = _validate_personal_final_report(markdown)
+    if error:
         markdown = _fallback_personal_markdown(
             profile,
             manse_lookup.formatted_text,
             face_analysis,
             recommendation_text,
-            generated.error,
+            error,
         )
     result = markdown
     return result
@@ -704,6 +709,104 @@ def _safe_generate(
         error = str(exc)
         text = f"{fallback}\n\n오류: {error}"
     result = _GeneratedText(text=text, error=error)
+    return result
+
+
+def _validate_personal_final_report(text: str) -> str:
+    payload, error = _load_json_payload_or_error(text)
+    result = error
+    if result == "":
+        result = _validate_required_text(payload, "essence")
+    if result == "":
+        result = _validate_required_blocks(
+            payload,
+            "saju_blocks",
+            _PERSONAL_FINAL_MIN_SAJU_BLOCKS,
+        )
+    return result
+
+
+def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = _strip_markdown_fence_text(cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start >= 0 and end >= start:
+        cleaned = cleaned[start : end + 1]
+    payload: dict[str, Any] = {}
+    error = ""
+    try:
+        loaded = json.loads(cleaned)
+        if isinstance(loaded, dict):
+            payload = loaded
+        else:
+            error = "final report JSON must be an object"
+    except json.JSONDecodeError as exc:
+        error = f"final report JSON parse failed: {exc.msg}"
+    result = (payload, error)
+    return result
+
+
+def _strip_markdown_fence_text(text: str) -> str:
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].startswith("```"):
+        lines = lines[:-1]
+    result = "\n".join(lines)
+    return result
+
+
+def _validate_required_text(payload: dict[str, Any], key: str) -> str:
+    value = payload.get(key)
+    result = ""
+    if not isinstance(value, str) or value.strip() == "":
+        result = f"final report JSON missing required text field: {key}"
+    return result
+
+
+def _validate_required_blocks(
+    payload: dict[str, Any],
+    key: str,
+    min_count: int,
+) -> str:
+    raw_blocks = payload.get(key)
+    result = ""
+    if not isinstance(raw_blocks, list):
+        result = f"final report JSON missing required list field: {key}"
+    elif len(raw_blocks) < min_count:
+        result = (
+            f"final report JSON field {key} has "
+            f"{len(raw_blocks)} blocks; expected at least {min_count}"
+        )
+    else:
+        result = _validate_block_items(raw_blocks, key, min_count)
+    return result
+
+
+def _validate_block_items(
+    raw_blocks: list[Any],
+    key: str,
+    min_count: int,
+) -> str:
+    result = ""
+    required_fields = ("category", "title", "summary", "body")
+    for index, raw_block in enumerate(raw_blocks[:min_count]):
+        if result != "":
+            continue
+        if not isinstance(raw_block, dict):
+            result = f"final report JSON field {key}[{index}] must be an object"
+        else:
+            for field in required_fields:
+                if result != "":
+                    continue
+                value = raw_block.get(field)
+                if not isinstance(value, str) or value.strip() == "":
+                    result = (
+                        f"final report JSON field "
+                        f"{key}[{index}].{field} is empty"
+                    )
     return result
 
 
