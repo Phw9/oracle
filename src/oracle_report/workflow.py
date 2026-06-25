@@ -508,6 +508,7 @@ def _build_single_face_analysis(
             prompt,
             artifact.image_path,
             "관상정보를 생성하지 못했습니다.",
+            debug_label="personal_face_analysis",
         )
     return result
 
@@ -587,6 +588,7 @@ def _build_compatibility_face_analysis(
         prompt,
         artifact.image_path,
         "관상정보를 생성하지 못했습니다.",
+        debug_label=f"compatibility_face_analysis:{person_label}",
     )
     return result
 
@@ -610,6 +612,7 @@ def _build_personal_markdown(
         prompt,
         None,
         "최종 리포트를 생성하지 못했습니다.",
+        debug_label="personal_final",
     )
     markdown = generated.text
     error = generated.error
@@ -649,6 +652,7 @@ def _build_compatibility_markdown(
         prompt,
         None,
         "궁합 리포트를 생성하지 못했습니다.",
+        debug_label="compatibility_final",
     )
     markdown = generated.text
     if generated.error:
@@ -700,14 +704,17 @@ def _safe_generate(
     prompt: str,
     image_path: Path | None,
     fallback: str,
+    debug_label: str = "llm",
 ) -> _GeneratedText:
     text = fallback
     error = ""
     try:
         text = client.generate(prompt, image_path=image_path)
+        print(f"\n[LLM RAW:{debug_label}:BEGIN]\n{text}\n[LLM RAW:{debug_label}:END]\n")
     except Exception as exc:
         error = str(exc)
         text = f"{fallback}\n\n오류: {error}"
+        print(f"\n[LLM RAW:{debug_label}:ERROR] {error}\n")
     result = _GeneratedText(text=text, error=error)
     return result
 
