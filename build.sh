@@ -18,9 +18,9 @@ PACKAGED_MODEL_SHA256="$GEMMA3_1B_Q4_MODEL_SHA256"
 # Options populated by parser
 BUILD_JOBS=""
 FORCE_CUDA="auto"
-PYTHON_ENV="auto"
+PYTHON_ENV="venv"
 MODEL_PATH=""
-python_env_mode="auto"
+python_env_mode="venv"
 
 log() {
   printf '[build] %s\n' "$*"
@@ -59,7 +59,7 @@ Options:
   --cuda                   Force build llama.cpp with CUDA support
   --cpu                    Force build llama.cpp in CPU-only mode
   --auto-gpu               Auto-detect CUDA capability (default)
-  --python-env ENV         Force python env type: active-conda, conda, uv, venv, or auto (default: auto)
+  --python-env ENV         Force python env type: active-conda, conda, uv, venv, or auto (default: venv)
   --model-path PATH        Set GGUF model path (default: models/gemma-3-1b-it-Q4_0.gguf)
   --llama-dir DIR          Directory for llama.cpp source/build (default: ./llama.cpp)
 EOF
@@ -186,8 +186,20 @@ python_cmd() {
   fi
 }
 
+activate_python_env() {
+  if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/bin/activate"
+  elif [[ -f "$VENV_DIR/Scripts/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/Scripts/activate"
+  else
+    fail "venv activation failed: $VENV_DIR"
+  fi
+}
+
 setup_python_env() {
-  local env_type="${PYTHON_ENV:-auto}"
+  local env_type="${PYTHON_ENV:-venv}"
   log "Setting up Python environment (mode: $env_type)..."
 
   # 1. Active Conda env
@@ -232,8 +244,7 @@ setup_python_env() {
     if [[ ! -d "$VENV_DIR" ]]; then
       uv venv "$VENV_DIR"
     fi
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
+    activate_python_env
     python_env_mode="uv"
     return 0
   fi
@@ -249,8 +260,7 @@ setup_python_env() {
       "$py" -m venv "$VENV_DIR"
     fi
   fi
-  # shellcheck source=/dev/null
-  source "$VENV_DIR/bin/activate"
+  activate_python_env
   python_env_mode="venv"
   return 0
 }
