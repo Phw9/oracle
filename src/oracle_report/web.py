@@ -385,7 +385,7 @@ def _personal_form() -> str:
             <label>이름</label>
             <input name="name" placeholder="이름을 입력하세요" required>
           </div>
-          <div class="field-grid">
+          <div class="field-stack">
             <div class="field">
               <label>생년월일</label>
               <input name="birth_date" type="date" required>
@@ -402,7 +402,7 @@ def _personal_form() -> str:
               <label>추천받고 싶은 얼굴 성별</label>
               <select name="target_gender">{target_gender_options}</select>
             </div>
-            <div class="field field-wide">
+            <div class="field">
               <label>관상 분석 모드</label>
               <select name="face_analysis_mode">{mode_options}</select>
             </div>
@@ -712,13 +712,10 @@ def _render_page(
           .field.lead {{
             margin-bottom: 16px;
           }}
-          .field-grid {{
+          .field-stack {{
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 16px 18px;
-          }}
-          .field-wide {{
-            grid-column: 1 / -1;
+            grid-template-columns: 1fr;
+            gap: 16px;
           }}
           .grid {{
             display: grid;
@@ -909,12 +906,6 @@ def _render_page(
             }}
             .input-card {{
               padding: 30px 22px 26px;
-            }}
-            .field-grid {{
-              grid-template-columns: 1fr;
-            }}
-            .field-wide {{
-              grid-column: auto;
             }}
             .actions {{
               flex-direction: column;
