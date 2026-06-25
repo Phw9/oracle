@@ -465,6 +465,13 @@ def _face_analysis_mode_options() -> str:
 
 def _capture_preview_panel() -> str:
     result = """
+    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="false" hidden>
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <div>
+        <strong id="workflow-loading-title">리포트 생성 중입니다</strong>
+        <p id="workflow-loading-message" class="hint">사주 리포트 생성 중입니다. 잠시만 기다려 주세요.</p>
+      </div>
+    </section>
     <section class="panel capture-preview" hidden>
       <h2>실시간 촬영 상태</h2>
       <img id="capture-preview-image" alt="실시간 촬영 상태">
@@ -602,6 +609,38 @@ def _render_page(title: str, body: str) -> str:
           .capture-preview {{
             margin-top: 16px;
           }}
+          .workflow-loading {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+            border-color: #b7c7aa;
+            background: #fbfdf8;
+          }}
+          .workflow-loading[hidden] {{
+            display: none;
+          }}
+          .workflow-loading strong {{
+            display: block;
+            margin-bottom: 4px;
+          }}
+          .workflow-loading p {{
+            margin: 0;
+          }}
+          .loading-spinner {{
+            width: 24px;
+            height: 24px;
+            flex: 0 0 24px;
+            border: 3px solid #d9dfd2;
+            border-top-color: #2f7d57;
+            border-radius: 999px;
+            animation: oracle-spin 0.8s linear infinite;
+          }}
+          @keyframes oracle-spin {{
+            to {{
+              transform: rotate(360deg);
+            }}
+          }}
           .capture-preview img {{
             display: block;
             width: 100%;
@@ -624,16 +663,25 @@ def _render_page(title: str, body: str) -> str:
               event.preventDefault();
               const skipFaceInput = form.querySelector('[name="skip_face"]');
               const skipFace = skipFaceInput && skipFaceInput.value === "1";
+              const loading = document.getElementById("workflow-loading");
+              const loadingTitle = document.getElementById("workflow-loading-title");
+              const loadingMessage = document.getElementById("workflow-loading-message");
               const preview = document.querySelector(".capture-preview");
               const previewImage = document.getElementById("capture-preview-image");
               const status = document.getElementById("workflow-status");
               const result = document.getElementById("workflow-result");
               result.innerHTML = "";
+              loading.hidden = false;
+              loading.setAttribute("aria-busy", "true");
               if (skipFace) {{
                 preview.hidden = true;
+                loadingTitle.textContent = "사주 리포트 생성 중입니다";
+                loadingMessage.textContent = "입력한 생년월일과 태어난 시간으로 사주 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
                 status.textContent = "리포트 생성 중";
               }} else {{
                 preview.hidden = false;
+                loadingTitle.textContent = "촬영 및 리포트 생성 중입니다";
+                loadingMessage.textContent = "얼굴 촬영과 사주 분석을 진행한 뒤 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
                 status.textContent = "촬영 중";
                 previewImage.src = "/video-feed?ts=" + Date.now();
               }}
@@ -650,6 +698,8 @@ def _render_page(title: str, body: str) -> str:
                 result.innerHTML = '<section class="error"><strong>처리 중 오류가 발생했습니다.</strong><p>' + String(error) + '</p></section>';
                 status.textContent = "오류";
               }} finally {{
+                loading.hidden = true;
+                loading.setAttribute("aria-busy", "false");
                 buttons.forEach(btn => btn.disabled = false);
               }}
             }});
