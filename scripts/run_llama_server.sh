@@ -29,12 +29,18 @@ else
   printf '[llama][error] llama-server not found; run ./build.sh first\n' >&2
   exit 1
 fi
-"$LLAMA_SERVER_BIN" \
-  -m "$MODEL_PATH" \
-  --host 127.0.0.1 \
-  --port 8080 \
-  -c "${LLAMA_CONTEXT_SIZE:-4096}" \
-  --parallel "${LLAMA_PARALLEL:-5}" \
-  -fa off \
-  -ctk q4_0 \
+server_args=(
+  -m "$MODEL_PATH"
+  --host 127.0.0.1
+  --port 8080
+  -c "${LLAMA_CONTEXT_SIZE:-4096}"
+  -fa off
+  -ctk q4_0
   --reasoning-format none
+)
+
+if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
+  server_args+=(--parallel "$LLAMA_PARALLEL")
+fi
+
+"$LLAMA_SERVER_BIN" "${server_args[@]}"

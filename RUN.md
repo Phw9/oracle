@@ -196,7 +196,7 @@ ORACLE_APP_PORT=8501
 ORACLE_LLAMA_MODEL_PATH=models/gemma-4-E2B-it-UD-Q2_K_XL.gguf
 ORACLE_LLAMA_MODEL_URL=https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf
 ORACLE_LLAMA_MODEL_SHA256=dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da2429a727de0c
-LLAMA_PARALLEL=5
+ORACLE_LLM_PROMPT_CACHE=0
 ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
@@ -226,7 +226,7 @@ configs/prompts_debug.json
 - `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 - `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
-운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. `prefix`에는 고정 지시문과 출력 스키마를 두고, `body`에는 이름, 생년월일시, 만세력 결과, 캡처 품질 같은 실행 시점 입력값을 둡니다. LLM 요청에는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
+운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. 일반 `./run.sh` 실행은 이전 방식처럼 전체 프롬프트를 하나의 user message로 보냅니다. 고정 slot prompt cache를 테스트하려면 `./run.sh kvfix ...`로 실행합니다. 이 모드에서는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
 
 관상 모드:
 

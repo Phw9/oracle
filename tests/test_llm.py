@@ -14,11 +14,21 @@ from oracle_report.prompt_templates import RenderedPrompt
 def test_default_llm_config_uses_llama_cpp(monkeypatch) -> None:
     monkeypatch.delenv("ORACLE_LLM_BASE_URL", raising=False)
     monkeypatch.delenv("ORACLE_LLM_MODEL", raising=False)
+    monkeypatch.delenv("ORACLE_LLM_PROMPT_CACHE", raising=False)
 
     config = load_llm_config()
 
     assert config.base_url == "http://127.0.0.1:8080/v1"
     assert config.model == "local-model"
+    assert config.prompt_cache is False
+
+
+def test_llm_config_enables_prompt_cache(monkeypatch) -> None:
+    monkeypatch.setenv("ORACLE_LLM_PROMPT_CACHE", "1")
+
+    config = load_llm_config()
+
+    assert config.prompt_cache is True
 
 
 def test_default_face_llm_config_uses_text_mode(monkeypatch) -> None:
@@ -64,7 +74,7 @@ def test_llama_cpp_payload_uses_chat_completions_shape() -> None:
     assert payload["max_tokens"] == 512
 
 
-def test_llama_cpp_payload_uses_prompt_cache_slot_for_rendered_prompt() -> None:
+def test_llama_cpp_payload_omits_prompt_cache_by_default() -> None:
     config = LlmConfig(
         model="local-model",
         base_url="http://127.0.0.1:8080/v1",
@@ -72,6 +82,35 @@ def test_llama_cpp_payload_uses_prompt_cache_slot_for_rendered_prompt() -> None:
         max_output_tokens=512,
         temperature=0.7,
         send_image=False,
+    )
+    client = LlamaCppChatClient(config)
+    prompt = RenderedPrompt(
+        name="saju_reading",
+        prefix="STATIC PREFIX",
+        body="DYNAMIC INPUT",
+        slot_id=1,
+    )
+
+    payload = client._build_payload(prompt, None)
+
+    assert "id_slot" not in payload
+    assert "cache_prompt" not in payload
+    assert len(payload["messages"]) == 1
+    assert payload["messages"][0]["role"] == "user"
+    assert payload["messages"][0]["content"][0]["text"] == (
+        "STATIC PREFIX\n\nDYNAMIC INPUT"
+    )
+
+
+def test_llama_cpp_payload_uses_prompt_cache_slot_when_enabled() -> None:
+    config = LlmConfig(
+        model="local-model",
+        base_url="http://127.0.0.1:8080/v1",
+        timeout_seconds=60.0,
+        max_output_tokens=512,
+        temperature=0.7,
+        send_image=False,
+        prompt_cache=True,
     )
     client = LlamaCppChatClient(config)
     prompt = RenderedPrompt(
