@@ -39,6 +39,21 @@ class FakeLlmClient:
         result = "LLM 결과"
         if "출력 형식" in prompt and image_path is not None:
             result = "## 관상정보\n- 얼굴 인상 태그: 차분함"
+        elif "사주 전용 개인 리포트" in prompt:
+            result = json.dumps(
+                {
+                    "essence": "사주 전용 핵심 문장",
+                    "element_note": "사주 전용 오행 메모",
+                    "saju_subtitle": "사주 전용 소제목",
+                    "saju_blocks": _report_blocks("사주 전용", 6),
+                    "synthesis_title": "사주 정리 제목",
+                    "synthesis_body": "사주 정리 본문",
+                    "synthesis_summary": "사주 정리 요약",
+                    "tags": ["사주 전용 태그"],
+                    "disclaimer": "사주 전용 고지",
+                },
+                ensure_ascii=False,
+            )
         elif "pair_blocks" in prompt:
             result = json.dumps(
                 {
@@ -322,6 +337,12 @@ def test_personal_workflow_skips_face(tmp_path: Path) -> None:
     assert result.output_path.exists()
     assert result.capture_path is None
     assert result.face_analysis == ""
+    assert result.recommendations == ()
+    assert "recommend_faces" not in result.timing_log_path.read_text(encoding="utf-8")
+    assert "사주 전용 핵심 문장" in result.report_html
+    assert "사주 전용 제목 1" in result.report_html
+    assert "FACE MATCH" not in result.report_html
+    assert "궁합 좋은 얼굴 추천" not in result.report_html
     assert "관상" not in result.report_html
 
 

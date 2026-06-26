@@ -313,6 +313,33 @@ def _build_personal_report_view(
         "element_note",
         f"가장 강한 오행은 {strongest}, 보완하면 좋은 오행은 {weakest}입니다.",
     )
+    synth_title_fallback = "관상과 사주를 함께 보면 더 선명해지는 흐름"
+    synth_body_fallback = (
+        "사주 데이터와 얼굴 관찰 메모가 같은 방향을 가리키는 지점을 중심으로 "
+        "해석합니다."
+    )
+    synth_summary_fallback = (
+        "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 "
+        "보완하세요."
+    )
+    disclaimer_fallback = (
+        "이 리포트는 얼굴 관찰과 사주/만세력 데이터를 바탕으로 생성된 재미용 "
+        "콘텐츠입니다. 운명을 단정하지 않으며 참고로만 즐겨 주세요."
+    )
+    if skip_face:
+        synth_title_fallback = "사주 흐름을 정리하면"
+        synth_body_fallback = (
+            "사주/만세력 데이터에 나타난 일간, 사주팔자, 오행 분포를 중심으로 "
+            "해석합니다."
+        )
+        synth_summary_fallback = (
+            "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 "
+            "보완하세요."
+        )
+        disclaimer_fallback = (
+            "이 리포트는 사주/만세력 데이터를 바탕으로 생성된 재미용 콘텐츠입니다. "
+            "운명을 단정하지 않으며 참고로만 즐겨 주세요."
+        )
     result = _PersonalReportView(
         name=profile.name,
         meta=meta,
@@ -334,18 +361,18 @@ def _build_personal_report_view(
         synth_title=_payload_text(
             payload,
             "synthesis_title",
-            "관상과 사주를 함께 보면 더 선명해지는 흐름",
+            synth_title_fallback,
         ),
         synth_body=_payload_text(
             payload,
             "synthesis_body",
-            "사주 데이터와 얼굴 관찰 메모가 같은 방향을 가리키는 지점을 중심으로 해석합니다.",
+            synth_body_fallback,
         ),
         convergence=_payload_convergence(payload, face_analysis, reading.interpretation),
         synth_summary=_payload_text(
             payload,
             "synthesis_summary",
-            "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 보완하세요.",
+            synth_summary_fallback,
         ),
         tags=_payload_tags(payload, (f"{weakest} 보완", "균형", "휴식", "표현")),
         recommendation_title=_payload_text(
@@ -362,7 +389,7 @@ def _build_personal_report_view(
         disclaimer=_payload_text(
             payload,
             "disclaimer",
-            "이 리포트는 얼굴 관찰과 사주/만세력 데이터를 바탕으로 생성된 재미용 콘텐츠입니다. 운명을 단정하지 않으며 참고로만 즐겨 주세요.",
+            disclaimer_fallback,
         ),
         skip_face=skip_face,
     )
@@ -799,6 +826,7 @@ def _first_nonempty_line(text: str, fallback: str) -> str:
 def _render_report_body(view: _PersonalReportView) -> str:
     eyebrow_text = "Oracle · 사주 리포트" if view.skip_face else "Oracle · 관상 &amp; 사주 종합 리포트"
     gwansang_html = "" if view.skip_face else _render_part("gwansang", "相", "관상 — 얼굴이 말하는 것", view.face_subtitle, view.face_blocks)
+    recommendation_html = "" if view.skip_face else _render_recommendations(view)
     result = f"""
 <div class="oracle-report">
 <div class="wrap">
@@ -815,7 +843,7 @@ def _render_report_body(view: _PersonalReportView) -> str:
   {_render_part("saju", "命", "사주 — 타고난 기운의 설계도", view.saju_subtitle, view.saju_blocks)}
   {_render_synthesis(view)}
   {_render_tags(view.tags)}
-  {_render_recommendations(view)}
+  {recommendation_html}
   <footer>
     <div class="logo">ORACLE</div>
     <p class="disc">{escape(view.disclaimer)}</p>
