@@ -23,7 +23,7 @@ RUN_ORACLE_LLAMA_MODEL_PATH=""
 RUN_ORACLE_LLAMA_SERVER_BIN="${RUN_ORACLE_LLAMA_SERVER_BIN:-llama-server}"
 RUN_LLAMA_CONTEXT_SIZE="${RUN_LLAMA_CONTEXT_SIZE:-8192}"
 RUN_LLAMA_PARALLEL="${RUN_LLAMA_PARALLEL:-}"
-KVFIX_LLAMA_CONTEXT_SIZE=16384
+KVFIX_LLAMA_CONTEXT_SIZE=20480
 
 RUN_ORACLE_CAMERA_INDEX="${RUN_ORACLE_CAMERA_INDEX:-0}"
 RUN_ORACLE_FRAME_WIDTH="${RUN_ORACLE_FRAME_WIDTH:-640}"
@@ -149,7 +149,7 @@ Usage: $0 [options] [command] [command_args...]
 
 Commands:
   debug <cmd> [args...]    Run in debug mode (saves outputs to runs/debug/)
-  kvfix <cmd> [args...]    Run with fixed prompt cache slots enabled (ctx default: 16384)
+  kvfix <cmd> [args...]    Run with fixed prompt cache slots enabled (ctx default: 20480)
   release <cmd> [args...]  Run in release mode (temp output dir, deleted after run)
   capture                  Run capture only
   prompt <args...>         Debug prompt generation
