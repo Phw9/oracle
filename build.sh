@@ -362,7 +362,24 @@ ensure_llama_cpp() {
   fi
 
   command_exists git || fail "git is required to clone llama.cpp"
-  command_exists cmake || fail "cmake is required to build llama.cpp"
+
+  if ! command_exists cmake; then
+    log "cmake is missing. Trying to install cmake via pip inside the virtual environment..."
+    if [[ "$python_env_mode" == "uv" ]]; then
+      uv pip install cmake || true
+    else
+      python -m pip install cmake || true
+    fi
+    if [[ -f "$VENV_DIR/bin/cmake" ]]; then
+      export PATH="$VENV_DIR/bin:$PATH"
+    elif [[ -f "$VIRTUAL_ENV/bin/cmake" ]]; then
+      export PATH="$VIRTUAL_ENV/bin:$PATH"
+    elif [[ -n "${CONDA_PREFIX:-}" && -f "$CONDA_PREFIX/bin/cmake" ]]; then
+      export PATH="$CONDA_PREFIX/bin:$PATH"
+    fi
+  fi
+
+  command_exists cmake || fail "cmake is required to build llama.cpp. Please install cmake (e.g., sudo apt-get install cmake) and try again."
 
   mkdir -p "$(dirname "$LLAMA_CPP_DIR")"
   if [[ ! -d "$LLAMA_CPP_DIR/.git" ]]; then
