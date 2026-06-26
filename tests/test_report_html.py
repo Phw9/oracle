@@ -94,3 +94,39 @@ def test_compatibility_report_html_uses_structured_layout() -> None:
     assert "궁합 핵심" in html
     assert "행동 제목" in html
     assert "left 님과 right 님" in html
+
+
+def test_profile_hanja_marks_use_readable_text_color() -> None:
+    repository = ManseRepository()
+    left = BirthProfile(
+        name="left",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    right = BirthProfile(
+        name="right",
+        birth_datetime=datetime(1997, 5, 20, 12, 0),
+        gender="여성",
+    )
+
+    html = render_compatibility_report_html(
+        left,
+        right,
+        "연인",
+        repository.lookup(left),
+        repository.lookup(right),
+        "얼굴 관찰 fixture",
+        '{"essence":"궁합 핵심"}',
+    )
+
+    assert ".person-mark" in html
+    assert ".person-day" in html
+    assert (
+        ".person-mark{display:flex;flex-direction:column;align-items:center;"
+        "justify-content:center;width:116px;height:116px;border-radius:50%;"
+        "color:#fff}"
+    ) not in html
+    assert (
+        '.person-day{font-family:"Song Myung",serif;font-size:48px;'
+        "line-height:1;color:#fff;"
+    ) not in html
