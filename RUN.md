@@ -40,6 +40,8 @@ python -m pip install -e .
 http://<raspberry-pi-ip>:8501
 ```
 
+`./run.sh`가 직접 시작한 llama.cpp 서버는 `./run.sh` 종료 시 함께 종료됩니다. 웹 UI 실행 중 `Ctrl+C`로 끄면 Flask UI와 이번 실행에서 시작된 llama-server가 같이 내려갑니다. 이미 실행 중이던 외부 llama-server를 재사용한 경우에는 해당 프로세스를 종료하지 않습니다.
+
 태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 사주 계산은 `12:30` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
 
 ## 3. 실행 모드
