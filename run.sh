@@ -96,7 +96,7 @@ Wrapper Options:
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   -b, --batch-size SIZE    Batch size for llama.cpp
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
-  --python-env ENV         Force Python env type (active-conda, conda, uv, venv, auto)
+  --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
   --llama-dir DIR          Path to llama.cpp repository
   --extra-llama-args ARGS  Additional raw command-line arguments for llama-server
 EOF
@@ -192,6 +192,16 @@ setup_python_env() {
       return 0
     elif [[ "$env_type" == "active-conda" ]]; then
       fail "active-conda specified but no Conda environment is active."
+    fi
+  fi
+
+  # 2. Active Virtualenv (venv, uv, etc.)
+  if [[ "$env_type" == "active-venv" || ( "$env_type" == "auto" && -n "${VIRTUAL_ENV:-}" ) ]]; then
+    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+      log "Using active virtual environment: $VIRTUAL_ENV"
+      return 0
+    elif [[ "$env_type" == "active-venv" ]]; then
+      fail "active-venv specified but no virtual environment is active."
     fi
   fi
 

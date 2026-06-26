@@ -19,7 +19,7 @@
 
 `build.sh`는 Python 환경, Python 패키지, llama.cpp, 기본 GGUF 모델을 준비합니다. 이미 `models/*.gguf`가 있으면 모델 다운로드를 건너뜁니다. `run.sh`는 빌드를 수행하지 않고 실행만 담당합니다.
 
-기본 Python 설치 위치는 프로젝트 루트의 `.venv`입니다. 다른 환경을 강제로 쓰려면 `--python-env uv`, `--python-env conda`, `--python-env active-conda`, `--python-env auto` 중 하나를 명시합니다.
+기본 Python 설치 위치는 프로젝트 루트의 `.venv`입니다. 다만 현재 실행(활성화)되어 있는 가상환경(anaconda, uv, venv 등)이 있다면 자동으로 해당 환경을 사용하며, 다른 환경을 강제로 쓰려면 `--python-env uv`, `--python-env conda`, `--python-env active-conda`, `--python-env active-venv`, `--python-env auto` 중 하나를 명시할 수 있습니다.
 
 고정 버전 목록만 직접 설치해야 하는 환경에서는 다음 파일을 참고합니다.
 

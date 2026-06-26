@@ -21,7 +21,7 @@ PACKAGED_MODEL_SHA256="$GEMMA4_E2B_Q2_MODEL_SHA256"
 # Options populated by parser
 BUILD_JOBS=""
 FORCE_CUDA="auto"
-PYTHON_ENV="venv"
+PYTHON_ENV="auto"
 MODEL_PATH=""
 python_env_mode="venv"
 
@@ -62,7 +62,7 @@ Options:
   --cuda                   Force build llama.cpp with CUDA support
   --cpu                    Force build llama.cpp in CPU-only mode
   --auto-gpu               Auto-detect CUDA capability (default)
-  --python-env ENV         Force python env type: active-conda, conda, uv, venv, or auto (default: venv)
+  --python-env ENV         Force python env type: active-conda, active-venv, conda, uv, venv, or auto (default: auto)
   --model-path PATH        Set GGUF model path (default: models/gemma-4-E2B-it-UD-Q2_K_XL.gguf)
   --llama-dir DIR          Directory for llama.cpp source/build (default: ./llama.cpp)
 EOF
@@ -140,7 +140,7 @@ install_apt_packages() {
   local filtered_packages=()
   local pkg
   for pkg in "${packages[@]}"; do
-    if [[ "$python_env_mode" == "conda" || "$python_env_mode" == "active-conda" || "$python_env_mode" == "uv" ]]; then
+    if [[ "$python_env_mode" == "conda" || "$python_env_mode" == "active-conda" || "$python_env_mode" == "uv" || "$python_env_mode" == "active-venv" ]]; then
       # Skip python/opencv system packages in conda/uv
       if [[ "$pkg" =~ ^python3.* || "$pkg" == "python3-opencv" || "$pkg" == "opencv-data" || "$pkg" == "libatlas-base-dev" ]]; then
         continue
@@ -202,7 +202,7 @@ activate_python_env() {
 }
 
 setup_python_env() {
-  local env_type="${PYTHON_ENV:-venv}"
+  local env_type="${PYTHON_ENV:-auto}"
   log "Setting up Python environment (mode: $env_type)..."
 
   # 1. Active Conda env
@@ -217,6 +217,21 @@ setup_python_env() {
       fi
     elif [[ "$env_type" == "active-conda" ]]; then
       fail "active-conda specified but no Conda environment is active."
+    fi
+  fi
+
+  # 2. Active Virtualenv (venv, uv, etc.)
+  if [[ "$env_type" == "active-venv" || ( "$env_type" == "auto" && -n "${VIRTUAL_ENV:-}" ) ]]; then
+    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+      log "Using already active virtual environment (Prefix: $VIRTUAL_ENV)"
+      if python -c "import pip" >/dev/null 2>&1; then
+        python_env_mode="active-venv"
+        return 0
+      else
+        log "Warning: VIRTUAL_ENV is set but python does not have pip. Falling back."
+      fi
+    elif [[ "$env_type" == "active-venv" ]]; then
+      fail "active-venv specified but no virtual environment is active."
     fi
   fi
 
