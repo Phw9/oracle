@@ -6,7 +6,7 @@ from pathlib import Path
 import threading
 import uuid
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, redirect, request
 from markupsafe import escape
 
 from oracle_report.config import (
@@ -31,6 +31,8 @@ class _WorkflowJob:
     status: str
     html: str = ""
     error: str = ""
+    download_html: str = ""
+    download_filename: str = "oracle_report.html"
 
 
 class _PreviewStream:
@@ -83,18 +85,52 @@ def create_app() -> Flask:
     @app.get("/")
     def index():
         body = """
-        <section class="menu">
-          <a class="menu-card" href="/personal">
-            <strong>개인 리포트</strong>
-            <span>관상 + 사주 + 궁합 좋은 얼굴 추천</span>
-          </a>
-          <a class="menu-card" href="/compatibility">
-            <strong>두 사람 궁합</strong>
-            <span>첫 번째 사람 촬영 후 3초 뒤 두 번째 사람을 순차 촬영</span>
-          </a>
-        </section>
+        <div class="oracle-home-shell">
+          <div class="top">
+            <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+            <div class="tag">관상 &amp; 사주 · 운명 해설</div>
+          </div>
+
+          <div class="hero">
+            <div class="halo"></div>
+            <div class="ring"></div>
+            <div class="illust">
+              <img src="/static/assets/saju.jpg" alt="관상 일러스트" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+              <div class="ph" style="display:none"><span class="em">🔮</span>assets/saju.jpg<br>관상 일러스트 삽입</div>
+            </div>
+          </div>
+
+          <div class="greet serif">당신의 얼굴과 사주를 펼쳐볼까요?</div>
+
+          <div class="cards">
+            <a class="mode solo" href="/personal">
+              <span class="tagline">혼자서</span>
+              <div class="ic">🧑‍🦰</div>
+              <h2>개인 리포트</h2>
+              <p>관상 · 사주 · 보완 분석에<br>궁합 좋은 얼굴 추천까지</p>
+              <span class="go">시작하기 <span class="arr">→</span></span>
+            </a>
+
+            <a class="mode pair" href="/compatibility">
+              <span class="tagline">둘이서</span>
+              <div class="ic">💞</div>
+              <h2>두 사람 궁합</h2>
+              <p>첫 번째 사람 촬영 후, 3초 뒤<br>두 번째 사람을 순차 촬영</p>
+              <span class="go">시작하기 <span class="arr">→</span></span>
+            </a>
+          </div>
+
+          <div class="home-foot">
+            <div class="chips">
+              <span class="chip">📷 카메라 관상</span>
+              <span class="chip">🗓️ 만세력 사주</span>
+              <span class="chip">🔒 100% 온-디바이스</span>
+            </div>
+            얼굴 이미지와 개인정보는 기기 안에서만 처리되고 외부로 전송되지 않아요.<br>Oracle은 재미를 위한 콘텐츠예요.
+          </div>
+        </div>
         """
-        result = _render_page("Oracle", body)
+        result = _render_page("Oracle", body, page_class="home-page", show_heading=False)
         return result
 
     @app.route("/personal", methods=["GET", "POST"])
@@ -102,24 +138,13 @@ def create_app() -> Flask:
         body = _personal_form()
         if request.method == "POST":
             try:
-                workflow_input = PersonalWorkflowInput(
-                    name=_form_value("name"),
-                    birth_date=_form_value("birth_date"),
-                    birth_time=_form_value("birth_time"),
-                    gender=_form_value("gender"),
-                    target_gender=_form_value("target_gender"),
-                    face_analysis_mode=_form_int("face_analysis_mode", 1),
-                    skip_face=_form_bool("skip_face", False),
+                workflow_input = _personal_workflow_input_from_form()
+                job_id = _start_personal_workflow_job(workflow_input)
+                result = redirect(
+                    _personal_result_url(job_id, workflow_input.skip_face),
+                    code=303,
                 )
-                workflow_result = run_personal_workflow(
-                    workflow_input=workflow_input,
-                    capture_config=load_capture_config(),
-                    face_llm_config=load_face_llm_config(),
-                    report_llm_config=load_report_llm_config(),
-                    manse_db_path=_manse_db_path(),
-                    recommendation_db_path=_face_db_path(),
-                )
-                body = _personal_result(workflow_result)
+                return result
             except Exception as exc:
                 body = _error_panel(exc) + _personal_form()
         result = _render_page(
@@ -132,31 +157,26 @@ def create_app() -> Flask:
 
     @app.post("/api/personal")
     def personal_api():
-        workflow_input = PersonalWorkflowInput(
-            name=_form_value("name"),
-            birth_date=_form_value("birth_date"),
-            birth_time=_form_value("birth_time"),
-            gender=_form_value("gender"),
-            target_gender=_form_value("target_gender"),
-            face_analysis_mode=_form_int("face_analysis_mode", 1),
-            skip_face=_form_bool("skip_face", False),
+        workflow_input = _personal_workflow_input_from_form()
+        job_id = _start_personal_workflow_job(workflow_input)
+        result = jsonify(
+            {
+                "job_id": job_id,
+                "result_url": _personal_result_url(job_id, workflow_input.skip_face),
+            },
         )
+        return result
 
-        def run_job() -> str:
-            workflow_result = run_personal_workflow(
-                workflow_input=workflow_input,
-                capture_config=load_capture_config(),
-                face_llm_config=load_face_llm_config(),
-                report_llm_config=load_report_llm_config(),
-                manse_db_path=_manse_db_path(),
-                recommendation_db_path=_face_db_path(),
-                capture_runner=_preview_capture_runner,
-            )
-            result = _personal_result(workflow_result)
-            return result
-
-        job_id = _start_workflow_job(run_job)
-        result = jsonify({"job_id": job_id})
+    @app.get("/personal/result/<job_id>")
+    def personal_result_page(job_id: str):
+        skip_face = _query_bool("skip_face", False)
+        body = _personal_result_page(job_id, skip_face)
+        result = _render_page(
+            "개인 리포트 결과",
+            body,
+            page_class="result-page",
+            show_heading=False,
+        )
         return result
 
     @app.route("/compatibility", methods=["GET", "POST"])
@@ -238,6 +258,23 @@ def create_app() -> Flask:
         result = jsonify(payload), status_code
         return result
 
+    @app.get("/api/jobs/<job_id>/download")
+    def job_download(job_id: str):
+        job = _get_job(job_id)
+        if job is None or job.status != "complete" or job.download_html == "":
+            result = ("report not ready", 404)
+        else:
+            result = Response(
+                job.download_html,
+                content_type="text/html; charset=utf-8",
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="{job.download_filename}"'
+                    ),
+                },
+            )
+        return result
+
     @app.get("/video-feed")
     def video_feed():
         result = Response(
@@ -287,6 +324,56 @@ def _form_bool(name: str, default: bool) -> bool:
     return result
 
 
+def _query_bool(name: str, default: bool) -> bool:
+    raw_value = request.args.get(name, "").strip()
+    result = default
+    if raw_value != "":
+        result = raw_value.lower() in ("1", "true", "yes", "y", "on")
+    return result
+
+
+def _personal_workflow_input_from_form() -> PersonalWorkflowInput:
+    result = PersonalWorkflowInput(
+        name=_form_value("name"),
+        birth_date=_form_value("birth_date"),
+        birth_time=_form_value("birth_time"),
+        gender=_form_value("gender"),
+        target_gender=_form_value("target_gender"),
+        face_analysis_mode=_form_int("face_analysis_mode", 1),
+        skip_face=_form_bool("skip_face", False),
+    )
+    return result
+
+
+def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
+    def run_job() -> _WorkflowJob:
+        workflow_result = run_personal_workflow(
+            workflow_input=workflow_input,
+            capture_config=load_capture_config(),
+            face_llm_config=load_face_llm_config(),
+            report_llm_config=load_report_llm_config(),
+            manse_db_path=_manse_db_path(),
+            recommendation_db_path=_face_db_path(),
+            capture_runner=_preview_capture_runner,
+        )
+        result = _WorkflowJob(
+            status="complete",
+            html=_personal_result(workflow_result),
+            download_html=workflow_result.report_html,
+            download_filename=workflow_result.output_path.name,
+        )
+        return result
+
+    result = _start_workflow_job(run_job)
+    return result
+
+
+def _personal_result_url(job_id: str, skip_face: bool) -> str:
+    skip_value = "1" if skip_face else "0"
+    result = f"/personal/result/{job_id}?skip_face={skip_value}"
+    return result
+
+
 def _preview_capture_runner(config, output_dir: Path | None = None):
     result = run_capture(
         config,
@@ -322,8 +409,12 @@ def _run_workflow_job(job_id: str, run_job) -> None:
         )
     else:
         try:
-            html = run_job()
-            _set_job(job_id, _WorkflowJob(status="complete", html=html))
+            job_result = run_job()
+            if isinstance(job_result, _WorkflowJob):
+                completed_job = job_result
+            else:
+                completed_job = _WorkflowJob(status="complete", html=job_result)
+            _set_job(job_id, completed_job)
         except Exception as exc:
             _set_job(
                 job_id,
@@ -415,7 +506,6 @@ def _personal_form() -> str:
 
         <p class="footnote">입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.</p>
       </div>
-      {_capture_preview_panel()}
     </div>
     """
     return result
@@ -504,19 +594,57 @@ def _face_analysis_mode_options() -> str:
     return result
 
 
-def _capture_preview_panel() -> str:
-    result = """
-    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="false" hidden>
+def _personal_result_page(job_id: str, skip_face: bool) -> str:
+    result = f"""
+    <div class="oracle-result-shell">
+      <div class="brand">
+        <div class="logo">ORACLE</div>
+        <div class="tag">개인 리포트 결과</div>
+        <div class="ornament"></div>
+      </div>
+      <div class="result-actions">
+        <a class="text-link" href="/personal">입력 다시 하기</a>
+        <a class="text-link" href="/">처음으로</a>
+        <a id="download-report-link" class="text-link download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
+      </div>
+      {_capture_preview_panel(job_id=job_id, skip_face=skip_face)}
+    </div>
+    """
+    return result
+
+
+def _capture_preview_panel(
+    *,
+    job_id: str = "",
+    skip_face: bool = False,
+) -> str:
+    job_attr = f' data-workflow-result-job="{escape(job_id)}"' if job_id != "" else ""
+    skip_attr = ' data-skip-face="1"' if skip_face else ' data-skip-face="0"'
+    loading_hidden = "" if job_id != "" else " hidden"
+    preview_hidden = " hidden" if skip_face or job_id == "" else ""
+    loading_title = (
+        "사주 리포트 생성 중입니다"
+        if skip_face
+        else "촬영 및 리포트 생성 중입니다"
+    )
+    loading_message = (
+        "입력한 생년월일과 태어난 시간으로 사주 리포트를 만들고 있습니다. 잠시만 기다려 주세요."
+        if skip_face
+        else "얼굴 촬영과 사주 분석을 진행한 뒤 리포트를 만들고 있습니다. 잠시만 기다려 주세요."
+    )
+    status_text = "리포트 생성 중" if skip_face else "촬영 중"
+    result = f"""
+    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="true"{job_attr}{skip_attr}{loading_hidden}>
       <span class="loading-spinner" aria-hidden="true"></span>
       <div>
-        <strong id="workflow-loading-title">리포트 생성 중입니다</strong>
-        <p id="workflow-loading-message" class="hint">사주 리포트 생성 중입니다. 잠시만 기다려 주세요.</p>
+        <strong id="workflow-loading-title">{loading_title}</strong>
+        <p id="workflow-loading-message" class="hint">{loading_message}</p>
       </div>
     </section>
-    <section class="panel capture-preview" hidden>
+    <section class="panel capture-preview"{preview_hidden}>
       <h2>실시간 촬영 상태</h2>
       <img id="capture-preview-image" alt="실시간 촬영 상태">
-      <p id="workflow-status" class="hint">촬영 준비 중</p>
+      <p id="workflow-status" class="hint">{status_text}</p>
     </section>
     <section id="workflow-result"></section>
     """
@@ -601,6 +729,10 @@ def _render_page(
             width: min(860px, calc(100vw - 48px));
             padding: 24px 0;
           }}
+          main.home-page {{
+            width: min(860px, calc(100vw - 40px));
+            padding: 40px 0 60px;
+          }}
           h1 {{
             margin: 0 0 24px;
             font-size: 32px;
@@ -632,6 +764,239 @@ def _render_page(
           }}
           .panel {{
             padding: 20px;
+          }}
+          .serif {{
+            font-family: "Gowun Batang", serif;
+          }}
+          .oracle-home-shell {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+          }}
+          .top {{
+            text-align: center;
+            margin-bottom: 30px;
+          }}
+          .top .logo {{
+            font-family: "Song Myung", serif;
+            font-size: 46px;
+            letter-spacing: 0.2em;
+            color: var(--ink);
+            position: relative;
+            display: inline-block;
+          }}
+          .top .logo .stamp {{
+            position: absolute;
+            top: -6px;
+            right: -46px;
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--hwa);
+            border-radius: 8px;
+            color: var(--hwa);
+            font-size: 19px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(9deg);
+            opacity: 0.9;
+          }}
+          .top .tag {{
+            font-size: 13px;
+            letter-spacing: 0.4em;
+            color: var(--gold);
+            text-transform: uppercase;
+            margin-top: 14px;
+          }}
+          .hero {{
+            position: relative;
+            margin: 6px 0 36px;
+            width: 230px;
+            height: 230px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }}
+          .hero .halo {{
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(204, 154, 59, 0.18), rgba(194, 82, 57, 0.06) 60%, transparent 72%);
+          }}
+          .hero .ring {{
+            position: absolute;
+            inset: 14px;
+            border: 1.5px dashed var(--gold);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: oracle-spin 40s linear infinite;
+          }}
+          .hero .illust {{
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #ffffff;
+            border: 3px solid #ffffff;
+            box-shadow: 0 14px 36px -14px rgba(46, 37, 32, 0.5);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+          }}
+          .hero .illust img {{
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 12%;
+          }}
+          .illust .ph {{
+            font-size: 12px;
+            color: #b6a98c;
+            text-align: center;
+            padding: 14px;
+            line-height: 1.6;
+          }}
+          .illust .ph .em {{
+            font-size: 40px;
+            display: block;
+            margin-bottom: 6px;
+          }}
+          .greet {{
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            color: var(--ink-soft);
+            margin-bottom: 24px;
+          }}
+          .cards {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 780px;
+          }}
+          .mode {{
+            position: relative;
+            display: block;
+            background: var(--paper-2);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 30px 26px 26px;
+            color: inherit;
+            cursor: pointer;
+            overflow: hidden;
+            text-decoration: none;
+            transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s;
+            box-shadow: 0 6px 20px -14px rgba(46, 37, 32, 0.4);
+          }}
+          .mode::after {{
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid var(--line-soft);
+            border-radius: 9px;
+            pointer-events: none;
+          }}
+          .mode:hover {{
+            transform: translateY(-6px);
+            box-shadow: 0 18px 40px -18px rgba(46, 37, 32, 0.5);
+          }}
+          .mode.solo:hover {{
+            border-color: var(--mok);
+          }}
+          .mode.pair:hover {{
+            border-color: var(--hwa);
+          }}
+          .mode .ic {{
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 27px;
+          }}
+          .mode.solo .ic {{
+            background: rgba(58, 125, 92, 0.12);
+          }}
+          .mode.pair .ic {{
+            background: rgba(194, 82, 57, 0.12);
+          }}
+          .mode h2 {{
+            font-family: "Gowun Batang", serif;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px;
+          }}
+          .mode p {{
+            font-size: 14px;
+            color: var(--ink-soft);
+            line-height: 1.6;
+            min-height: 42px;
+            margin: 0;
+          }}
+          .mode .go {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 18px;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            font-weight: 700;
+          }}
+          .mode.solo .go {{
+            color: var(--mok-deep);
+          }}
+          .mode.pair .go {{
+            color: var(--hwa);
+          }}
+          .mode .go .arr {{
+            transition: transform 0.2s;
+          }}
+          .mode:hover .go .arr {{
+            transform: translateX(4px);
+          }}
+          .mode .tagline {{
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-family: "Gowun Dodum", sans-serif;
+          }}
+          .mode.solo .tagline {{
+            background: rgba(58, 125, 92, 0.1);
+            color: var(--mok-deep);
+          }}
+          .mode.pair .tagline {{
+            background: rgba(194, 82, 57, 0.1);
+            color: var(--hwa);
+          }}
+          .home-foot {{
+            margin-top: 34px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--ink-soft);
+            line-height: 1.8;
+            max-width: 520px;
+          }}
+          .home-foot .chips {{
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+          }}
+          .home-foot .chip {{
+            background: var(--paper-2);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--ink);
           }}
           .oracle-input-shell {{
             width: 100%;
@@ -859,6 +1224,33 @@ def _render_page(
           .capture-preview {{
             margin-top: 16px;
           }}
+          .oracle-result-shell {{
+            width: 100%;
+          }}
+          main.result-page {{
+            width: min(960px, calc(100vw - 40px));
+            padding: 24px 0 60px;
+          }}
+          .result-actions {{
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin: -4px 0 18px;
+          }}
+          .text-link {{
+            color: var(--ink-soft);
+            font-size: 13px;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+          }}
+          .text-link:hover {{
+            color: var(--mok-deep);
+            border-bottom-color: var(--mok-deep);
+          }}
+          .download-link {{
+            color: var(--mok-deep);
+            font-weight: 700;
+          }}
           .workflow-loading {{
             display: flex;
             align-items: center;
@@ -914,6 +1306,20 @@ def _render_page(
               font-size: 28px;
             }}
           }}
+          @media (max-width: 680px) {{
+            .cards {{
+              grid-template-columns: 1fr;
+            }}
+            .top .logo {{
+              font-size: 38px;
+            }}
+            .top .logo .stamp {{
+              right: -40px;
+            }}
+            .mode p {{
+              min-height: 0;
+            }}
+          }}
         </style>
       </head>
       <body>
@@ -928,27 +1334,9 @@ def _render_page(
               event.preventDefault();
               const skipFaceInput = form.querySelector('[name="skip_face"]');
               const skipFace = skipFaceInput && skipFaceInput.value === "1";
-              const loading = document.getElementById("workflow-loading");
-              const loadingTitle = document.getElementById("workflow-loading-title");
-              const loadingMessage = document.getElementById("workflow-loading-message");
-              const preview = document.querySelector(".capture-preview");
-              const previewImage = document.getElementById("capture-preview-image");
-              const status = document.getElementById("workflow-status");
-              const result = document.getElementById("workflow-result");
-              result.innerHTML = "";
-              loading.hidden = false;
-              loading.setAttribute("aria-busy", "true");
-              if (skipFace) {{
-                preview.hidden = true;
-                loadingTitle.textContent = "사주 리포트 생성 중입니다";
-                loadingMessage.textContent = "입력한 생년월일과 태어난 시간으로 사주 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
-                status.textContent = "리포트 생성 중";
-              }} else {{
-                preview.hidden = false;
-                loadingTitle.textContent = "촬영 및 리포트 생성 중입니다";
-                loadingMessage.textContent = "얼굴 촬영과 사주 분석을 진행한 뒤 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
-                status.textContent = "촬영 중";
-                previewImage.src = "/video-feed?ts=" + Date.now();
+              const ui = workflowUi();
+              if (ui) {{
+                prepareWorkflowUi(ui, skipFace);
               }}
               const buttons = form.querySelectorAll("button");
               buttons.forEach(btn => btn.disabled = true);
@@ -958,19 +1346,74 @@ def _render_page(
                   body: new FormData(form),
                 }});
                 const startPayload = await startResponse.json();
-                await pollWorkflow(startPayload.job_id, status, result);
+                if (startPayload.result_url) {{
+                  window.location.href = startPayload.result_url;
+                  return;
+                }}
+                if (!ui) {{
+                  throw new Error("결과를 표시할 영역을 찾을 수 없습니다.");
+                }}
+                await pollWorkflow(startPayload.job_id, ui.status, ui.result, ui.loading);
               }} catch (error) {{
-                result.innerHTML = '<section class="error"><strong>처리 중 오류가 발생했습니다.</strong><p>' + String(error) + '</p></section>';
-                status.textContent = "오류";
+                if (ui) {{
+                  ui.result.innerHTML = '<section class="error"><strong>처리 중 오류가 발생했습니다.</strong><p>' + String(error) + '</p></section>';
+                  ui.status.textContent = "오류";
+                }} else {{
+                  window.alert(String(error));
+                }}
               }} finally {{
-                loading.hidden = true;
-                loading.setAttribute("aria-busy", "false");
+                if (ui && !ui.loading.dataset.workflowResultJob) {{
+                  ui.loading.hidden = true;
+                  ui.loading.setAttribute("aria-busy", "false");
+                }}
                 buttons.forEach(btn => btn.disabled = false);
               }}
             }});
           }});
 
-          async function pollWorkflow(jobId, status, result) {{
+          const resultUi = workflowUi();
+          const resultJobId = resultUi && resultUi.loading.dataset.workflowResultJob;
+          if (resultJobId) {{
+            const skipFace = resultUi.loading.dataset.skipFace === "1";
+            prepareWorkflowUi(resultUi, skipFace);
+            pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading);
+          }}
+
+          function workflowUi() {{
+            const loading = document.getElementById("workflow-loading");
+            const preview = document.querySelector(".capture-preview");
+            const previewImage = document.getElementById("capture-preview-image");
+            const status = document.getElementById("workflow-status");
+            const result = document.getElementById("workflow-result");
+            let ui = null;
+            if (loading && preview && previewImage && status && result) {{
+              ui = {{ loading, preview, previewImage, status, result }};
+            }}
+            return ui;
+          }}
+
+          function prepareWorkflowUi(ui, skipFace) {{
+            const loadingTitle = document.getElementById("workflow-loading-title");
+            const loadingMessage = document.getElementById("workflow-loading-message");
+            ui.result.innerHTML = "";
+            ui.loading.hidden = false;
+            ui.loading.setAttribute("aria-busy", "true");
+            if (skipFace) {{
+              ui.preview.hidden = true;
+              loadingTitle.textContent = "사주 리포트 생성 중입니다";
+              loadingMessage.textContent = "입력한 생년월일과 태어난 시간으로 사주 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
+              ui.status.textContent = "리포트 생성 중";
+            }} else {{
+              ui.preview.hidden = false;
+              loadingTitle.textContent = "촬영 및 리포트 생성 중입니다";
+              loadingMessage.textContent = "얼굴 촬영과 사주 분석을 진행한 뒤 리포트를 만들고 있습니다. 잠시만 기다려 주세요.";
+              ui.status.textContent = "촬영 중";
+              ui.previewImage.src = "/video-feed?ts=" + Date.now();
+            }}
+          }}
+
+          async function pollWorkflow(jobId, status, result, loading) {{
+            const downloadLink = document.getElementById("download-report-link");
             let done = false;
             while (!done) {{
               await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -979,10 +1422,17 @@ def _render_page(
               if (payload.status === "complete") {{
                 result.innerHTML = payload.html;
                 status.textContent = "완료";
+                loading.hidden = true;
+                loading.setAttribute("aria-busy", "false");
+                if (downloadLink) {{
+                  downloadLink.hidden = false;
+                }}
                 done = true;
               }} else if (payload.status === "error") {{
                 result.innerHTML = payload.html;
                 status.textContent = "오류";
+                loading.hidden = true;
+                loading.setAttribute("aria-busy", "false");
                 done = true;
               }} else {{
                 status.textContent = "촬영 및 리포트 생성 중";

@@ -11,6 +11,7 @@ from oracle_report.report import (
     build_compatibility_face_analysis_prompt,
     build_personal_face_analysis_prompt,
     build_personal_final_prompt,
+    build_personal_saju_final_prompt,
 )
 
 
@@ -55,6 +56,22 @@ def test_personal_final_prompt_contains_json_schema() -> None:
     assert "관상 입력" in prompt
     assert "보조 해석" not in prompt
     assert "주의 문구" not in prompt
+
+
+def test_personal_saju_final_prompt_omits_face_and_recommendation_schema() -> None:
+    profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
+
+    prompt = build_personal_saju_final_prompt(
+        profile,
+        "사주 입력",
+    )
+
+    assert "\"saju_blocks\"" in prompt
+    assert "\"face_blocks\"" not in prompt
+    assert "\"recommendation_title\"" not in prompt
+    assert "사주 입력" in prompt
+    assert "얼굴 관찰 메모" not in prompt
+    assert "추천받고 싶은 얼굴" not in prompt
 
 
 def test_compatibility_final_prompt_contains_json_schema() -> None:

@@ -26,6 +26,7 @@ from oracle_report.report import (
     build_compatibility_face_analysis_prompt,
     build_personal_face_analysis_prompt,
     build_personal_final_prompt,
+    build_personal_saju_final_prompt,
 )
 from oracle_report.report_html import (
     render_compatibility_report_html,
@@ -241,13 +242,15 @@ def run_personal_workflow(
     else:
         face_analysis_text = ""
 
-    recommendations = timing_recorder.run(
-        "recommend_faces",
-        recommend_faces,
-        recommendation_db_path,
-        workflow_input.target_gender,
-        manse_lookup.reading,
-    )
+    recommendations: tuple[FaceRecommendation, ...] = ()
+    if not workflow_input.skip_face:
+        recommendations = timing_recorder.run(
+            "recommend_faces",
+            recommend_faces,
+            recommendation_db_path,
+            workflow_input.target_gender,
+            manse_lookup.reading,
+        )
     markdown = timing_recorder.run(
         "final_report",
         _build_personal_markdown,
@@ -256,6 +259,7 @@ def run_personal_workflow(
         manse_lookup,
         face_analysis_text,
         recommendations,
+        workflow_input.skip_face,
     )
     report_html = timing_recorder.run(
         "render_report_html",
@@ -599,20 +603,26 @@ def _build_personal_markdown(
     manse_lookup: ManseLookupResult,
     face_analysis: str,
     recommendations: tuple[FaceRecommendation, ...],
+    skip_face: bool = False,
 ) -> str:
-    recommendation_text = format_recommendations(recommendations)
-    prompt = build_personal_final_prompt(
-        profile,
-        manse_lookup.formatted_text,
-        face_analysis,
-        recommendation_text,
-    )
+    recommendation_text = ""
+    debug_label = "personal_saju_final"
+    prompt = build_personal_saju_final_prompt(profile, manse_lookup.formatted_text)
+    if not skip_face:
+        recommendation_text = format_recommendations(recommendations)
+        debug_label = "personal_final"
+        prompt = build_personal_final_prompt(
+            profile,
+            manse_lookup.formatted_text,
+            face_analysis,
+            recommendation_text,
+        )
     generated = _safe_generate(
         client,
         prompt,
         None,
         "최종 리포트를 생성하지 못했습니다.",
-        debug_label="personal_final",
+        debug_label=debug_label,
     )
     markdown = generated.text
     error = generated.error
@@ -629,6 +639,7 @@ def _build_personal_markdown(
             face_analysis,
             recommendation_text,
             error,
+            skip_face,
         )
     result = markdown
     return result
@@ -885,20 +896,25 @@ def _fallback_personal_markdown(
     face_analysis: str,
     recommendation_text: str,
     error: str,
+    skip_face: bool = False,
 ) -> str:
-    result = f"""
-# {profile.name} 님 Oracle 종합 리포트
-## 한 줄 요약
-로컬 LLM 응답에 문제가 있어 룰 기반 정보로 기본 리포트를 생성했습니다.
-
-## 사주팔자 핵심
-{saju_text}
-
+    face_sections = ""
+    if not skip_face:
+        face_sections = f"""
 ## 얼굴 관찰 풀이
 {face_analysis}
 
 ## 추천받고 싶은 얼굴 성별 기준 추천
 {recommendation_text}
+"""
+    result = f"""
+# {profile.name} 님 Oracle {'사주' if skip_face else '종합'} 리포트
+## 한 줄 요약
+로컬 LLM 응답에 문제가 있어 룰 기반 정보로 기본 리포트를 생성했습니다.
+
+## 사주팔자 핵심
+{saju_text}
+{face_sections}
 
 ## 참고 문구
 이 리포트는 엔터테인먼트 목적의 참고 자료입니다.

@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from oracle_report.models import BirthProfile
+from oracle_report.recommender import FaceRecommendation
 from oracle_report.report_html import (
     render_compatibility_report_html,
     render_personal_report_html,
@@ -34,6 +35,40 @@ def test_report_html_fallback_face_blocks_explain_terms(tmp_path: Path) -> None:
     assert "표정과 눈썹 흐름" not in html
     assert "눈은 시선의 또렷함" in html
     assert "삼정은 얼굴을 위" in html
+
+
+def test_personal_saju_only_report_hides_face_recommendations(tmp_path: Path) -> None:
+    db_path = tmp_path / "manse.sqlite"
+    build_manse_database(db_path, start_year=1995, end_year=1995)
+    profile = BirthProfile(
+        name="tester",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    recommendation = FaceRecommendation(
+        display_name="추천 후보",
+        image_path=None,
+        target_gender="여성",
+        face_tags=("밝은 표정",),
+        saju_tags=("목",),
+        reason="보완 설명",
+        score=9,
+    )
+
+    html = render_personal_report_html(
+        profile,
+        ManseRepository(db_path).lookup(profile),
+        "",
+        (recommendation,),
+        '{"essence":"사주 핵심","saju_blocks":[]}',
+        skip_face=True,
+    )
+
+    assert "Oracle · 사주 리포트" in html
+    assert "FACE MATCH" not in html
+    assert "궁합 좋은 얼굴 추천" not in html
+    assert "추천 후보" not in html
+    assert "관상 — 얼굴이 말하는 것" not in html
 
 
 def test_compatibility_report_html_uses_structured_layout(tmp_path: Path) -> None:

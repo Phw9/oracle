@@ -14,7 +14,47 @@ def test_favicon_returns_no_content() -> None:
     assert response.status_code == 204
 
 
-def test_personal_page_includes_visible_workflow_loading_state() -> None:
+def test_home_page_uses_oracle_home_layout_and_hover_effects() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import create_app
+
+    app = create_app()
+
+    response = app.test_client().get("/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'class="oracle-home-shell"' in html
+    assert 'ORACLE<span class="stamp serif">運</span>' in html
+    assert 'class="hero"' in html
+    assert 'class="mode solo"' in html
+    assert 'href="/personal"' in html
+    assert 'class="mode pair"' in html
+    assert 'href="/compatibility"' in html
+    assert ".mode:hover" in html
+    assert "transform: translateY(-6px);" in html
+    assert ".mode:hover .go .arr" in html
+    assert "transform: translateX(4px);" in html
+
+
+def test_home_page_serves_saju_illustration() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import create_app
+
+    app = create_app()
+    client = app.test_client()
+
+    response = client.get("/")
+    html = response.get_data(as_text=True)
+    image_response = client.get("/static/assets/saju.jpg")
+
+    assert response.status_code == 200
+    assert 'src="/static/assets/saju.jpg"' in html
+    assert image_response.status_code == 200
+    assert image_response.content_type == "image/jpeg"
+
+
+def test_personal_input_page_links_to_separate_result_page() -> None:
     pytest.importorskip("flask")
     from oracle_report.web import create_app
 
@@ -24,10 +64,69 @@ def test_personal_page_includes_visible_workflow_loading_state() -> None:
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    assert 'data-workflow-api="/api/personal"' in html
+    assert 'id="workflow-loading"' not in html
+    assert 'id="workflow-result"' not in html
+    assert "startPayload.result_url" in html
+    assert "window.location.href" in html
+
+
+def test_personal_result_page_includes_workflow_loading_state() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import create_app
+
+    app = create_app()
+
+    response = app.test_client().get("/personal/result/test-job?skip_face=1")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'data-workflow-result-job="test-job"' in html
+    assert 'data-skip-face="1"' in html
     assert 'id="workflow-loading"' in html
     assert 'role="status"' in html
     assert "사주 리포트 생성 중입니다" in html
-    assert "loading.hidden = false" in html
+    assert "pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading)" in html
+    assert 'id="download-report-link"' in html
+    assert 'href="/api/jobs/test-job/download"' in html
+    assert "리포트 다운로드" in html
+
+
+def test_completed_job_downloads_report_html() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    app = create_app()
+    _set_job(
+        "downloadable-job",
+        _WorkflowJob(
+            status="complete",
+            html="<section>fragment</section>",
+            download_html="<!doctype html><html><body>full report</body></html>",
+            download_filename="personal_report.html",
+        ),
+    )
+
+    response = app.test_client().get("/api/jobs/downloadable-job/download")
+
+    assert response.status_code == 200
+    assert response.content_type == "text/html; charset=utf-8"
+    assert response.headers["Content-Disposition"] == (
+        'attachment; filename="personal_report.html"'
+    )
+    assert "full report" in response.get_data(as_text=True)
+
+
+def test_running_job_download_returns_not_found() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    app = create_app()
+    _set_job("running-job", _WorkflowJob(status="running"))
+
+    response = app.test_client().get("/api/jobs/running-job/download")
+
+    assert response.status_code == 404
 
 
 def test_personal_page_uses_oracle_input_card_layout() -> None:
