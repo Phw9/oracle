@@ -59,6 +59,8 @@ LLAMA_BATCH_SIZE=""
 LLAMA_EXTRA_ARGS=""
 PYTHON_ENV="auto"
 POSITIONAL_ARGS=()
+LLAMA_SERVER_STARTED=0
+LLAMA_SERVER_PID=""
 
 log() {
   printf '[run] %s\n' "$*"
@@ -72,6 +74,72 @@ fail() {
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
+
+process_running() {
+  local pid="$1"
+  local state
+  if ! kill -0 "$pid" >/dev/null 2>&1; then
+    return 1
+  fi
+  state="$(ps -p "$pid" -o stat= 2>/dev/null | tr -d '[:space:]')"
+  if [[ "$state" == Z* ]]; then
+    return 1
+  fi
+  return 0
+}
+
+cleanup_llama_server() {
+  local pid
+  local recorded_pid
+  local attempt
+
+  if [[ "${LLAMA_SERVER_STARTED:-0}" != "1" ]]; then
+    return
+  fi
+
+  pid="${LLAMA_SERVER_PID:-}"
+  if [[ -z "$pid" ]]; then
+    return
+  fi
+
+  if process_running "$pid"; then
+    log "stopping llama.cpp server pid=$pid"
+    kill "$pid" >/dev/null 2>&1 || true
+    for attempt in $(seq 1 30); do
+      if ! process_running "$pid"; then
+        break
+      fi
+      sleep 0.2
+    done
+    if process_running "$pid"; then
+      log "forcing llama.cpp server stop pid=$pid"
+      kill -KILL "$pid" >/dev/null 2>&1 || true
+    fi
+    wait "$pid" >/dev/null 2>&1 || true
+  fi
+
+  if [[ -f "$LLAMA_PID_FILE" ]]; then
+    recorded_pid="$(cat "$LLAMA_PID_FILE" 2>/dev/null || true)"
+    if [[ "$recorded_pid" == "$pid" ]]; then
+      rm -f "$LLAMA_PID_FILE"
+    fi
+  fi
+
+  LLAMA_SERVER_STARTED=0
+  LLAMA_SERVER_PID=""
+}
+
+on_run_exit() {
+  local status
+  status="$?"
+  set +e
+  cleanup_llama_server
+  exit "$status"
+}
+
+trap on_run_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 print_help() {
   cat <<EOF
@@ -624,7 +692,9 @@ start_llama_server() {
   log "llama-server arguments: ${server_args[*]}"
 
   "$server_bin" "${server_args[@]}" >"$LLAMA_LOG_DIR/llama-server.log" 2>&1 &
-  printf '%s\n' "$!" >"$LLAMA_PID_FILE"
+  LLAMA_SERVER_PID="$!"
+  LLAMA_SERVER_STARTED=1
+  printf '%s\n' "$LLAMA_SERVER_PID" >"$LLAMA_PID_FILE"
 
   local attempt
   for attempt in $(seq 1 180); do
