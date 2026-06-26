@@ -14,12 +14,12 @@
 기본 설치:
 
 ```bash
-./run.sh build
+./build.sh
 ```
 
-`build.sh`는 Python 환경, Python 패키지, llama.cpp, 기본 GGUF 모델, 만세력 DB를 준비합니다. 이미 `models/*.gguf`가 있으면 모델 다운로드를 건너뜁니다.
+`build.sh`는 Python 환경, Python 패키지, llama.cpp, 기본 GGUF 모델을 준비합니다. 이미 `models/*.gguf`가 있으면 모델 다운로드를 건너뜁니다. `run.sh`는 빌드를 수행하지 않고 실행만 담당합니다.
 
-기본 Python 설치 위치는 프로젝트 루트의 `.venv`입니다. 다른 환경을 강제로 쓰려면 `--python-env uv`, `--python-env conda`, `--python-env active-conda`, `--python-env auto` 중 하나를 명시합니다.
+기본 Python 설치 위치는 프로젝트 루트의 `.venv`입니다. 다만 현재 실행(활성화)되어 있는 가상환경(anaconda, uv, venv 등)이 있다면 자동으로 해당 환경을 사용하며, 다른 환경을 강제로 쓰려면 `--python-env uv`, `--python-env conda`, `--python-env active-conda`, `--python-env active-venv`, `--python-env auto` 중 하나를 명시할 수 있습니다.
 
 고정 버전 목록만 직접 설치해야 하는 환경에서는 다음 파일을 참고합니다.
 
@@ -40,7 +40,7 @@ python -m pip install -e .
 http://<raspberry-pi-ip>:8501
 ```
 
-태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 만세력 조회는 `12:00` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
+태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 사주 계산은 `12:30` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
 
 ## 3. 실행 모드
 
@@ -70,16 +70,19 @@ http://<raspberry-pi-ip>:8501
 궁합 리포트 관상 분석 LLM 프롬프트 확인:
 
 ```bash
-./run.sh prompt compatibility-face-analysis \
+./run.sh prompt face-analysis-copule \
   --name "홍길동" \
   --birth-date 1995-03-15 \
   --birth-time 14:30 \
   --gender male \
-  --mode 연인 \
-  --person-label "첫 번째 사람"
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
 ```
 
-사주/만세력 조회 결과가 최종 리포트에 어떤 텍스트로 들어가는지 확인:
+개인 사주/만세력 조회 결과가 리포트에 어떤 텍스트로 들어가는지 확인:
 
 ```bash
 ./run.sh prompt saju-reading \
@@ -89,7 +92,22 @@ http://<raspberry-pi-ip>:8501
   --gender male
 ```
 
-개인 최종 리포트 프롬프트 확인:
+궁합 사주/만세력 조회 결과가 리포트에 어떤 텍스트로 들어가는지 확인:
+
+```bash
+./run.sh prompt saju-reading-couple \
+  --name "홍길동" \
+  --birth-date 1995-03-15 \
+  --birth-time 14:30 \
+  --gender male \
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
+```
+
+개인 최종 리포트 legacy/debug 프롬프트 확인:
 
 ```bash
 ./run.sh prompt personal-final \
@@ -102,27 +120,11 @@ http://<raspberry-pi-ip>:8501
   --recommendation-text "추천 후보 예시"
 ```
 
-궁합 최종 리포트 프롬프트 확인:
-
-```bash
-./run.sh prompt compatibility-final \
-  --name "홍길동" \
-  --birth-date 1995-03-15 \
-  --birth-time 14:30 \
-  --gender male \
-  --right-name "김영희" \
-  --right-birth-date 1997-05-20 \
-  --right-birth-time 09:00 \
-  --right-gender female \
-  --mode 연인 \
-  --face-analysis "두 사람 관상 분석 결과 예시"
-```
-
 ## 5. LLM 결과만 확인
 
 `llm`은 프롬프트를 로컬 LLM에 보내고 LLM 응답만 출력합니다.
 
-사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
+개인 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm saju-reading \
@@ -132,7 +134,22 @@ http://<raspberry-pi-ip>:8501
   --gender male
 ```
 
-개인 최종 리포트 LLM 결과만 확인:
+궁합 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading_couple` 프롬프트에 넣고 LLM 결과만 확인:
+
+```bash
+./run.sh llm saju-reading-couple \
+  --name "홍길동" \
+  --birth-date 1995-03-15 \
+  --birth-time 14:30 \
+  --gender male \
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
+```
+
+개인 최종 리포트 legacy/debug 프롬프트를 `configs/prompts_debug.json`에서 읽어 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm personal-final \
@@ -156,45 +173,72 @@ http://<raspberry-pi-ip>:8501
   --image runs/session-001/capture.jpg
 ```
 
-## 6. 설정 파일
+## 6. 프롬프트 토큰 확인
 
-자주 수정하는 값은 `run.sh` 상단 또는 `.env`에서 조정합니다.
+`token`은 현재 `configs/prompts.json`의 각 프롬프트 prefix/body 템플릿 토큰 크기를 출력합니다. 기본 실행은 로컬 llama.cpp `/tokenize`를 사용하므로 실제 모델 기준에 가깝습니다.
+
+```bash
+./run.sh token
+```
+
+llama.cpp 서버 없이 대략적인 크기만 확인할 때:
+
+```bash
+./run.sh token --offline
+```
+
+## 7. 설정 파일
+
+자주 수정하는 값은 `.env`에서 조정합니다.
 
 ```env
 ORACLE_APP_PORT=8501
-ORACLE_LLAMA_MODEL_PATH=models/gemma-3-1b-it-Q4_0.gguf
+ORACLE_LLAMA_MODEL_PATH=models/gemma-4-E2B-it-UD-Q2_K_XL.gguf
+ORACLE_LLAMA_MODEL_URL=https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf
+ORACLE_LLAMA_MODEL_SHA256=dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da2429a727de0c
+LLAMA_PARALLEL=5
 ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
 ORACLE_PROMPTS_PATH=configs/prompts.json
+ORACLE_DEBUG_PROMPTS_PATH=configs/prompts_debug.json
 ORACLE_FACE_DB_PATH=data/face_recommendations.sqlite
 ```
 
-프롬프트 템플릿은 다음 파일을 수정합니다.
+운영 프롬프트 템플릿은 다음 파일을 수정합니다.
 
 ```text
 configs/prompts.json
 ```
 
+legacy/debug 프롬프트는 다음 파일을 수정합니다.
+
+```text
+configs/prompts_debug.json
+```
+
 주요 템플릿 키:
 
 - `saju_reading`: 런타임 만세력 계산 결과를 LLM에 보내는 사주 해설 프롬프트
+- `saju_reading_couple`: 두 사람의 만세력 계산 결과를 LLM에 보내는 궁합 사주 해설 프롬프트
 - `personal_face_analysis`: 캡처 이미지 기반 개인 관상 메모 프롬프트
-- `compatibility_face_analysis`: 캡처 이미지 기반 궁합 관상 메모 프롬프트
-- `personal_final`: 사주/만세력, 관상 메모, 얼굴 추천 정보를 합친 개인 최종 JSON 리포트 프롬프트
-- `compatibility_final`: 두 사람의 사주/만세력과 관상 메모를 합친 궁합 최종 JSON 리포트 프롬프트
+- `face_analysis_copule`: 두 사람의 결합 크롭 이미지 기반 궁합 관상 JSON 프롬프트
+- `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
+- `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
+
+운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. `prefix`에는 고정 지시문과 출력 스키마를 두고, `body`에는 이름, 생년월일시, 만세력 결과, 캡처 품질 같은 실행 시점 입력값을 둡니다. LLM 요청에는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
 
 관상 모드:
 
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
-## 7. 데이터 파일
+## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB
 - `data/face_recommendations.sqlite`: 개인 리포트 추천 후보용 로컬 샘플 DB. 없으면 실행 중 자동 생성됩니다.
 
-## 8. 테스트 및 결과 저장
+## 9. 테스트 및 결과 저장
 
 테스트 실행:
 
@@ -215,10 +259,10 @@ python -m pytest 2>&1 | tee test-results/pytest-latest.txt
 test-results/pytest-latest.txt
 ```
 
-## 9. 재현 체크리스트
+## 10. 재현 체크리스트
 
-1. `requirements.txt` 또는 `./run.sh build`로 라이브러리 설치
-2. `models/*.gguf` 또는 `ORACLE_LLAMA_MODEL_PATH` 확인
+1. `requirements.txt` 또는 `./build.sh`로 라이브러리 설치
+2. `.env`의 `ORACLE_LLAMA_MODEL_PATH`와 `models/*.gguf` 확인
 3. `configs/prompts.json` 프롬프트 확인
 4. `python -m pytest` 실행
 5. `./run.sh`로 웹 UI 실행

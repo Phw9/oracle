@@ -14,12 +14,16 @@ from oracle_report.config import (
 from oracle_report.llm import LlamaCppChatClient
 from oracle_report.models import BirthProfile
 from oracle_report.physiognomy import FaceReadingInput
+from oracle_report.prompt_templates import (
+    list_prompt_template_info,
+    render_debug_prompt_template,
+)
 from oracle_report.recommender import format_recommendations, recommend_faces
 from oracle_report.report import (
+    build_couple_face_analysis_prompt,
+    build_couple_saju_reading_prompt,
     build_compatibility_face_analysis_prompt,
-    build_compatibility_final_prompt,
     build_personal_face_analysis_prompt,
-    build_personal_final_prompt,
     build_saju_reading_prompt,
 )
 from oracle_report.saju.engine import SajuReading
@@ -27,6 +31,8 @@ from oracle_report.saju.repository import (
     ManseLookupResult,
     ManseRepository,
     UNKNOWN_BIRTH_TIME_REPRESENTATIVE,
+    birth_datetime_display_from_profile,
+    birth_time_display_from_profile,
     representative_time_from_time_branch,
 )
 from oracle_report.vision.runtime import run_capture
@@ -35,6 +41,13 @@ from oracle_report.vision.runtime import run_capture
 _DEFAULT_FACE_ANALYSIS_TEXT = "관상 분석 결과를 여기에 넣습니다."
 _DEFAULT_FACE_DB_PATH = "data/face_recommendations.sqlite"
 _UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
+_TOKEN_TABLE_HEADERS = (
+    "name",
+    "id_slot",
+    "prefix_tokens",
+    "body_template_tokens",
+    "full_template_tokens",
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _run_prompt_result_command(args)
         elif args.command == "llm":
             result = _run_prompt_result_command(args)
+        elif args.command == "token":
+            result = _run_token_command(args)
         else:
             parser.print_help()
             result = 2
@@ -88,6 +103,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_prompt_args(llm)
 
+    token = subparsers.add_parser(
+        "token",
+        help="print prompt prefix token sizes",
+    )
+    token.add_argument(
+        "--offline",
+        action="store_true",
+        help="estimate token counts without calling llama.cpp /tokenize",
+    )
+
     result = parser
     return result
 
@@ -105,7 +130,9 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
         choices=(
             "personal-face-analysis",
             "compatibility-face-analysis",
+            "face-analysis-copule",
             "saju-reading",
+            "saju-reading-couple",
             "personal-final",
             "compatibility-final",
         ),
@@ -157,12 +184,21 @@ def _run_prompt_command(args: argparse.Namespace) -> int:
 def _run_prompt_result_command(args: argparse.Namespace) -> int:
     prompt_text = _build_llm_prompt_text(args)
     output_text = prompt_text
-    if args.target in ("personal-face-analysis", "compatibility-face-analysis"):
+    if args.target in (
+        "personal-face-analysis",
+        "compatibility-face-analysis",
+        "face-analysis-copule",
+    ):
         output_text = LlamaCppChatClient(load_face_llm_config()).generate(
             prompt_text,
             image_path=args.image,
         )
-    elif args.target in ("saju-reading", "personal-final", "compatibility-final"):
+    elif args.target in (
+        "saju-reading",
+        "saju-reading-couple",
+        "personal-final",
+        "compatibility-final",
+    ):
         output_text = LlamaCppChatClient(load_report_llm_config()).generate(
             prompt_text,
             image_path=None,
@@ -172,12 +208,143 @@ def _run_prompt_result_command(args: argparse.Namespace) -> int:
     return result
 
 
+def _run_token_command(args: argparse.Namespace) -> int:
+    config = load_report_llm_config()
+    counter = _PromptTokenCounter(config.base_url, offline=args.offline)
+    rows = []
+    for info in list_prompt_template_info():
+        prefix_tokens = counter.count(info.prefix)
+        body_tokens = counter.count(info.body_template)
+        full_text = _join_prompt_parts(info.prefix, info.body_template)
+        full_tokens = counter.count(full_text)
+        slot_text = "" if info.slot_id is None else str(info.slot_id)
+        rows.append(
+            (
+                info.name,
+                slot_text,
+                str(prefix_tokens),
+                str(body_tokens),
+                str(full_tokens),
+            ),
+        )
+    print(f"source={counter.source}")
+    for line in _format_table(_TOKEN_TABLE_HEADERS, rows):
+        print(line)
+    result = 0
+    return result
+
+
+def _format_table(
+    headers: tuple[str, ...],
+    rows: list[tuple[str, ...]],
+) -> list[str]:
+    all_rows = [headers, *rows]
+    widths = _table_widths(all_rows)
+    result = [_format_table_row(headers, widths)]
+    for row in rows:
+        result.append(_format_table_row(row, widths))
+    return result
+
+
+def _table_widths(rows: list[tuple[str, ...]]) -> tuple[int, ...]:
+    widths = [0] * len(rows[0])
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+    result = tuple(widths)
+    return result
+
+
+def _format_table_row(row: tuple[str, ...], widths: tuple[int, ...]) -> str:
+    cells = []
+    last_index = len(row) - 1
+    for index, cell in enumerate(row):
+        if index == last_index:
+            cells.append(cell)
+        else:
+            cells.append(cell.ljust(widths[index]))
+    result = "  ".join(cells).rstrip()
+    return result
+
+
 def _build_llm_prompt_text(args: argparse.Namespace) -> str:
     result = _build_prompt_text(args)
     if args.target == "saju-reading":
         profile = _build_prompt_birth_profile(args)
         manse_lookup = _lookup_manse(args, profile)
         result = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
+    elif args.target == "saju-reading-couple":
+        result = _build_couple_saju_reading_prompt_text(args)
+    return result
+
+
+class _PromptTokenCounter:
+    def __init__(self, base_url: str, offline: bool) -> None:
+        self._base_url = base_url
+        self._offline = offline
+        self._server_failed = False
+
+    @property
+    def source(self) -> str:
+        result = "llama.cpp /tokenize"
+        if self._offline or self._server_failed:
+            result = "estimated"
+        return result
+
+    def count(self, text: str) -> int:
+        result = _estimate_token_count(text)
+        if not self._offline and not self._server_failed:
+            try:
+                result = _server_token_count(self._base_url, text)
+            except Exception as exc:
+                self._server_failed = True
+                print(f"[token][warn] using estimated counts: {exc}")
+                result = _estimate_token_count(text)
+        return result
+
+
+def _server_token_count(base_url: str, text: str) -> int:
+    import requests
+
+    token_url = _tokenize_url(base_url)
+    response = requests.post(
+        token_url,
+        json={"content": text},
+        timeout=15.0,
+    )
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(f"HTTP {response.status_code} from {token_url}")
+    root = response.json()
+    result = 0
+    tokens = root.get("tokens")
+    if isinstance(tokens, list):
+        result = len(tokens)
+    else:
+        count = root.get("count", root.get("n_tokens", 0))
+        if isinstance(count, int):
+            result = count
+    return result
+
+
+def _tokenize_url(base_url: str) -> str:
+    cleaned_url = base_url.rstrip("/")
+    if cleaned_url.endswith("/v1"):
+        cleaned_url = cleaned_url[:-3]
+    result = f"{cleaned_url}/tokenize"
+    return result
+
+
+def _estimate_token_count(text: str) -> int:
+    result = 0
+    if text.strip() != "":
+        result = max(1, len(text.encode("utf-8")) // 4)
+    return result
+
+
+def _join_prompt_parts(prefix: str, body: str) -> str:
+    result = body.strip()
+    if prefix.strip() != "":
+        result = f"{prefix.strip()}\n\n{body.strip()}".strip()
     return result
 
 
@@ -215,24 +382,16 @@ def _build_prompt_text(args: argparse.Namespace) -> str:
             args.person_label,
             args.mode,
         )
+    elif args.target == "face-analysis-copule":
+        result = _build_couple_face_analysis_prompt_text(args, profile)
     elif args.target == "saju-reading":
         result = _lookup_manse(args, profile).formatted_text
+    elif args.target == "saju-reading-couple":
+        result = _build_pair_manse_text(args, profile)
     elif args.target == "personal-final":
-        manse_lookup = _lookup_manse(args, profile)
-        face_analysis = _read_text_option(
-            args.face_analysis,
-            args.face_analysis_file,
-            _DEFAULT_FACE_ANALYSIS_TEXT,
-        )
-        recommendation_text = _build_recommendation_text(args, manse_lookup.reading)
-        result = build_personal_final_prompt(
-            profile,
-            manse_lookup.formatted_text,
-            face_analysis,
-            recommendation_text,
-        )
+        result = _build_personal_final_debug_prompt_text(args, profile)
     elif args.target == "compatibility-final":
-        result = _build_compatibility_final_prompt_text(args, profile)
+        result = _build_compatibility_final_debug_prompt_text(args, profile)
     return result
 
 
@@ -281,7 +440,84 @@ def _build_recommendation_text(
     return result
 
 
-def _build_compatibility_final_prompt_text(
+def _build_personal_final_debug_prompt_text(
+    args: argparse.Namespace,
+    profile: BirthProfile,
+) -> str:
+    manse_lookup = _lookup_manse(args, profile)
+    face_analysis = _read_text_option(
+        args.face_analysis,
+        args.face_analysis_file,
+        _DEFAULT_FACE_ANALYSIS_TEXT,
+    )
+    recommendation_text = _build_recommendation_text(args, manse_lookup.reading)
+    result = render_debug_prompt_template(
+        "personal_final",
+        {
+            "name": profile.name,
+            "gender": _gender_text(profile),
+            "birth_datetime": birth_datetime_display_from_profile(profile),
+            "birth_time_text": birth_time_display_from_profile(profile),
+            "timezone": profile.timezone,
+            "saju_text": manse_lookup.formatted_text,
+            "face_analysis": face_analysis,
+            "recommendation_text": recommendation_text,
+        },
+    )
+    return result
+
+
+def _build_couple_face_analysis_prompt_text(
+    args: argparse.Namespace,
+    left_profile: BirthProfile,
+) -> str:
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_input = FaceReadingInput(image_path=args.image, quality=None)
+    right_input = FaceReadingInput(image_path=args.image, quality=None)
+    result = build_couple_face_analysis_prompt(
+        left_profile,
+        right_profile,
+        args.mode,
+        left_input,
+        right_input,
+    )
+    return result
+
+
+def _build_couple_saju_reading_prompt_text(args: argparse.Namespace) -> str:
+    left_profile = _build_prompt_birth_profile(args)
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_manse = _lookup_manse(args, left_profile)
+    right_manse = _lookup_manse(args, right_profile)
+    result = build_couple_saju_reading_prompt(
+        left_profile,
+        right_profile,
+        args.mode,
+        left_manse.formatted_text,
+        right_manse.formatted_text,
+    )
+    return result
+
+
+def _build_pair_manse_text(
+    args: argparse.Namespace,
+    left_profile: BirthProfile,
+) -> str:
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_manse = _lookup_manse(args, left_profile)
+    right_manse = _lookup_manse(args, right_profile)
+    result = "\n\n".join((left_manse.formatted_text, right_manse.formatted_text))
+    return result
+
+
+def _gender_text(profile: BirthProfile) -> str:
+    result = profile.gender
+    if result == "":
+        result = "미입력"
+    return result
+
+
+def _build_compatibility_final_debug_prompt_text(
     args: argparse.Namespace,
     left_profile: BirthProfile,
 ) -> str:
@@ -293,13 +529,22 @@ def _build_compatibility_final_prompt_text(
         args.face_analysis_file,
         _DEFAULT_FACE_ANALYSIS_TEXT,
     )
-    result = build_compatibility_final_prompt(
-        left_profile,
-        right_profile,
-        args.mode,
-        left_manse.formatted_text,
-        right_manse.formatted_text,
-        face_analysis,
+    result = render_debug_prompt_template(
+        "compatibility_final",
+        {
+            "left_name": left_profile.name,
+            "left_gender": _gender_text(left_profile),
+            "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
+            "left_birth_time_text": birth_time_display_from_profile(left_profile),
+            "right_name": right_profile.name,
+            "right_gender": _gender_text(right_profile),
+            "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
+            "right_birth_time_text": birth_time_display_from_profile(right_profile),
+            "mode": args.mode,
+            "left_saju_text": left_manse.formatted_text,
+            "right_saju_text": right_manse.formatted_text,
+            "face_analysis": face_analysis,
+        },
     )
     return result
 

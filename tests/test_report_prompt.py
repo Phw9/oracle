@@ -7,12 +7,38 @@ from pathlib import Path
 from oracle_report.models import BirthProfile
 from oracle_report.physiognomy import FaceReadingInput
 from oracle_report.report import (
-    build_compatibility_final_prompt,
+    build_couple_face_analysis_prompt,
+    build_couple_saju_reading_prompt,
     build_compatibility_face_analysis_prompt,
     build_personal_face_analysis_prompt,
-    build_personal_final_prompt,
     build_saju_reading_prompt,
 )
+
+
+_PROMPT_TEMPLATE_NAMES = (
+    "personal_face_analysis",
+    "saju_reading",
+    "saju_reading_couple",
+    "compatibility_face_analysis",
+    "face_analysis_copule",
+)
+
+
+def test_runtime_prompts_define_explicit_cache_prefixes() -> None:
+    prompt_path = Path("configs/prompts.json")
+    root = json.loads(prompt_path.read_text(encoding="utf-8"))
+
+    for prompt_name in _PROMPT_TEMPLATE_NAMES:
+        prompt_config = root[prompt_name]
+
+        assert isinstance(prompt_config, dict)
+        assert isinstance(prompt_config["id_slot"], int)
+        assert isinstance(prompt_config["prefix"], list)
+        assert isinstance(prompt_config["body"], list)
+        assert prompt_config["prefix"]
+        assert prompt_config["body"]
+        assert "${" not in "\n".join(prompt_config["prefix"])
+        assert "${" in "\n".join(prompt_config["body"])
 
 
 def test_personal_face_analysis_prompt_contains_required_context() -> None:
@@ -41,24 +67,6 @@ def test_compatibility_face_analysis_prompt_contains_pair_context() -> None:
     assert "현재 분석 대상: 첫 번째 사람" in prompt
 
 
-def test_personal_final_prompt_contains_json_schema() -> None:
-    profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
-
-    prompt = build_personal_final_prompt(
-        profile,
-        "사주 입력",
-        "관상 입력",
-        "추천 입력",
-    )
-
-    assert "\"face_blocks\"" in prompt
-    assert "\"saju_blocks\"" in prompt
-    assert "사주 입력" in prompt
-    assert "관상 입력" in prompt
-    assert "보조 해석" not in prompt
-    assert "주의 문구" not in prompt
-
-
 def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
     profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
 
@@ -73,28 +81,48 @@ def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
     assert "사주 입력" in prompt
     assert "얼굴 관찰 메모" not in prompt
     assert "추천받고 싶은 얼굴" not in prompt
+    assert prompt.name == "saju_reading"
+    assert prompt.slot_id == 1
+    assert prompt.prefix.strip() != ""
+    assert "사주 입력" not in prompt.prefix
+    assert "사주 입력" in prompt.body
 
 
-def test_compatibility_final_prompt_contains_json_schema() -> None:
+def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:
     left = BirthProfile(name="left", birth_datetime=datetime(1995, 3, 15, 14, 30))
     right = BirthProfile(name="right", birth_datetime=datetime(1997, 5, 20, 9, 0))
 
-    prompt = build_compatibility_final_prompt(
+    prompt = build_couple_saju_reading_prompt(
         left,
         right,
         "연인",
-        "첫 번째 사주 입력",
-        "두 번째 사주 입력",
-        "궁합 관상 입력",
+        "LEFT SAJU INPUT",
+        "RIGHT SAJU INPUT",
+    )
+
+    assert "\"saju_blocks\"" in prompt
+    assert "\"pair_blocks\"" not in prompt
+    assert "LEFT SAJU INPUT" in prompt
+    assert "RIGHT SAJU INPUT" in prompt
+    assert "face_analysis_copule" not in prompt
+
+
+def test_couple_face_analysis_prompt_uses_pair_face_only() -> None:
+    left = BirthProfile(name="left", birth_datetime=datetime(1995, 3, 15, 14, 30))
+    right = BirthProfile(name="right", birth_datetime=datetime(1997, 5, 20, 9, 0))
+
+    prompt = build_couple_face_analysis_prompt(
+        left,
+        right,
+        "연인",
+        FaceReadingInput(None, None),
+        FaceReadingInput(None, None),
     )
 
     assert "\"pair_blocks\"" in prompt
-    assert "\"saju_blocks\"" in prompt
-    assert "\"action_title\"" in prompt
-    assert "첫 번째 사주 입력" in prompt
-    assert "두 번째 사주 입력" in prompt
-    assert "궁합 관상 입력" in prompt
-    assert "Markdown으로만" not in prompt
+    assert "\"saju_blocks\"" not in prompt
+    assert "left" in prompt
+    assert "right" in prompt
 
 
 def test_prompt_template_can_be_overridden_from_json(

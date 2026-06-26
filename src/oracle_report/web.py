@@ -600,9 +600,9 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
         <div class="ornament"></div>
       </div>
       <div class="result-actions">
-        <a class="text-link" href="/personal">입력 다시 하기</a>
-        <a class="text-link" href="/">처음으로</a>
-        <a id="download-report-link" class="text-link download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
+        <a class="result-action" href="/personal">입력 다시 하기</a>
+        <a class="result-action" href="/">처음으로</a>
+        <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
       {_capture_preview_panel(job_id=job_id, skip_face=skip_face)}
     </div>
@@ -1231,22 +1231,40 @@ def _render_page(
           .result-actions {{
             display: flex;
             justify-content: center;
-            gap: 14px;
-            margin: -4px 0 18px;
+            gap: 10px;
+            margin: 2px 0 22px;
+            flex-wrap: wrap;
           }}
-          .text-link {{
-            color: var(--ink-soft);
-            font-size: 13px;
-            text-decoration: none;
-            border-bottom: 1px solid transparent;
-          }}
-          .text-link:hover {{
-            color: var(--mok-deep);
-            border-bottom-color: var(--mok-deep);
-          }}
-          .download-link {{
-            color: var(--mok-deep);
+          .result-action {{
+            min-height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px 18px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: var(--paper-2);
+            color: var(--ink);
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
             font-weight: 700;
+            text-decoration: none;
+            box-shadow: 0 8px 20px -16px rgba(46, 37, 32, 0.5);
+            transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s, background 0.2s;
+          }}
+          .result-action:hover {{
+            transform: translateY(-2px);
+            border-color: var(--mok);
+            box-shadow: 0 14px 28px -18px rgba(46, 37, 32, 0.6);
+          }}
+          .result-action-primary {{
+            background: var(--mok);
+            border-color: var(--mok);
+            color: #ffffff;
+          }}
+          .result-action-primary:hover {{
+            background: var(--mok-deep);
+            border-color: var(--mok-deep);
           }}
           .workflow-loading {{
             display: flex;

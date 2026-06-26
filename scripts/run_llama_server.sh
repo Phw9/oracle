@@ -4,8 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 LLAMA_CPP_DIR="${ORACLE_LLAMA_CPP_DIR:-$ROOT_DIR/llama.cpp}"
-MODEL_PATH="${1:-${ORACLE_LLAMA_MODEL_PATH:-$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf}}"
+MODEL_PATH="${1:-${ORACLE_LLAMA_MODEL_PATH:-${LLAMA_MODEL:-$ROOT_DIR/models/gemma-4-E2B-it-UD-Q2_K_XL.gguf}}}"
 if [[ ! -f "$MODEL_PATH" ]]; then
   printf '[llama][error] model not found: %s\n' "$MODEL_PATH" >&2
   printf 'usage: scripts/run_llama_server.sh /path/to/model.gguf\n' >&2
@@ -27,6 +34,7 @@ fi
   --host 127.0.0.1 \
   --port 8080 \
   -c "${LLAMA_CONTEXT_SIZE:-4096}" \
+  --parallel "${LLAMA_PARALLEL:-5}" \
   -fa off \
   -ctk q4_0 \
   --reasoning-format none

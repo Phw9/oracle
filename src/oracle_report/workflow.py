@@ -22,8 +22,8 @@ from oracle_report.recommender import (
 )
 from oracle_report.physiognomy import FaceReadingInput
 from oracle_report.report import (
-    build_compatibility_final_prompt,
-    build_compatibility_face_analysis_prompt,
+    build_couple_face_analysis_prompt,
+    build_couple_saju_reading_prompt,
     build_personal_face_analysis_prompt,
     build_saju_reading_prompt,
 )
@@ -394,16 +394,21 @@ def run_compatibility_workflow(
         mode,
         face_analysis_mode,
     )
-    markdown = timing_recorder.run(
-        "final_report",
-        _build_compatibility_markdown,
+    saju_analysis = timing_recorder.run(
+        "saju_analysis_pair",
+        _build_compatibility_saju_analysis,
         active_report_client,
         left_profile,
         right_profile,
         mode,
         left_manse,
         right_manse,
+    )
+    markdown = timing_recorder.run(
+        "final_report",
+        _build_compatibility_report_json,
         face_analysis.text,
+        saju_analysis.text,
     )
     report_html = timing_recorder.run(
         "render_report_html",
@@ -552,62 +557,60 @@ def _build_pair_face_analysis(
             artifact.right,
             face_analysis_mode,
         )
+        error = ""
+        if left_analysis.error or right_analysis.error:
+            error = " / ".join(
+                item for item in (left_analysis.error, right_analysis.error) if item
+            )
+        text = "\n\n".join(
+            (
+                f"## 첫 번째 사람 관상정보\n{left_analysis.text}",
+                f"## 두 번째 사람 관상정보\n{right_analysis.text}",
+            ),
+        )
+        result = _GeneratedText(text=text, error=error)
     else:
-        left_analysis = _build_compatibility_face_analysis(
+        result = _build_couple_face_analysis(
             client,
             left_profile,
-            artifact.left,
-            "첫 번째 사람",
-            mode,
-        )
-        right_analysis = _build_compatibility_face_analysis(
-            client,
             right_profile,
-            artifact.right,
-            "두 번째 사람",
+            artifact,
             mode,
         )
-    error = ""
-    if left_analysis.error or right_analysis.error:
-        error = " / ".join(
-            item for item in (left_analysis.error, right_analysis.error) if item
-        )
-    text = "\n\n".join(
-        (
-            f"## 첫 번째 사람 관상정보\n{left_analysis.text}",
-            f"## 두 번째 사람 관상정보\n{right_analysis.text}",
-        ),
-    )
-    result = _GeneratedText(text=text, error=error)
     return result
 
 
-def _build_compatibility_face_analysis(
+def _build_couple_face_analysis(
     client: TextGenerator | None,
-    profile: BirthProfile,
-    artifact: CaptureArtifact,
-    person_label: str,
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
     mode: str,
 ) -> _GeneratedText:
     if client is None:
         raise ValueError("face analysis client is required for mode 1.")
-    image_path = _face_llm_image_path(artifact)
-    face_input = FaceReadingInput(
+    image_path = _pair_face_llm_image_path(artifact)
+    left_input = FaceReadingInput(
         image_path=image_path,
-        quality=artifact.quality,
+        quality=artifact.left.quality,
     )
-    prompt = build_compatibility_face_analysis_prompt(
-        profile,
-        face_input,
-        person_label,
+    right_input = FaceReadingInput(
+        image_path=image_path,
+        quality=artifact.right.quality,
+    )
+    prompt = build_couple_face_analysis_prompt(
+        left_profile,
+        right_profile,
         mode,
+        left_input,
+        right_input,
     )
     result = _safe_generate(
         client,
         prompt,
         image_path,
-        "관상정보를 생성하지 못했습니다.",
-        debug_label=f"compatibility_face_analysis:{person_label}",
+        "궁합 관상정보를 생성하지 못했습니다.",
+        debug_label="face_analysis_copule",
     )
     return result
 
@@ -647,6 +650,59 @@ def _face_llm_image_path(artifact: CaptureArtifact) -> Path:
                     "[FACE CROP] failed to write cropped face image; "
                     f"using original image: {artifact.image_path}",
                 )
+    return result
+
+
+def _pair_face_llm_image_path(artifact: SequentialPairCaptureArtifact) -> Path:
+    left_path = _face_llm_image_path(artifact.left)
+    right_path = _face_llm_image_path(artifact.right)
+    result = left_path
+    try:
+        cv2 = _import_cv2_for_face_crop()
+    except RuntimeError as exc:
+        print(
+            "[FACE CROP] OpenCV is unavailable; "
+            f"using first face image for pair analysis: {left_path}. reason={exc}",
+        )
+    else:
+        left_image = cv2.imread(str(left_path))
+        right_image = cv2.imread(str(right_path))
+        if left_image is None or right_image is None:
+            print(
+                "[FACE CROP] failed to read pair face crops; "
+                f"using first face image: {left_path}",
+            )
+        else:
+            target_height = max(left_image.shape[0], right_image.shape[0])
+            left_resized = _resize_image_to_height(cv2, left_image, target_height)
+            right_resized = _resize_image_to_height(cv2, right_image, target_height)
+            combined = cv2.hconcat((left_resized, right_resized))
+            pair_path = _pair_face_image_path(left_path, right_path)
+            ok = cv2.imwrite(str(pair_path), combined)
+            if ok:
+                result = pair_path
+            else:
+                print(
+                    "[FACE CROP] failed to write pair face image; "
+                    f"using first face image: {left_path}",
+                )
+    return result
+
+
+def _resize_image_to_height(cv2, image, target_height: int):
+    image_height, image_width = image.shape[:2]
+    result = image
+    if image_height > 0 and image_height != target_height:
+        target_width = max(1, int(image_width * target_height / image_height))
+        result = cv2.resize(image, (target_width, target_height))
+    return result
+
+
+def _pair_face_image_path(left_path: Path, right_path: Path) -> Path:
+    result_dir = left_path.parent
+    if left_path.parent.parent == right_path.parent.parent:
+        result_dir = left_path.parent.parent
+    result = result_dir / "pair_face_crop.jpg"
     return result
 
 
@@ -690,6 +746,31 @@ def _build_saju_analysis(
     return result
 
 
+def _build_compatibility_saju_analysis(
+    client: TextGenerator,
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    mode: str,
+    left_manse: ManseLookupResult,
+    right_manse: ManseLookupResult,
+) -> _GeneratedText:
+    prompt = build_couple_saju_reading_prompt(
+        left_profile,
+        right_profile,
+        mode,
+        left_manse.formatted_text,
+        right_manse.formatted_text,
+    )
+    result = _safe_generate(
+        client,
+        prompt,
+        None,
+        "궁합 사주정보를 생성하지 못했습니다.",
+        debug_label="saju_analysis_couple",
+    )
+    return result
+
+
 def _build_personal_report_json(
     manse_lookup: ManseLookupResult,
     face_analysis: str,
@@ -719,6 +800,89 @@ def _build_personal_report_json(
         skip_face,
     )
     result = json.dumps(payload, ensure_ascii=False)
+    return result
+
+
+def _build_compatibility_report_json(
+    face_analysis: str,
+    saju_analysis: str,
+) -> str:
+    face_payload, face_error = _load_json_payload_or_error(face_analysis)
+    saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
+    if face_error:
+        print(
+            "[UI FALLBACK:face_analysis_copule] invalid LLM output; "
+            f"renderer will fill missing pair fields. reason={face_error}",
+        )
+    if saju_error:
+        print(
+            "[UI FALLBACK:saju_analysis_couple] invalid LLM output; "
+            f"renderer will fill missing saju fields. reason={saju_error}",
+        )
+    payload = _merge_compatibility_payloads(face_payload, saju_payload)
+    result = json.dumps(payload, ensure_ascii=False)
+    return result
+
+
+def _merge_compatibility_payloads(
+    face_payload: dict[str, Any],
+    saju_payload: dict[str, Any],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key in (
+        "essence",
+        "saju_subtitle",
+        "saju_blocks",
+        "synthesis_title",
+        "synthesis_body",
+        "action_title",
+        "action_body",
+        "tags",
+        "disclaimer",
+    ):
+        value = saju_payload.get(key)
+        if value:
+            payload[key] = value
+    for key in ("pair_subtitle", "pair_blocks"):
+        value = face_payload.get(key)
+        if value:
+            payload[key] = value
+    for key in ("essence", "synthesis_title", "synthesis_body", "action_title", "action_body"):
+        if key not in payload:
+            value = face_payload.get(key)
+            if value:
+                payload[key] = value
+    payload["convergence"] = _combined_pair_convergence(face_payload, saju_payload)
+    result = payload
+    return result
+
+
+def _combined_pair_convergence(
+    face_payload: dict[str, Any],
+    saju_payload: dict[str, Any],
+) -> list[dict[str, str]]:
+    existing = face_payload.get("convergence") or saju_payload.get("convergence")
+    result = []
+    if isinstance(existing, list) and existing:
+        result = existing
+    else:
+        for index in range(3):
+            result.append(
+                {
+                    "face": _block_summary(
+                        face_payload,
+                        "pair_blocks",
+                        index,
+                        "두 사람의 얼굴 관찰에서 보이는 관계 분위기",
+                    ),
+                    "saju": _block_summary(
+                        saju_payload,
+                        "saju_blocks",
+                        index,
+                        "두 사람의 사주 흐름에서 보이는 상호 보완점",
+                    ),
+                },
+            )
     return result
 
 
@@ -871,45 +1035,6 @@ def _dominant_element(counts: dict[str, int], strongest: bool) -> str:
     return result
 
 
-def _build_compatibility_markdown(
-    client: TextGenerator,
-    left_profile: BirthProfile,
-    right_profile: BirthProfile,
-    mode: str,
-    left_manse: ManseLookupResult,
-    right_manse: ManseLookupResult,
-    face_analysis: str,
-) -> str:
-    prompt = build_compatibility_final_prompt(
-        left_profile,
-        right_profile,
-        mode,
-        left_manse.formatted_text,
-        right_manse.formatted_text,
-        face_analysis,
-    )
-    generated = _safe_generate(
-        client,
-        prompt,
-        None,
-        "궁합 리포트를 생성하지 못했습니다.",
-        debug_label="compatibility_final",
-    )
-    markdown = generated.text
-    if generated.error:
-        markdown = _fallback_compatibility_markdown(
-            left_profile,
-            right_profile,
-            mode,
-            left_manse.formatted_text,
-            right_manse.formatted_text,
-            face_analysis,
-            generated.error,
-        )
-    result = markdown
-    return result
-
-
 def _lookup_pair_manse(
     repository: ManseRepository,
     left_profile: BirthProfile,
@@ -1051,36 +1176,4 @@ def _new_session_dir(base_dir: Path, prefix: str) -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     result = base_dir / f"{prefix}_{stamp}"
     result.mkdir(parents=True, exist_ok=True)
-    return result
-
-
-def _fallback_compatibility_markdown(
-    left_profile: BirthProfile,
-    right_profile: BirthProfile,
-    mode: str,
-    left_saju_text: str,
-    right_saju_text: str,
-    face_analysis: str,
-    error: str,
-) -> str:
-    result = f"""
-# {left_profile.name} 님과 {right_profile.name} 님의 {mode} 궁합 리포트
-## 한 줄 요약
-로컬 LLM 응답에 문제가 있어 룰 기반 정보로 기본 궁합 리포트를 생성했습니다.
-
-## 첫 번째 사람 사주팔자
-{left_saju_text}
-
-## 두 번째 사람 사주팔자
-{right_saju_text}
-
-## 얼굴 관찰로 보는 소통 분위기
-{face_analysis}
-
-## 참고 문구
-이 리포트는 엔터테인먼트 목적의 참고 자료입니다.
-
-## 시스템 참고
-최종 LLM 오류: {error}
-""".strip()
     return result

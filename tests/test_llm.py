@@ -8,6 +8,7 @@ from oracle_report.llm import (
     _extract_finish_reason,
     _extract_output_text,
 )
+from oracle_report.prompt_templates import RenderedPrompt
 
 
 def test_default_llm_config_uses_llama_cpp(monkeypatch) -> None:
@@ -61,6 +62,32 @@ def test_llama_cpp_payload_uses_chat_completions_shape() -> None:
     assert payload["messages"][0]["role"] == "user"
     assert payload["messages"][0]["content"][0]["type"] == "text"
     assert payload["max_tokens"] == 512
+
+
+def test_llama_cpp_payload_uses_prompt_cache_slot_for_rendered_prompt() -> None:
+    config = LlmConfig(
+        model="local-model",
+        base_url="http://127.0.0.1:8080/v1",
+        timeout_seconds=60.0,
+        max_output_tokens=512,
+        temperature=0.7,
+        send_image=False,
+    )
+    client = LlamaCppChatClient(config)
+    prompt = RenderedPrompt(
+        name="saju_reading",
+        prefix="STATIC PREFIX",
+        body="DYNAMIC INPUT",
+        slot_id=1,
+    )
+
+    payload = client._build_payload(prompt, None)
+
+    assert payload["id_slot"] == 1
+    assert payload["cache_prompt"] is True
+    assert payload["messages"][0] == {"role": "system", "content": "STATIC PREFIX"}
+    assert payload["messages"][1]["role"] == "user"
+    assert payload["messages"][1]["content"][0]["text"] == "DYNAMIC INPUT"
 
 
 def test_extracts_chat_completion_text() -> None:

@@ -6,8 +6,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/hyukju/oracle
-Environment=LLAMA_MODEL=/home/hyukju/oracle/models/gemma-3-1b-it-Q4_0.gguf
-ExecStart=/home/hyukju/oracle/scripts/run_llama_server.sh ${LLAMA_MODEL}
+EnvironmentFile=-/home/hyukju/oracle/.env
+Environment=LLAMA_MODEL=/home/hyukju/oracle/models/gemma-4-E2B-it-UD-Q2_K_XL.gguf
+ExecStart=/home/hyukju/oracle/scripts/run_llama_server.sh
 Restart=on-failure
 RestartSec=5
 User=hyukju

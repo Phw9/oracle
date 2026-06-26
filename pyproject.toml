@@ -44,6 +44,9 @@ oracle-build-physiognomy-db = "oracle_report.vision.physiognomy_rule_cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+oracle_report = ["static/assets/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"

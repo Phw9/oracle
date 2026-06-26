@@ -10,15 +10,18 @@ DEFAULT_LLAMA_CPP_DIR="${ORACLE_LLAMA_CPP_DIR:-$ROOT_DIR/llama.cpp}"
 LLAMA_CPP_DIR=""
 
 GEMMA3_1B_Q4_MODEL_PATH="$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf"
+GEMMA4_E2B_Q2_MODEL_PATH="$ROOT_DIR/models/gemma-4-E2B-it-UD-Q2_K_XL.gguf"
 GEMMA3_1B_Q4_MODEL_URL="https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_0.gguf"
 GEMMA3_1B_Q4_MODEL_SHA256="27ee88e03be02e9ba73def9a819d570d8ad73716e50769e87f374ae394b0276e"
-PACKAGED_MODEL_URL="$GEMMA3_1B_Q4_MODEL_URL"
-PACKAGED_MODEL_SHA256="$GEMMA3_1B_Q4_MODEL_SHA256"
+GEMMA4_E2B_Q2_MODEL_URL="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf"
+GEMMA4_E2B_Q2_MODEL_SHA256="dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da2429a727de0c"
+PACKAGED_MODEL_URL="$GEMMA4_E2B_Q2_MODEL_URL"
+PACKAGED_MODEL_SHA256="$GEMMA4_E2B_Q2_MODEL_SHA256"
 
 # Options populated by parser
 BUILD_JOBS=""
 FORCE_CUDA="auto"
-PYTHON_ENV="venv"
+PYTHON_ENV="auto"
 MODEL_PATH=""
 python_env_mode="venv"
 
@@ -59,8 +62,8 @@ Options:
   --cuda                   Force build llama.cpp with CUDA support
   --cpu                    Force build llama.cpp in CPU-only mode
   --auto-gpu               Auto-detect CUDA capability (default)
-  --python-env ENV         Force python env type: active-conda, conda, uv, venv, or auto (default: venv)
-  --model-path PATH        Set GGUF model path (default: models/gemma-3-1b-it-Q4_0.gguf)
+  --python-env ENV         Force python env type: active-conda, active-venv, conda, uv, venv, or auto (default: auto)
+  --model-path PATH        Set GGUF model path (default: models/gemma-4-E2B-it-UD-Q2_K_XL.gguf)
   --llama-dir DIR          Directory for llama.cpp source/build (default: ./llama.cpp)
 EOF
   exit 0
@@ -137,7 +140,7 @@ install_apt_packages() {
   local filtered_packages=()
   local pkg
   for pkg in "${packages[@]}"; do
-    if [[ "$python_env_mode" == "conda" || "$python_env_mode" == "active-conda" || "$python_env_mode" == "uv" ]]; then
+    if [[ "$python_env_mode" == "conda" || "$python_env_mode" == "active-conda" || "$python_env_mode" == "uv" || "$python_env_mode" == "active-venv" ]]; then
       # Skip python/opencv system packages in conda/uv
       if [[ "$pkg" =~ ^python3.* || "$pkg" == "python3-opencv" || "$pkg" == "opencv-data" || "$pkg" == "libatlas-base-dev" ]]; then
         continue
@@ -199,7 +202,7 @@ activate_python_env() {
 }
 
 setup_python_env() {
-  local env_type="${PYTHON_ENV:-venv}"
+  local env_type="${PYTHON_ENV:-auto}"
   log "Setting up Python environment (mode: $env_type)..."
 
   # 1. Active Conda env
@@ -214,6 +217,21 @@ setup_python_env() {
       fi
     elif [[ "$env_type" == "active-conda" ]]; then
       fail "active-conda specified but no Conda environment is active."
+    fi
+  fi
+
+  # 2. Active Virtualenv (venv, uv, etc.)
+  if [[ "$env_type" == "active-venv" || ( "$env_type" == "auto" && -n "${VIRTUAL_ENV:-}" ) ]]; then
+    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+      log "Using already active virtual environment (Prefix: $VIRTUAL_ENV)"
+      if python -c "import pip" >/dev/null 2>&1; then
+        python_env_mode="active-venv"
+        return 0
+      else
+        log "Warning: VIRTUAL_ENV is set but python does not have pip. Falling back."
+      fi
+    elif [[ "$env_type" == "active-venv" ]]; then
+      fail "active-venv specified but no virtual environment is active."
     fi
   fi
 
@@ -408,6 +426,8 @@ default_model_url_for_path() {
   result="$PACKAGED_MODEL_URL"
   if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
     result="$GEMMA3_1B_Q4_MODEL_URL"
+  elif [[ "$model_name" == "gemma-4-E2B-it-UD-Q2_K_XL.gguf" ]]; then
+    result="$GEMMA4_E2B_Q2_MODEL_URL"
   fi
   printf '%s\n' "$result"
 }
@@ -421,6 +441,8 @@ default_model_hash_for_path() {
   result="$PACKAGED_MODEL_SHA256"
   if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
     result="$GEMMA3_1B_Q4_MODEL_SHA256"
+  elif [[ "$model_name" == "gemma-4-E2B-it-UD-Q2_K_XL.gguf" ]]; then
+    result="$GEMMA4_E2B_Q2_MODEL_SHA256"
   fi
   printf '%s\n' "$result"
 }
@@ -447,7 +469,7 @@ configured_model_hash_for_path() {
   result="$(default_model_hash_for_path "$model_path")"
   
   local model_name="${model_path##*/}"
-  if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+  if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" || "$model_name" == "gemma-4-E2B-it-UD-Q2_K_XL.gguf" ]]; then
     if [[ -n "$configured_hash" ]]; then
       result="$configured_hash"
     fi
@@ -505,6 +527,8 @@ known_repo_model_hash_for_path() {
   result=""
   if [[ "$model_name" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
     result="$GEMMA3_1B_Q4_MODEL_SHA256"
+  elif [[ "$model_name" == "gemma-4-E2B-it-UD-Q2_K_XL.gguf" ]]; then
+    result="$GEMMA4_E2B_Q2_MODEL_SHA256"
   fi
   printf '%s\n' "$result"
 }
@@ -536,32 +560,15 @@ download_model_file() {
   log "model file ready at $model_path"
 }
 
-ensure_model_file_at() {
-  local model_path
-  local model_url
-  local model_hash
-  model_path="$1"
-  model_url="$2"
-  model_hash="$3"
-  if [[ -f "$model_path" ]]; then
-    verify_file_hash "$model_path" "$model_hash"
-    log "model file ready at $model_path"
-    return
-  fi
-
-  download_model_file "$model_path" "$model_url" "$model_hash"
-  verify_file_hash "$model_path" "$model_hash"
-}
-
 ensure_model_file() {
   local model_path
   local model_url
   local model_hash
   local existing_model_path
-  model_path="${ORACLE_LLAMA_MODEL_PATH:-$GEMMA3_1B_Q4_MODEL_PATH}"
+  model_path="${ORACLE_LLAMA_MODEL_PATH:-$GEMMA4_E2B_Q2_MODEL_PATH}"
   if [[ "${model_path##*/}" == "model.gguf" ]]; then
-    log "models/model.gguf is a legacy default; using Gemma 3 1B Q4 at $GEMMA3_1B_Q4_MODEL_PATH"
-    model_path="$GEMMA3_1B_Q4_MODEL_PATH"
+    log "models/model.gguf is a legacy default; using Gemma 4 E2B Q2 at $GEMMA4_E2B_Q2_MODEL_PATH"
+    model_path="$GEMMA4_E2B_Q2_MODEL_PATH"
     export ORACLE_LLAMA_MODEL_PATH="$model_path"
   fi
   if [[ -f "$model_path" ]]; then
@@ -571,7 +578,7 @@ ensure_model_file() {
     return
   fi
 
-  if [[ "${model_path##*/}" == "gemma-3-1b-it-Q4_0.gguf" ]]; then
+  if [[ "${model_path##*/}" == "gemma-3-1b-it-Q4_0.gguf" || "${model_path##*/}" == "gemma-4-E2B-it-UD-Q2_K_XL.gguf" ]]; then
     model_url="$(configured_model_url_for_path "$model_path")"
     model_hash="$(configured_model_hash_for_path "$model_path")"
     download_model_file "$model_path" "$model_url" "$model_hash"
@@ -591,35 +598,6 @@ ensure_model_file() {
   model_hash="$(configured_model_hash_for_path "$model_path")"
   download_model_file "$model_path" "$model_url" "$model_hash"
   verify_file_hash "$model_path" "$model_hash"
-}
-
-ensure_gemma3_1b_q4_model_file() {
-  local model_path
-  local model_url
-  local model_hash
-  local existing_model_path
-  if [[ "${ORACLE_DOWNLOAD_GEMMA3_1B_Q4_MODEL:-1}" != "1" ]]; then
-    log "skipping Gemma 3 1B Q4 model download"
-    return
-  fi
-
-  model_path="${ORACLE_GEMMA3_1B_Q4_MODEL_PATH:-$GEMMA3_1B_Q4_MODEL_PATH}"
-  if [[ -f "$model_path" ]]; then
-    model_hash="${ORACLE_GEMMA3_1B_Q4_MODEL_SHA256:-$GEMMA3_1B_Q4_MODEL_SHA256}"
-    verify_file_hash "$model_path" "$model_hash"
-    log "model file ready at $model_path"
-    return
-  fi
-
-  existing_model_path="$(find_repo_model_file)"
-  if [[ -n "$existing_model_path" ]]; then
-    log "repo model already exists at $existing_model_path; skipping Gemma 3 1B Q4 model download"
-    return
-  fi
-
-  model_url="${ORACLE_GEMMA3_1B_Q4_MODEL_URL:-$GEMMA3_1B_Q4_MODEL_URL}"
-  model_hash="${ORACLE_GEMMA3_1B_Q4_MODEL_SHA256:-$GEMMA3_1B_Q4_MODEL_SHA256}"
-  ensure_model_file_at "$model_path" "$model_url" "$model_hash"
 }
 
 generate_systemd_services() {
@@ -661,7 +639,7 @@ main() {
   fi
 
   if [[ -n "$MODEL_PATH" ]]; then
-    GEMMA3_1B_Q4_MODEL_PATH="$MODEL_PATH"
+    export ORACLE_LLAMA_MODEL_PATH="$MODEL_PATH"
   fi
 
   # Call setup_python_env first to determine the package environment mode
@@ -687,7 +665,6 @@ main() {
   load_env
   ensure_runtime_dirs
   ensure_model_file
-  ensure_gemma3_1b_q4_model_file
   generate_systemd_services
   run_verification
   log "build complete"

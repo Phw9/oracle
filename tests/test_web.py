@@ -88,8 +88,11 @@ def test_personal_result_page_includes_workflow_loading_state() -> None:
     assert "사주 리포트 생성 중입니다" in html
     assert "pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading)" in html
     assert 'id="download-report-link"' in html
+    assert 'class="result-action result-action-primary download-link"' in html
     assert 'href="/api/jobs/test-job/download"' in html
     assert "리포트 다운로드" in html
+    assert "min-height: 46px;" in html
+    assert "border-radius: 999px;" in html
 
 
 def test_completed_job_downloads_report_html() -> None:
