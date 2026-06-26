@@ -352,6 +352,15 @@ def create_app() -> Flask:
                     pass
         return result
 
+    @app.get("/api/distributed/status")
+    def distributed_status():
+        from oracle_report.llm import is_local_llm_running
+        is_busy = _CAPTURE_LOCK.locked() or is_local_llm_running()
+        result = jsonify({
+            "status": "busy" if is_busy else "idle"
+        })
+        return result
+
     @app.get("/favicon.ico")
     def favicon():
         result = ("", 204)
@@ -365,7 +374,7 @@ def serve() -> None:
     config = load_app_config()
 
     # Run distributed warmup in the background if enabled
-    if config.distributed_role == "master" and config.distributed_warmup:
+    if config.distributed_role in ("master", "hybrid") and config.distributed_warmup:
         import threading
         def run_warmup_background():
             import time

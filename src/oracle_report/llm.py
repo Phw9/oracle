@@ -9,7 +9,18 @@ from oracle_report.config import LlmConfig
 from oracle_report.prompt_templates import RenderedPrompt
 
 
+import threading
+
 _INCOMPLETE_FINISH_REASONS = frozenset(("length",))
+_ACTIVE_GENERATIONS_LOCK = threading.Lock()
+_ACTIVE_GENERATIONS_COUNT = 0
+
+
+def is_local_llm_running() -> bool:
+    global _ACTIVE_GENERATIONS_COUNT
+    with _ACTIVE_GENERATIONS_LOCK:
+        result = _ACTIVE_GENERATIONS_COUNT > 0
+    return result
 
 
 class LlamaCppChatClient:
@@ -24,48 +35,56 @@ class LlamaCppChatClient:
         import requests
         import time
 
-        payload = self._build_payload(prompt, image_path)
-        t0 = time.perf_counter()
-        response = requests.post(
-            self._chat_completions_url(),
-            headers={"Content-Type": "application/json"},
-            data=json.dumps(payload),
-            timeout=self._config.timeout_seconds,
-        )
-        t1 = time.perf_counter()
-        if response.status_code < 200 or response.status_code >= 300:
-            raise RuntimeError(
-                f"local llama.cpp request failed: HTTP {response.status_code}",
+        global _ACTIVE_GENERATIONS_COUNT
+        with _ACTIVE_GENERATIONS_LOCK:
+            _ACTIVE_GENERATIONS_COUNT += 1
+
+        try:
+            payload = self._build_payload(prompt, image_path)
+            t0 = time.perf_counter()
+            response = requests.post(
+                self._chat_completions_url(),
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=self._config.timeout_seconds,
             )
-        elapsed = t1 - t0
-        root = response.json()
-        usage = root.get("usage", {}) if isinstance(root.get("usage"), dict) else {}
-        completion_tokens = usage.get("completion_tokens", 0)
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        cached_tokens = _extract_cached_tokens(root)
-        finish_reason = _extract_finish_reason(root)
-        result = _extract_output_text(root)
+            t1 = time.perf_counter()
+            if response.status_code < 200 or response.status_code >= 300:
+                raise RuntimeError(
+                    f"local llama.cpp request failed: HTTP {response.status_code}",
+                )
+            elapsed = t1 - t0
+            root = response.json()
+            usage = root.get("usage", {}) if isinstance(root.get("usage"), dict) else {}
+            completion_tokens = usage.get("completion_tokens", 0)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            cached_tokens = _extract_cached_tokens(root)
+            finish_reason = _extract_finish_reason(root)
+            result = _extract_output_text(root)
 
-        speed_str = ""
-        if completion_tokens > 0 and elapsed > 0:
-            speed = completion_tokens / elapsed
-            speed_str = f" ({speed:.2f} tokens/sec)"
+            speed_str = ""
+            if completion_tokens > 0 and elapsed > 0:
+                speed = completion_tokens / elapsed
+                speed_str = f" ({speed:.2f} tokens/sec)"
 
-        print(
-            f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
-            f"cached_tokens={cached_tokens}, "
-            f"completion_tokens={completion_tokens}, "
-            f"finish_reason={finish_reason or 'unknown'}, "
-            f"elapsed={elapsed:.2f}s{speed_str}"
-        )
-        if finish_reason in _INCOMPLETE_FINISH_REASONS:
-            raise RuntimeError(
-                "incomplete LLM response: "
-                f"finish_reason={finish_reason}, "
+            print(
+                f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
+                f"cached_tokens={cached_tokens}, "
                 f"completion_tokens={completion_tokens}, "
-                f"max_output_tokens={self._config.max_output_tokens}",
+                f"finish_reason={finish_reason or 'unknown'}, "
+                f"elapsed={elapsed:.2f}s{speed_str}"
             )
-        return result
+            if finish_reason in _INCOMPLETE_FINISH_REASONS:
+                raise RuntimeError(
+                    "incomplete LLM response: "
+                    f"finish_reason={finish_reason}, "
+                    f"completion_tokens={completion_tokens}, "
+                    f"max_output_tokens={self._config.max_output_tokens}",
+                )
+            return result
+        finally:
+            with _ACTIVE_GENERATIONS_LOCK:
+                _ACTIVE_GENERATIONS_COUNT -= 1
 
     def _build_payload(
         self,

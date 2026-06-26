@@ -1390,6 +1390,21 @@ def _generate_distributed(
             is_meta = task["is_metadata"]
             cat = task["target_category"]
 
+            # If it's a remote slave, check its availability status first (Hybrid Mode Support)
+            if not is_local:
+                try:
+                    status_url = f"{slave_url.rstrip('/')}/api/distributed/status"
+                    res = requests.get(status_url, timeout=2.0)
+                    if res.status_code == 200:
+                        status_data = res.json()
+                        if status_data.get("status") == "busy":
+                            task_queue.put(task)
+                            task_queue.task_done()  # Keep unfinished_tasks counter in sync
+                            time.sleep(1.0)
+                            continue
+                except Exception:
+                    pass
+
             # Render prompt for local generation or debugging
             rendered = None
             if is_local or app_config.debug:

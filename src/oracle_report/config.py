@@ -104,8 +104,8 @@ def load_report_llm_config() -> LlmConfig:
 def load_app_config() -> AppConfig:
     _load_dotenv()
     role = os.getenv("ORACLE_DISTRIBUTED_ROLE")
-    if role not in (None, "", "master", "slave"):
-        raise ValueError("ORACLE_DISTRIBUTED_ROLE must be 'master' or 'slave'.")
+    if role not in (None, "", "master", "slave", "hybrid"):
+        raise ValueError("ORACLE_DISTRIBUTED_ROLE must be 'master', 'slave', or 'hybrid'.")
     slave_addrs_raw = os.getenv("ORACLE_SLAVE_ADDRS", "")
     slave_addrs = [addr.strip() for addr in slave_addrs_raw.split(",") if addr.strip()]
     result = AppConfig(

@@ -45,11 +45,11 @@
 
 | CLI 옵션 | 환경 변수명 | 값 형식 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `--distributed-role` | `ORACLE_DISTRIBUTED_ROLE` | `master` 또는 `slave` | 현재 노드의 역할을 설정합니다. |
+| `--distributed-role` | `ORACLE_DISTRIBUTED_ROLE` | `master`, `slave` 또는 `hybrid` | 현재 노드의 역할을 설정합니다. (`hybrid`는 평소엔 마스터처럼 웹서버를 돌리지만 유휴 시 타 기기의 슬레이브 연산을 수행합니다.) |
 | `--distributed-split` | `ORACLE_DISTRIBUTED_SPLIT` | `1` (CLI 입력 시 자동 활성화) | 프롬프트를 쪼개어 분산 처리할지 여부를 결정합니다. |
-| `--distributed-warmup`| `ORACLE_DISTRIBUTED_WARMUP` | `1` (CLI 입력 시 자동 활성화) | (마스터 전용) 시작 시 백그라운드로 웜업용 더미 추론을 실행하여 각 노드의 `llama-server` KV 캐시를 미리 빌드합니다. |
+| `--distributed-warmup`| `ORACLE_DISTRIBUTED_WARMUP` | `1` (CLI 입력 시 자동 활성화) | (마스터/하이브리드 전용) 시작 시 백그라운드로 웜업용 더미 추론을 실행하여 각 노드의 `llama-server` KV 캐시를 미리 빌드합니다. |
 | `--master-addr` | `ORACLE_MASTER_ADDR` | `http://<IP>:<Port>` | 마스터 노드의 웹 서비스 주소를 설정합니다. |
-| `--slave-addrs` | `ORACLE_SLAVE_ADDRS` | `http://<IP1>:<Port>,http://<IP2>:<Port>` | (마스터 전용) 작업을 분담할 슬레이브들의 웹 API 주소 목록입니다. |
+| `--slave-addrs` | `ORACLE_SLAVE_ADDRS` | `http://<IP1>:<Port>,http://<IP2>:<Port>` | (마스터/하이브리드 전용) 작업을 분담할 슬레이브들의 웹 API 주소 목록입니다. |
 | `--debug` | `ORACLE_APP_DEBUG` | `1` (CLI 입력 시 자동 활성화) | 디버그 모드를 활성화하여 어떤 기기로 어떤 프롬프트가 전송되고 수신되었는지 콘솔(STDOUT)에 상세 로그를 출력합니다. |
 
 ---
@@ -95,3 +95,9 @@
 ### 3) 로컬 루프백 우회 (Bypass)
 * 마스터 기기가 자기 자신(`localhost` / `127.0.0.1` / 마스터 IP)을 슬레이브 주소로 할당받아 연산할 때는 Flask의 HTTP 스레드 경유 및 소켓 통신을 하지 않습니다.
 * 대신, 내부적으로 **로컬 `LlamaCppChatClient` 호출을 다이렉트로 매핑**하여 네트워크 통신 오버헤드와 Flask 커넥션 고갈로 인한 스레드 데드락/타임아웃(90s) 문제를 원천 차단합니다.
+
+### 4) 하이브리드 모드 (Hybrid Mode) 및 노킹(Knocking) 상태 체크
+* 하이브리드 노드(`--distributed-role hybrid`)로 작동 중인 기기는 다른 기기의 추론 요청을 처리해 줄 수 있도록 슬레이브 API(`POST /api/distributed/generate`)를 오픈해둡니다.
+* 마스터/하이브리드 기기는 원격 슬레이브 기기로 작업을 전송하기 직전에, 대상 슬레이브 기기의 유휴 상태(`GET /api/distributed/status`)를 가볍게 노킹(체크)합니다.
+* 만약 기기가 `busy` 상태(현재 카메라 촬영 중이거나 로컬에서 자체 LLM 연산 수행 중)인 것으로 감지되면, 작업을 전송하지 않고 즉시 작업 큐에 작업을 반납한 뒤 양보(Yield)합니다.
+* 이 상태 체크 덕분에 다른 기기의 자원을 뺏어오지 않고 유휴 자원만을 안전하고 효율적으로 공유할 수 있게 됩니다.

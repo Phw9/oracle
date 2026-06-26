@@ -169,7 +169,7 @@ Wrapper Options:
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
-  --distributed-role ROLE  Distributed role: master or slave
+  --distributed-role ROLE  Distributed role: master, slave, or hybrid
   --distributed-split      Split prompts for parallel execution
   --distributed-warmup     Warmup LLM KV cache on start
   --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
