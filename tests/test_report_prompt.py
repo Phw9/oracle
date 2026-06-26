@@ -55,6 +55,11 @@ def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
     assert "사주 입력" in prompt
     assert "얼굴 관찰 메모" not in prompt
     assert "추천받고 싶은 얼굴" not in prompt
+    assert prompt.name == "saju_reading"
+    assert prompt.slot_id == 1
+    assert prompt.prefix.strip() != ""
+    assert "사주 입력" not in prompt.prefix
+    assert "사주 입력" in prompt.body
 
 
 def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:

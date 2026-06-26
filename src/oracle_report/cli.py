@@ -14,7 +14,10 @@ from oracle_report.config import (
 from oracle_report.llm import LlamaCppChatClient
 from oracle_report.models import BirthProfile
 from oracle_report.physiognomy import FaceReadingInput
-from oracle_report.prompt_templates import render_debug_prompt_template
+from oracle_report.prompt_templates import (
+    list_prompt_template_info,
+    render_debug_prompt_template,
+)
 from oracle_report.recommender import format_recommendations, recommend_faces
 from oracle_report.report import (
     build_couple_face_analysis_prompt,
@@ -55,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _run_prompt_result_command(args)
         elif args.command == "llm":
             result = _run_prompt_result_command(args)
+        elif args.command == "token":
+            result = _run_token_command(args)
         else:
             parser.print_help()
             result = 2
@@ -90,6 +95,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="run one workflow prompt and print only LLM output",
     )
     _add_prompt_args(llm)
+
+    token = subparsers.add_parser(
+        "token",
+        help="print prompt prefix token sizes",
+    )
+    token.add_argument(
+        "--offline",
+        action="store_true",
+        help="estimate token counts without calling llama.cpp /tokenize",
+    )
 
     result = parser
     return result
@@ -186,6 +201,25 @@ def _run_prompt_result_command(args: argparse.Namespace) -> int:
     return result
 
 
+def _run_token_command(args: argparse.Namespace) -> int:
+    config = load_report_llm_config()
+    counter = _PromptTokenCounter(config.base_url, offline=args.offline)
+    rows = []
+    for info in list_prompt_template_info():
+        prefix_tokens = counter.count(info.prefix)
+        body_tokens = counter.count(info.body_template)
+        full_text = _join_prompt_parts(info.prefix, info.body_template)
+        full_tokens = counter.count(full_text)
+        rows.append((info.name, info.slot_id, prefix_tokens, body_tokens, full_tokens))
+    print(f"source={counter.source}")
+    print("name\tid_slot\tprefix_tokens\tbody_template_tokens\tfull_template_tokens")
+    for name, slot_id, prefix_tokens, body_tokens, full_tokens in rows:
+        slot_text = "" if slot_id is None else str(slot_id)
+        print(f"{name}\t{slot_text}\t{prefix_tokens}\t{body_tokens}\t{full_tokens}")
+    result = 0
+    return result
+
+
 def _build_llm_prompt_text(args: argparse.Namespace) -> str:
     result = _build_prompt_text(args)
     if args.target == "saju-reading":
@@ -194,6 +228,76 @@ def _build_llm_prompt_text(args: argparse.Namespace) -> str:
         result = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
     elif args.target == "saju-reading-couple":
         result = _build_couple_saju_reading_prompt_text(args)
+    return result
+
+
+class _PromptTokenCounter:
+    def __init__(self, base_url: str, offline: bool) -> None:
+        self._base_url = base_url
+        self._offline = offline
+        self._server_failed = False
+
+    @property
+    def source(self) -> str:
+        result = "llama.cpp /tokenize"
+        if self._offline or self._server_failed:
+            result = "estimated"
+        return result
+
+    def count(self, text: str) -> int:
+        result = _estimate_token_count(text)
+        if not self._offline and not self._server_failed:
+            try:
+                result = _server_token_count(self._base_url, text)
+            except Exception as exc:
+                self._server_failed = True
+                print(f"[token][warn] using estimated counts: {exc}")
+                result = _estimate_token_count(text)
+        return result
+
+
+def _server_token_count(base_url: str, text: str) -> int:
+    import requests
+
+    token_url = _tokenize_url(base_url)
+    response = requests.post(
+        token_url,
+        json={"content": text},
+        timeout=15.0,
+    )
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(f"HTTP {response.status_code} from {token_url}")
+    root = response.json()
+    result = 0
+    tokens = root.get("tokens")
+    if isinstance(tokens, list):
+        result = len(tokens)
+    else:
+        count = root.get("count", root.get("n_tokens", 0))
+        if isinstance(count, int):
+            result = count
+    return result
+
+
+def _tokenize_url(base_url: str) -> str:
+    cleaned_url = base_url.rstrip("/")
+    if cleaned_url.endswith("/v1"):
+        cleaned_url = cleaned_url[:-3]
+    result = f"{cleaned_url}/tokenize"
+    return result
+
+
+def _estimate_token_count(text: str) -> int:
+    result = 0
+    if text.strip() != "":
+        result = max(1, len(text.encode("utf-8")) // 4)
+    return result
+
+
+def _join_prompt_parts(prefix: str, body: str) -> str:
+    result = body.strip()
+    if prefix.strip() != "":
+        result = f"{prefix.strip()}\n\n{body.strip()}".strip()
     return result
 
 

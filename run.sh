@@ -24,6 +24,7 @@ RUN_ORACLE_START_LLAMA_SERVER="${RUN_ORACLE_START_LLAMA_SERVER:-1}"
 RUN_ORACLE_LLAMA_MODEL_PATH=""
 RUN_ORACLE_LLAMA_SERVER_BIN="${RUN_ORACLE_LLAMA_SERVER_BIN:-llama-server}"
 RUN_LLAMA_CONTEXT_SIZE="${RUN_LLAMA_CONTEXT_SIZE:-8192}"
+RUN_LLAMA_PARALLEL="${RUN_LLAMA_PARALLEL:-}"
 
 RUN_ORACLE_CAMERA_INDEX="${RUN_ORACLE_CAMERA_INDEX:-0}"
 RUN_ORACLE_FRAME_WIDTH="${RUN_ORACLE_FRAME_WIDTH:-640}"
@@ -84,6 +85,7 @@ Commands:
   capture                  Run capture only
   prompt <args...>         Debug prompt generation
   prompt-run <args...>     Run prompt generation with LLM call
+  token                    Print prompts.json prefix token sizes
   (empty)                  Start Flask web server (default)
 
 Wrapper Options:
@@ -94,6 +96,7 @@ Wrapper Options:
   -t, --threads THREADS    Number of threads for llama.cpp server
   -ngl, --ngl LAYERS       Number of GPU layers to offload to GPU (llama.cpp)
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
+  --parallel N             Number of llama.cpp slots (default: 5)
   -b, --batch-size SIZE    Batch size for llama.cpp
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
@@ -132,6 +135,10 @@ parse_args() {
         ;;
       -c|--ctx-size|--context-size)
         RUN_LLAMA_CONTEXT_SIZE="$2"
+        shift 2
+        ;;
+      --parallel)
+        RUN_LLAMA_PARALLEL="$2"
         shift 2
         ;;
       -b|--batch-size)
@@ -278,6 +285,7 @@ apply_run_config() {
   export ORACLE_LLAMA_MODEL_PATH="${ORACLE_LLAMA_MODEL_PATH:-$RUN_ORACLE_LLAMA_MODEL_PATH}"
   export ORACLE_LLAMA_SERVER_BIN="$RUN_ORACLE_LLAMA_SERVER_BIN"
   export LLAMA_CONTEXT_SIZE="$RUN_LLAMA_CONTEXT_SIZE"
+  export LLAMA_PARALLEL="${RUN_LLAMA_PARALLEL:-${LLAMA_PARALLEL:-5}}"
 
   export ORACLE_CAMERA_INDEX="$RUN_ORACLE_CAMERA_INDEX"
   export ORACLE_FRAME_WIDTH="$RUN_ORACLE_FRAME_WIDTH"
@@ -562,6 +570,7 @@ start_llama_server() {
     --host "$host"
     --port "$port"
     -c "${LLAMA_CONTEXT_SIZE:-4096}"
+    --parallel "${LLAMA_PARALLEL:-5}"
     --cache-type-k q4_0
     --cache-type-v q4_0
     --reasoning off
@@ -703,6 +712,16 @@ needs_llm_server() {
       prompt-run)
         case "${2:-}" in
           saju-reading | --help | -h | "")
+            result=1
+            ;;
+          *)
+            result=0
+            ;;
+        esac
+        ;;
+      token)
+        case "${2:-}" in
+          --offline)
             result=1
             ;;
           *)

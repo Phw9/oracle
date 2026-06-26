@@ -173,7 +173,21 @@ http://<raspberry-pi-ip>:8501
   --image runs/session-001/capture.jpg
 ```
 
-## 6. 설정 파일
+## 6. 프롬프트 토큰 확인
+
+`token`은 현재 `configs/prompts.json`의 각 프롬프트 prefix/body 템플릿 토큰 크기를 출력합니다. 기본 실행은 로컬 llama.cpp `/tokenize`를 사용하므로 실제 모델 기준에 가깝습니다.
+
+```bash
+./run.sh token
+```
+
+llama.cpp 서버 없이 대략적인 크기만 확인할 때:
+
+```bash
+./run.sh token --offline
+```
+
+## 7. 설정 파일
 
 자주 수정하는 값은 `.env`에서 조정합니다.
 
@@ -182,6 +196,7 @@ ORACLE_APP_PORT=8501
 ORACLE_LLAMA_MODEL_PATH=models/gemma-4-E2B-it-UD-Q2_K_XL.gguf
 ORACLE_LLAMA_MODEL_URL=https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf
 ORACLE_LLAMA_MODEL_SHA256=dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da2429a727de0c
+LLAMA_PARALLEL=5
 ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
@@ -211,17 +226,19 @@ configs/prompts_debug.json
 - `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 - `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
+운영 프롬프트는 첫 `${...}` 치환값 이전까지를 cache prefix로 자동 분리합니다. LLM 요청에는 전체 프롬프트를 계속 보내되, prefix는 system message로, 가변 입력은 user message로 나누고 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
+
 관상 모드:
 
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
-## 7. 데이터 파일
+## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB
 - `data/face_recommendations.sqlite`: 개인 리포트 추천 후보용 로컬 샘플 DB. 없으면 실행 중 자동 생성됩니다.
 
-## 8. 테스트 및 결과 저장
+## 9. 테스트 및 결과 저장
 
 테스트 실행:
 
@@ -242,7 +259,7 @@ python -m pytest 2>&1 | tee test-results/pytest-latest.txt
 test-results/pytest-latest.txt
 ```
 
-## 9. 재현 체크리스트
+## 10. 재현 체크리스트
 
 1. `requirements.txt` 또는 `./build.sh`로 라이브러리 설치
 2. `.env`의 `ORACLE_LLAMA_MODEL_PATH`와 `models/*.gguf` 확인

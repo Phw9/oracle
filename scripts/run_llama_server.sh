@@ -34,6 +34,7 @@ fi
   --host 127.0.0.1 \
   --port 8080 \
   -c "${LLAMA_CONTEXT_SIZE:-4096}" \
+  --parallel "${LLAMA_PARALLEL:-5}" \
   -fa off \
   -ctk q4_0 \
   --reasoning-format none

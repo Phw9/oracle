@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from oracle_report.config import LlmConfig
+from oracle_report.prompt_templates import RenderedPrompt
 
 
 _INCOMPLETE_FINISH_REASONS = frozenset(("length",))
@@ -15,7 +16,11 @@ class LlamaCppChatClient:
     def __init__(self, config: LlmConfig) -> None:
         self._config = config
 
-    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+    def generate(
+        self,
+        prompt: str | RenderedPrompt,
+        image_path: Path | None = None,
+    ) -> str:
         import requests
         import time
 
@@ -37,6 +42,7 @@ class LlamaCppChatClient:
         usage = root.get("usage", {}) if isinstance(root.get("usage"), dict) else {}
         completion_tokens = usage.get("completion_tokens", 0)
         prompt_tokens = usage.get("prompt_tokens", 0)
+        cached_tokens = _extract_cached_tokens(root)
         finish_reason = _extract_finish_reason(root)
         result = _extract_output_text(root)
 
@@ -47,6 +53,7 @@ class LlamaCppChatClient:
 
         print(
             f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
+            f"cached_tokens={cached_tokens}, "
             f"completion_tokens={completion_tokens}, "
             f"finish_reason={finish_reason or 'unknown'}, "
             f"elapsed={elapsed:.2f}s{speed_str}"
@@ -60,8 +67,13 @@ class LlamaCppChatClient:
             )
         return result
 
-    def _build_payload(self, prompt: str, image_path: Path | None) -> dict[str, Any]:
-        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+    def _build_payload(
+        self,
+        prompt: str | RenderedPrompt,
+        image_path: Path | None,
+    ) -> dict[str, Any]:
+        rendered_prompt = _coerce_rendered_prompt(prompt)
+        content: list[dict[str, Any]] = [{"type": "text", "text": rendered_prompt.body}]
         if image_path is not None and self._config.send_image:
             content.append(
                 {
@@ -72,13 +84,20 @@ class LlamaCppChatClient:
                     },
                 },
             )
+        messages: list[dict[str, Any]] = []
+        if rendered_prompt.prefix.strip() != "":
+            messages.append({"role": "system", "content": rendered_prompt.prefix})
+        messages.append({"role": "user", "content": content})
         result = {
             "model": self._config.model,
-            "messages": [{"role": "user", "content": content}],
+            "messages": messages,
             "max_tokens": self._config.max_output_tokens,
             "temperature": self._config.temperature,
             "stream": False,
         }
+        if rendered_prompt.slot_id is not None:
+            result["id_slot"] = rendered_prompt.slot_id
+            result["cache_prompt"] = True
         return result
 
     def _chat_completions_url(self) -> str:
@@ -106,6 +125,19 @@ def _extract_output_text(root: dict[str, Any]) -> str:
     return result
 
 
+def _coerce_rendered_prompt(prompt: str | RenderedPrompt) -> RenderedPrompt:
+    if isinstance(prompt, RenderedPrompt):
+        result = prompt
+    else:
+        result = RenderedPrompt(
+            name="raw",
+            prefix="",
+            body=prompt,
+            slot_id=None,
+        )
+    return result
+
+
 def _extract_finish_reason(root: dict[str, Any]) -> str:
     result = ""
     choices = root.get("choices")
@@ -115,6 +147,28 @@ def _extract_finish_reason(root: dict[str, Any]) -> str:
             finish_reason = first_choice.get("finish_reason")
             if isinstance(finish_reason, str):
                 result = finish_reason
+    return result
+
+
+def _extract_cached_tokens(root: dict[str, Any]) -> int:
+    result = 0
+    usage = root.get("usage")
+    if isinstance(usage, dict):
+        details = usage.get("prompt_tokens_details")
+        if isinstance(details, dict):
+            cached_tokens = details.get("cached_tokens", 0)
+            if isinstance(cached_tokens, int):
+                result = cached_tokens
+    if result == 0:
+        timings = root.get("timings")
+        if isinstance(timings, dict):
+            cached_tokens = timings.get("cached_n", timings.get("prompt_cached_n", 0))
+            if isinstance(cached_tokens, int):
+                result = cached_tokens
+    if result == 0:
+        cached_tokens = root.get("tokens_cached", 0)
+        if isinstance(cached_tokens, int):
+            result = cached_tokens
     return result
 
 

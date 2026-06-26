@@ -165,6 +165,20 @@ def test_prompt_command_prints_compatibility_final_prompt(
     assert "\"action_title\"" in output
 
 
+def test_token_command_prints_prompt_prefix_sizes(capsys) -> None:
+    result = main(["token", "--offline"])
+
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "source=estimated" in output
+    assert "name\tid_slot\tprefix_tokens" in output
+    assert "personal_face_analysis\t0\t" in output
+    assert "saju_reading\t1\t" in output
+    assert "face_analysis_copule\t2\t" in output
+    assert "saju_reading_couple\t3\t" in output
+
+
 def _build_test_manse_db(tmp_path: Path) -> Path:
     result = tmp_path / "unused-manse.sqlite"
     return result
