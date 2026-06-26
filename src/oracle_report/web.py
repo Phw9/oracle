@@ -83,18 +83,52 @@ def create_app() -> Flask:
     @app.get("/")
     def index():
         body = """
-        <section class="menu">
-          <a class="menu-card" href="/personal">
-            <strong>개인 리포트</strong>
-            <span>관상 + 사주 + 궁합 좋은 얼굴 추천</span>
-          </a>
-          <a class="menu-card" href="/compatibility">
-            <strong>두 사람 궁합</strong>
-            <span>첫 번째 사람 촬영 후 3초 뒤 두 번째 사람을 순차 촬영</span>
-          </a>
-        </section>
+        <div class="oracle-home-shell">
+          <div class="top">
+            <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+            <div class="tag">관상 &amp; 사주 · 운명 해설</div>
+          </div>
+
+          <div class="hero">
+            <div class="halo"></div>
+            <div class="ring"></div>
+            <div class="illust">
+              <img src="" alt="관상 일러스트" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+              <div class="ph" style="display:none"><span class="em">🔮</span>assets/saju.jpg<br>관상 일러스트 삽입</div>
+            </div>
+          </div>
+
+          <div class="greet serif">당신의 얼굴과 사주를 펼쳐볼까요?</div>
+
+          <div class="cards">
+            <a class="mode solo" href="/personal">
+              <span class="tagline">혼자서</span>
+              <div class="ic">🧑‍🦰</div>
+              <h2>개인 리포트</h2>
+              <p>관상 · 사주 · 보완 분석에<br>궁합 좋은 얼굴 추천까지</p>
+              <span class="go">시작하기 <span class="arr">→</span></span>
+            </a>
+
+            <a class="mode pair" href="/compatibility">
+              <span class="tagline">둘이서</span>
+              <div class="ic">💞</div>
+              <h2>두 사람 궁합</h2>
+              <p>첫 번째 사람 촬영 후, 3초 뒤<br>두 번째 사람을 순차 촬영</p>
+              <span class="go">시작하기 <span class="arr">→</span></span>
+            </a>
+          </div>
+
+          <div class="home-foot">
+            <div class="chips">
+              <span class="chip">📷 카메라 관상</span>
+              <span class="chip">🗓️ 만세력 사주</span>
+              <span class="chip">🔒 100% 온-디바이스</span>
+            </div>
+            얼굴 이미지와 개인정보는 기기 안에서만 처리되고 외부로 전송되지 않아요.<br>Oracle은 재미를 위한 콘텐츠예요.
+          </div>
+        </div>
         """
-        result = _render_page("Oracle", body)
+        result = _render_page("Oracle", body, page_class="home-page", show_heading=False)
         return result
 
     @app.route("/personal", methods=["GET", "POST"])
@@ -601,6 +635,10 @@ def _render_page(
             width: min(860px, calc(100vw - 48px));
             padding: 24px 0;
           }}
+          main.home-page {{
+            width: min(860px, calc(100vw - 40px));
+            padding: 40px 0 60px;
+          }}
           h1 {{
             margin: 0 0 24px;
             font-size: 32px;
@@ -632,6 +670,239 @@ def _render_page(
           }}
           .panel {{
             padding: 20px;
+          }}
+          .serif {{
+            font-family: "Gowun Batang", serif;
+          }}
+          .oracle-home-shell {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+          }}
+          .top {{
+            text-align: center;
+            margin-bottom: 30px;
+          }}
+          .top .logo {{
+            font-family: "Song Myung", serif;
+            font-size: 46px;
+            letter-spacing: 0.2em;
+            color: var(--ink);
+            position: relative;
+            display: inline-block;
+          }}
+          .top .logo .stamp {{
+            position: absolute;
+            top: -6px;
+            right: -46px;
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--hwa);
+            border-radius: 8px;
+            color: var(--hwa);
+            font-size: 19px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(9deg);
+            opacity: 0.9;
+          }}
+          .top .tag {{
+            font-size: 13px;
+            letter-spacing: 0.4em;
+            color: var(--gold);
+            text-transform: uppercase;
+            margin-top: 14px;
+          }}
+          .hero {{
+            position: relative;
+            margin: 6px 0 36px;
+            width: 230px;
+            height: 230px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }}
+          .hero .halo {{
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(204, 154, 59, 0.18), rgba(194, 82, 57, 0.06) 60%, transparent 72%);
+          }}
+          .hero .ring {{
+            position: absolute;
+            inset: 14px;
+            border: 1.5px dashed var(--gold);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: oracle-spin 40s linear infinite;
+          }}
+          .hero .illust {{
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #ffffff;
+            border: 3px solid #ffffff;
+            box-shadow: 0 14px 36px -14px rgba(46, 37, 32, 0.5);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+          }}
+          .hero .illust img {{
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 12%;
+          }}
+          .illust .ph {{
+            font-size: 12px;
+            color: #b6a98c;
+            text-align: center;
+            padding: 14px;
+            line-height: 1.6;
+          }}
+          .illust .ph .em {{
+            font-size: 40px;
+            display: block;
+            margin-bottom: 6px;
+          }}
+          .greet {{
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            color: var(--ink-soft);
+            margin-bottom: 24px;
+          }}
+          .cards {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 780px;
+          }}
+          .mode {{
+            position: relative;
+            display: block;
+            background: var(--paper-2);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 30px 26px 26px;
+            color: inherit;
+            cursor: pointer;
+            overflow: hidden;
+            text-decoration: none;
+            transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s;
+            box-shadow: 0 6px 20px -14px rgba(46, 37, 32, 0.4);
+          }}
+          .mode::after {{
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid var(--line-soft);
+            border-radius: 9px;
+            pointer-events: none;
+          }}
+          .mode:hover {{
+            transform: translateY(-6px);
+            box-shadow: 0 18px 40px -18px rgba(46, 37, 32, 0.5);
+          }}
+          .mode.solo:hover {{
+            border-color: var(--mok);
+          }}
+          .mode.pair:hover {{
+            border-color: var(--hwa);
+          }}
+          .mode .ic {{
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 27px;
+          }}
+          .mode.solo .ic {{
+            background: rgba(58, 125, 92, 0.12);
+          }}
+          .mode.pair .ic {{
+            background: rgba(194, 82, 57, 0.12);
+          }}
+          .mode h2 {{
+            font-family: "Gowun Batang", serif;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px;
+          }}
+          .mode p {{
+            font-size: 14px;
+            color: var(--ink-soft);
+            line-height: 1.6;
+            min-height: 42px;
+            margin: 0;
+          }}
+          .mode .go {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 18px;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            font-weight: 700;
+          }}
+          .mode.solo .go {{
+            color: var(--mok-deep);
+          }}
+          .mode.pair .go {{
+            color: var(--hwa);
+          }}
+          .mode .go .arr {{
+            transition: transform 0.2s;
+          }}
+          .mode:hover .go .arr {{
+            transform: translateX(4px);
+          }}
+          .mode .tagline {{
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-family: "Gowun Dodum", sans-serif;
+          }}
+          .mode.solo .tagline {{
+            background: rgba(58, 125, 92, 0.1);
+            color: var(--mok-deep);
+          }}
+          .mode.pair .tagline {{
+            background: rgba(194, 82, 57, 0.1);
+            color: var(--hwa);
+          }}
+          .home-foot {{
+            margin-top: 34px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--ink-soft);
+            line-height: 1.8;
+            max-width: 520px;
+          }}
+          .home-foot .chips {{
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+          }}
+          .home-foot .chip {{
+            background: var(--paper-2);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--ink);
           }}
           .oracle-input-shell {{
             width: 100%;
@@ -912,6 +1183,20 @@ def _render_page(
             }}
             .brand .logo {{
               font-size: 28px;
+            }}
+          }}
+          @media (max-width: 680px) {{
+            .cards {{
+              grid-template-columns: 1fr;
+            }}
+            .top .logo {{
+              font-size: 38px;
+            }}
+            .top .logo .stamp {{
+              right: -40px;
+            }}
+            .mode p {{
+              min-height: 0;
             }}
           }}
         </style>
