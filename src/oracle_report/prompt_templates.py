@@ -9,7 +9,9 @@ from typing import Any
 
 
 _DEFAULT_PROMPTS_PATH = Path("configs/prompts.json")
+_DEFAULT_DEBUG_PROMPTS_PATH = Path("configs/prompts_debug.json")
 _PROMPTS_PATH_ENV_NAME = "ORACLE_PROMPTS_PATH"
+_DEBUG_PROMPTS_PATH_ENV_NAME = "ORACLE_DEBUG_PROMPTS_PATH"
 
 
 def render_prompt_template(name: str, values: Mapping[str, object]) -> str:
@@ -20,11 +22,34 @@ def render_prompt_template(name: str, values: Mapping[str, object]) -> str:
     return result
 
 
+def render_debug_prompt_template(name: str, values: Mapping[str, object]) -> str:
+    templates = _load_prompt_templates(_debug_prompt_templates_path())
+    template_text = _template_text(templates, name)
+    string_values = {key: str(value) for key, value in values.items()}
+    result = Template(template_text).substitute(string_values).strip()
+    return result
+
+
 def _prompt_templates_path() -> Path:
-    configured_path = os.getenv(_PROMPTS_PATH_ENV_NAME, "")
+    result = _configured_prompt_path(_PROMPTS_PATH_ENV_NAME, _DEFAULT_PROMPTS_PATH)
+    return result
+
+
+def _debug_prompt_templates_path() -> Path:
+    result = _configured_prompt_path(
+        _DEBUG_PROMPTS_PATH_ENV_NAME,
+        _DEFAULT_DEBUG_PROMPTS_PATH,
+    )
+    return result
+
+
+def _configured_prompt_path(env_name: str, default_path: Path) -> Path:
+    configured_path = os.getenv(env_name, "")
     result = _DEFAULT_PROMPTS_PATH
     if configured_path.strip() != "":
         result = Path(configured_path)
+    else:
+        result = default_path
     return result
 
 

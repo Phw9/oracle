@@ -70,16 +70,19 @@ http://<raspberry-pi-ip>:8501
 궁합 리포트 관상 분석 LLM 프롬프트 확인:
 
 ```bash
-./run.sh prompt compatibility-face-analysis \
+./run.sh prompt face-analysis-copule \
   --name "홍길동" \
   --birth-date 1995-03-15 \
   --birth-time 14:30 \
   --gender male \
-  --mode 연인 \
-  --person-label "첫 번째 사람"
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
 ```
 
-사주/만세력 조회 결과가 최종 리포트에 어떤 텍스트로 들어가는지 확인:
+개인 사주/만세력 조회 결과가 리포트에 어떤 텍스트로 들어가는지 확인:
 
 ```bash
 ./run.sh prompt saju-reading \
@@ -89,7 +92,22 @@ http://<raspberry-pi-ip>:8501
   --gender male
 ```
 
-개인 최종 리포트 프롬프트 확인:
+궁합 사주/만세력 조회 결과가 리포트에 어떤 텍스트로 들어가는지 확인:
+
+```bash
+./run.sh prompt saju-reading-couple \
+  --name "홍길동" \
+  --birth-date 1995-03-15 \
+  --birth-time 14:30 \
+  --gender male \
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
+```
+
+개인 최종 리포트 legacy/debug 프롬프트 확인:
 
 ```bash
 ./run.sh prompt personal-final \
@@ -102,27 +120,11 @@ http://<raspberry-pi-ip>:8501
   --recommendation-text "추천 후보 예시"
 ```
 
-궁합 최종 리포트 프롬프트 확인:
-
-```bash
-./run.sh prompt compatibility-final \
-  --name "홍길동" \
-  --birth-date 1995-03-15 \
-  --birth-time 14:30 \
-  --gender male \
-  --right-name "김영희" \
-  --right-birth-date 1997-05-20 \
-  --right-birth-time 09:00 \
-  --right-gender female \
-  --mode 연인 \
-  --face-analysis "두 사람 관상 분석 결과 예시"
-```
-
 ## 5. LLM 결과만 확인
 
 `llm`은 프롬프트를 로컬 LLM에 보내고 LLM 응답만 출력합니다.
 
-사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
+개인 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm saju-reading \
@@ -132,7 +134,22 @@ http://<raspberry-pi-ip>:8501
   --gender male
 ```
 
-개인 최종 리포트 LLM 결과만 확인:
+궁합 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading_couple` 프롬프트에 넣고 LLM 결과만 확인:
+
+```bash
+./run.sh llm saju-reading-couple \
+  --name "홍길동" \
+  --birth-date 1995-03-15 \
+  --birth-time 14:30 \
+  --gender male \
+  --right-name "김영희" \
+  --right-birth-date 1997-05-20 \
+  --right-birth-time 09:00 \
+  --right-gender female \
+  --mode 연인
+```
+
+개인 최종 리포트 legacy/debug 프롬프트를 `configs/prompts_debug.json`에서 읽어 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm personal-final \
@@ -169,22 +186,30 @@ ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
 ORACLE_PROMPTS_PATH=configs/prompts.json
+ORACLE_DEBUG_PROMPTS_PATH=configs/prompts_debug.json
 ORACLE_FACE_DB_PATH=data/face_recommendations.sqlite
 ```
 
-프롬프트 템플릿은 다음 파일을 수정합니다.
+운영 프롬프트 템플릿은 다음 파일을 수정합니다.
 
 ```text
 configs/prompts.json
 ```
 
+legacy/debug 프롬프트는 다음 파일을 수정합니다.
+
+```text
+configs/prompts_debug.json
+```
+
 주요 템플릿 키:
 
 - `saju_reading`: 런타임 만세력 계산 결과를 LLM에 보내는 사주 해설 프롬프트
+- `saju_reading_couple`: 두 사람의 만세력 계산 결과를 LLM에 보내는 궁합 사주 해설 프롬프트
 - `personal_face_analysis`: 캡처 이미지 기반 개인 관상 메모 프롬프트
-- `compatibility_face_analysis`: 캡처 이미지 기반 궁합 관상 메모 프롬프트
-- `personal_final`: 사주/만세력, 관상 메모, 얼굴 추천 정보를 합친 개인 최종 JSON 리포트 프롬프트
-- `compatibility_final`: 두 사람의 사주/만세력과 관상 메모를 합친 궁합 최종 JSON 리포트 프롬프트
+- `face_analysis_copule`: 두 사람의 결합 크롭 이미지 기반 궁합 관상 JSON 프롬프트
+- `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
+- `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
 관상 모드:
 

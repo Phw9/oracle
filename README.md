@@ -65,7 +65,8 @@ python -m pytest
 
 ## 주요 설정 파일
 
-- [configs/prompts.json](configs/prompts.json): LLM 프롬프트 템플릿
+- [configs/prompts.json](configs/prompts.json): 운영 LLM 프롬프트 템플릿
+- [configs/prompts_debug.json](configs/prompts_debug.json): legacy/debug LLM 프롬프트 템플릿
 - [.env.example](.env.example): 실행 환경 변수 예시
 - [configs/raspberry_pi.env](configs/raspberry_pi.env): Raspberry Pi 기본 설정 예시
 - [requirements.txt](requirements.txt): 고정 버전 라이브러리 목록

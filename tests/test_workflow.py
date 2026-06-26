@@ -160,6 +160,50 @@ class RecordingSajuClient:
         return result
 
 
+class RecordingPairFaceClient:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+        self.image_paths: list[Path | None] = []
+
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        self.prompts.append(prompt)
+        self.image_paths.append(image_path)
+        result = json.dumps(
+            {
+                "pair_subtitle": "PAIR FACE SUBTITLE",
+                "pair_blocks": _report_blocks("PAIR FACE", 4),
+                "face_summary": "PAIR FACE SUMMARY",
+            },
+            ensure_ascii=False,
+        )
+        return result
+
+
+class RecordingPairSajuClient:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+        self.image_paths: list[Path | None] = []
+
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        self.prompts.append(prompt)
+        self.image_paths.append(image_path)
+        result = json.dumps(
+            {
+                "essence": "PAIR SAJU ESSENCE",
+                "saju_subtitle": "PAIR SAJU SUBTITLE",
+                "saju_blocks": _report_blocks("PAIR SAJU", 4),
+                "synthesis_title": "PAIR SYNTHESIS TITLE",
+                "synthesis_body": "PAIR SYNTHESIS BODY",
+                "action_title": "PAIR ACTION TITLE",
+                "action_body": "PAIR ACTION BODY",
+                "tags": ["PAIR TAG"],
+                "disclaimer": "PAIR DISCLAIMER",
+            },
+            ensure_ascii=False,
+        )
+        return result
+
+
 class FailingFaceClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         raise AssertionError("face LLM must not run in landmark rule mode")
@@ -336,6 +380,52 @@ def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) 
     assert "궁합 행동 제목" in result.report_html
     assert result.left_capture_path.parent.name == "person_1"
     assert result.right_capture_path.parent.name == "person_2"
+
+
+def test_compatibility_workflow_uses_couple_face_and_saju_prompts(
+    tmp_path: Path,
+) -> None:
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    face_client = RecordingPairFaceClient()
+    report_client = RecordingPairSajuClient()
+    workflow_input = CompatibilityWorkflowInput(
+        left_name="left",
+        left_birth_date="1995-03-15",
+        left_birth_time="14:30",
+        left_gender="male",
+        right_name="right",
+        right_birth_date="1997-05-20",
+        right_birth_time="09:00",
+        right_gender="female",
+        mode="연인",
+    )
+
+    result = run_compatibility_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        face_llm_config=_llm_config(),
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        face_client=face_client,
+        report_client=report_client,
+        capture_runner=_fake_single_capture,
+        inter_capture_delay_seconds=0.0,
+    )
+
+    assert len(face_client.prompts) == 1
+    assert len(report_client.prompts) == 1
+    assert face_client.image_paths[0] is not None
+    assert "pair_face" in face_client.image_paths[0].name
+    assert face_client.image_paths[0].exists()
+    assert report_client.image_paths == [None]
+    assert "\"pair_blocks\"" in face_client.prompts[0]
+    assert "\"saju_blocks\"" not in face_client.prompts[0]
+    assert "\"saju_blocks\"" in report_client.prompts[0]
+    assert "\"pair_blocks\"" not in report_client.prompts[0]
+    assert "PAIR FACE 제목 1" in result.report_html
+    assert "PAIR SAJU 제목 1" in result.report_html
+    assert "PAIR ACTION TITLE" in result.report_html
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:

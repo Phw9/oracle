@@ -14,12 +14,13 @@ from oracle_report.config import (
 from oracle_report.llm import LlamaCppChatClient
 from oracle_report.models import BirthProfile
 from oracle_report.physiognomy import FaceReadingInput
+from oracle_report.prompt_templates import render_debug_prompt_template
 from oracle_report.recommender import format_recommendations, recommend_faces
 from oracle_report.report import (
+    build_couple_face_analysis_prompt,
+    build_couple_saju_reading_prompt,
     build_compatibility_face_analysis_prompt,
-    build_compatibility_final_prompt,
     build_personal_face_analysis_prompt,
-    build_personal_final_prompt,
     build_saju_reading_prompt,
 )
 from oracle_report.saju.engine import SajuReading
@@ -27,6 +28,8 @@ from oracle_report.saju.repository import (
     ManseLookupResult,
     ManseRepository,
     UNKNOWN_BIRTH_TIME_REPRESENTATIVE,
+    birth_datetime_display_from_profile,
+    birth_time_display_from_profile,
     representative_time_from_time_branch,
 )
 from oracle_report.vision.runtime import run_capture
@@ -105,7 +108,9 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
         choices=(
             "personal-face-analysis",
             "compatibility-face-analysis",
+            "face-analysis-copule",
             "saju-reading",
+            "saju-reading-couple",
             "personal-final",
             "compatibility-final",
         ),
@@ -157,12 +162,21 @@ def _run_prompt_command(args: argparse.Namespace) -> int:
 def _run_prompt_result_command(args: argparse.Namespace) -> int:
     prompt_text = _build_llm_prompt_text(args)
     output_text = prompt_text
-    if args.target in ("personal-face-analysis", "compatibility-face-analysis"):
+    if args.target in (
+        "personal-face-analysis",
+        "compatibility-face-analysis",
+        "face-analysis-copule",
+    ):
         output_text = LlamaCppChatClient(load_face_llm_config()).generate(
             prompt_text,
             image_path=args.image,
         )
-    elif args.target in ("saju-reading", "personal-final", "compatibility-final"):
+    elif args.target in (
+        "saju-reading",
+        "saju-reading-couple",
+        "personal-final",
+        "compatibility-final",
+    ):
         output_text = LlamaCppChatClient(load_report_llm_config()).generate(
             prompt_text,
             image_path=None,
@@ -178,6 +192,8 @@ def _build_llm_prompt_text(args: argparse.Namespace) -> str:
         profile = _build_prompt_birth_profile(args)
         manse_lookup = _lookup_manse(args, profile)
         result = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
+    elif args.target == "saju-reading-couple":
+        result = _build_couple_saju_reading_prompt_text(args)
     return result
 
 
@@ -215,24 +231,16 @@ def _build_prompt_text(args: argparse.Namespace) -> str:
             args.person_label,
             args.mode,
         )
+    elif args.target == "face-analysis-copule":
+        result = _build_couple_face_analysis_prompt_text(args, profile)
     elif args.target == "saju-reading":
         result = _lookup_manse(args, profile).formatted_text
+    elif args.target == "saju-reading-couple":
+        result = _build_pair_manse_text(args, profile)
     elif args.target == "personal-final":
-        manse_lookup = _lookup_manse(args, profile)
-        face_analysis = _read_text_option(
-            args.face_analysis,
-            args.face_analysis_file,
-            _DEFAULT_FACE_ANALYSIS_TEXT,
-        )
-        recommendation_text = _build_recommendation_text(args, manse_lookup.reading)
-        result = build_personal_final_prompt(
-            profile,
-            manse_lookup.formatted_text,
-            face_analysis,
-            recommendation_text,
-        )
+        result = _build_personal_final_debug_prompt_text(args, profile)
     elif args.target == "compatibility-final":
-        result = _build_compatibility_final_prompt_text(args, profile)
+        result = _build_compatibility_final_debug_prompt_text(args, profile)
     return result
 
 
@@ -281,7 +289,84 @@ def _build_recommendation_text(
     return result
 
 
-def _build_compatibility_final_prompt_text(
+def _build_personal_final_debug_prompt_text(
+    args: argparse.Namespace,
+    profile: BirthProfile,
+) -> str:
+    manse_lookup = _lookup_manse(args, profile)
+    face_analysis = _read_text_option(
+        args.face_analysis,
+        args.face_analysis_file,
+        _DEFAULT_FACE_ANALYSIS_TEXT,
+    )
+    recommendation_text = _build_recommendation_text(args, manse_lookup.reading)
+    result = render_debug_prompt_template(
+        "personal_final",
+        {
+            "name": profile.name,
+            "gender": _gender_text(profile),
+            "birth_datetime": birth_datetime_display_from_profile(profile),
+            "birth_time_text": birth_time_display_from_profile(profile),
+            "timezone": profile.timezone,
+            "saju_text": manse_lookup.formatted_text,
+            "face_analysis": face_analysis,
+            "recommendation_text": recommendation_text,
+        },
+    )
+    return result
+
+
+def _build_couple_face_analysis_prompt_text(
+    args: argparse.Namespace,
+    left_profile: BirthProfile,
+) -> str:
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_input = FaceReadingInput(image_path=args.image, quality=None)
+    right_input = FaceReadingInput(image_path=args.image, quality=None)
+    result = build_couple_face_analysis_prompt(
+        left_profile,
+        right_profile,
+        args.mode,
+        left_input,
+        right_input,
+    )
+    return result
+
+
+def _build_couple_saju_reading_prompt_text(args: argparse.Namespace) -> str:
+    left_profile = _build_prompt_birth_profile(args)
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_manse = _lookup_manse(args, left_profile)
+    right_manse = _lookup_manse(args, right_profile)
+    result = build_couple_saju_reading_prompt(
+        left_profile,
+        right_profile,
+        args.mode,
+        left_manse.formatted_text,
+        right_manse.formatted_text,
+    )
+    return result
+
+
+def _build_pair_manse_text(
+    args: argparse.Namespace,
+    left_profile: BirthProfile,
+) -> str:
+    right_profile = _build_right_prompt_birth_profile(args)
+    left_manse = _lookup_manse(args, left_profile)
+    right_manse = _lookup_manse(args, right_profile)
+    result = "\n\n".join((left_manse.formatted_text, right_manse.formatted_text))
+    return result
+
+
+def _gender_text(profile: BirthProfile) -> str:
+    result = profile.gender
+    if result == "":
+        result = "미입력"
+    return result
+
+
+def _build_compatibility_final_debug_prompt_text(
     args: argparse.Namespace,
     left_profile: BirthProfile,
 ) -> str:
@@ -293,13 +378,22 @@ def _build_compatibility_final_prompt_text(
         args.face_analysis_file,
         _DEFAULT_FACE_ANALYSIS_TEXT,
     )
-    result = build_compatibility_final_prompt(
-        left_profile,
-        right_profile,
-        args.mode,
-        left_manse.formatted_text,
-        right_manse.formatted_text,
-        face_analysis,
+    result = render_debug_prompt_template(
+        "compatibility_final",
+        {
+            "left_name": left_profile.name,
+            "left_gender": _gender_text(left_profile),
+            "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
+            "left_birth_time_text": birth_time_display_from_profile(left_profile),
+            "right_name": right_profile.name,
+            "right_gender": _gender_text(right_profile),
+            "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
+            "right_birth_time_text": birth_time_display_from_profile(right_profile),
+            "mode": args.mode,
+            "left_saju_text": left_manse.formatted_text,
+            "right_saju_text": right_manse.formatted_text,
+            "face_analysis": face_analysis,
+        },
     )
     return result
 

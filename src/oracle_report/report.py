@@ -43,28 +43,6 @@ def build_compatibility_face_analysis_prompt(
     return result
 
 
-def build_personal_final_prompt(
-    birth_profile: BirthProfile,
-    saju_text: str,
-    face_analysis: str,
-    recommendation_text: str,
-) -> str:
-    result = render_prompt_template(
-        "personal_final",
-        {
-            "name": birth_profile.name,
-            "gender": _gender_text(birth_profile),
-            "birth_datetime": birth_datetime_display_from_profile(birth_profile),
-            "birth_time_text": _birth_time_text(birth_profile),
-            "timezone": birth_profile.timezone,
-            "saju_text": saju_text,
-            "face_analysis": face_analysis,
-            "recommendation_text": recommendation_text,
-        },
-    )
-    return result
-
-
 def build_saju_reading_prompt(
     birth_profile: BirthProfile,
     saju_text: str,
@@ -83,16 +61,15 @@ def build_saju_reading_prompt(
     return result
 
 
-def build_compatibility_final_prompt(
+def build_couple_saju_reading_prompt(
     left_profile: BirthProfile,
     right_profile: BirthProfile,
     mode: str,
     left_saju_text: str,
     right_saju_text: str,
-    face_analysis: str,
 ) -> str:
     result = render_prompt_template(
-        "compatibility_final",
+        "saju_reading_couple",
         {
             "left_name": left_profile.name,
             "left_gender": _gender_text(left_profile),
@@ -105,7 +82,32 @@ def build_compatibility_final_prompt(
             "mode": mode,
             "left_saju_text": left_saju_text,
             "right_saju_text": right_saju_text,
-            "face_analysis": face_analysis,
+        },
+    )
+    return result
+
+
+def build_couple_face_analysis_prompt(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    mode: str,
+    left_face_input: FaceReadingInput,
+    right_face_input: FaceReadingInput,
+) -> str:
+    result = render_prompt_template(
+        "face_analysis_copule",
+        {
+            "left_name": left_profile.name,
+            "left_gender": _gender_text(left_profile),
+            "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
+            "left_birth_time_text": _birth_time_text(left_profile),
+            "left_quality_text": format_face_quality(left_face_input.quality),
+            "right_name": right_profile.name,
+            "right_gender": _gender_text(right_profile),
+            "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
+            "right_birth_time_text": _birth_time_text(right_profile),
+            "right_quality_text": format_face_quality(right_face_input.quality),
+            "mode": mode,
         },
     )
     return result
