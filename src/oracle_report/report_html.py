@@ -1135,18 +1135,18 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:"Gowun Dodum"
 .serif{font-family:"Gowun Batang",serif}
 header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--line)}
 .eyebrow{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;margin-bottom:26px}
-.ilgan{font-family:"Song Myung",serif;font-size:56px;line-height:1.1;width:120px;height:120px;border-radius:50%;border:2px solid currentColor;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;position:relative;margin-bottom:10px}
+.ilgan{font-family:"Song Myung",serif;font-size:72px;line-height:1.1;width:150px;height:150px;border-radius:50%;border:2px solid currentColor;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;position:relative;margin-bottom:10px}
 .ilgan.c-mok{color:var(--mok);background:rgba(58,125,92,.12);border-color:var(--mok)}
 .ilgan.c-hwa{color:var(--hwa);background:rgba(194,82,57,.12);border-color:var(--hwa)}
 .ilgan.c-to{color:#7A5615;background:rgba(204,154,59,.16);border-color:var(--to)}
 .ilgan.c-geum{color:#5F5A52;background:rgba(154,149,139,.16);border-color:var(--geum)}
 .ilgan.c-su{color:var(--su);background:rgba(46,66,88,.12);border-color:var(--su)}
-.ilgan .ko{font-family:"Gowun Batang",serif;font-size:13px;color:var(--ink-soft);margin-top:4px}
+.ilgan .ko{font-family:"Gowun Batang",serif;font-size:17px;color:var(--ink-soft);margin-top:6px}
 .pair-mark{display:flex;align-items:center;justify-content:center;gap:18px;margin:4px 0 18px}.pair-x{font-family:"Gowun Batang",serif;font-size:34px;color:var(--gold)}
 .person-mark{display:flex;flex-direction:column;align-items:center;justify-content:center;width:116px;height:116px;border-radius:50%;color:var(--ink);background:var(--paper-2);border:2px solid currentColor}.person-mark .person-hanja{font-family:"Song Myung",serif;font-size:54px;line-height:1}.person-mark .person-ko{font-family:"Gowun Batang",serif;font-size:12px;margin-top:6px;color:var(--ink-soft)}
 .name{font-family:"Gowun Batang",serif;font-size:30px;font-weight:700;margin-top:18px}
 .meta{font-size:14px;color:var(--ink-soft);margin-top:8px;letter-spacing:.04em}
-.essence{font-family:"Gowun Batang",serif;font-size:19px;margin-top:24px;color:var(--ink);max-width:30ch;margin-left:auto;margin-right:auto}
+.essence{font-family:"Gowun Batang",serif;font-size:19px;margin-top:24px;color:var(--ink);max-width:600px;margin-left:auto;margin-right:auto}
 .pair-profiles{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:46px 0}.person-card{background:var(--paper-2);border:1px solid var(--line);border-radius:8px;padding:24px 22px;text-align:center}.person-name{font-size:22px;font-weight:700;margin:4px 0}.person-meta{font-size:13px;color:var(--ink-soft);margin-bottom:16px}.person-day{font-family:"Song Myung",serif;font-size:48px;line-height:1;color:var(--ink);background:var(--paper-2);border:2px solid currentColor;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}.person-label{font-size:13px;color:var(--ink-soft);margin-bottom:12px}.person-card p{font-size:13.5px;color:var(--ink);line-height:1.65}
 .ohaeng{margin:46px 0;padding:30px 26px;background:var(--paper-2);border:1px solid var(--line);border-radius:6px}
 .ohaeng h3,.myeongsik .cap,.tags h3{font-family:"Gowun Batang",serif;font-size:13px;letter-spacing:.3em;color:var(--ink-soft);text-align:center;margin-bottom:26px;font-weight:400}
