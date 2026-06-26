@@ -37,7 +37,6 @@ RUN_ORACLE_SHOW_PREVIEW="${RUN_ORACLE_SHOW_PREVIEW:-0}"
 RUN_ORACLE_FACE_ANALYSIS_MODE="${RUN_ORACLE_FACE_ANALYSIS_MODE:-1}"
 
 RUN_ORACLE_OUTPUT_DIR="${RUN_ORACLE_OUTPUT_DIR:-$ROOT_DIR/runs}"
-RUN_ORACLE_MANSE_DB_PATH="${RUN_ORACLE_MANSE_DB_PATH:-$ROOT_DIR/data/manse.sqlite}"
 RUN_ORACLE_FACE_DB_PATH="${RUN_ORACLE_FACE_DB_PATH:-$ROOT_DIR/data/face_recommendations.sqlite}"
 
 VENV_DIR="${ORACLE_VENV_DIR:-$ROOT_DIR/.venv}"
@@ -60,7 +59,6 @@ LLAMA_NGL=""
 LLAMA_BATCH_SIZE=""
 LLAMA_EXTRA_ARGS=""
 PYTHON_ENV="auto"
-BUILD_JOBS=""
 POSITIONAL_ARGS=()
 
 log() {
@@ -81,7 +79,6 @@ print_help() {
 Usage: $0 [options] [command] [command_args...]
 
 Commands:
-  build                    Build the project (forwards options to build.sh)
   debug <cmd> [args...]    Run in debug mode (saves outputs to runs/debug/)
   release <cmd> [args...]  Run in release mode (temp output dir, deleted after run)
   capture                  Run capture only
@@ -96,9 +93,8 @@ Wrapper Options:
   --host HOST              Host for the Flask app (default: 0.0.0.0)
   -t, --threads THREADS    Number of threads for llama.cpp server
   -ngl, --ngl LAYERS       Number of GPU layers to offload to GPU (llama.cpp)
-  -c, --ctx-size SIZE      Context size for llama.cpp (default: 4096)
+  -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   -b, --batch-size SIZE    Batch size for llama.cpp
-  -j, --jobs JOBS          Number of build jobs (used with build command)
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
   --python-env ENV         Force Python env type (active-conda, conda, uv, venv, auto)
   --llama-dir DIR          Path to llama.cpp repository
@@ -140,10 +136,6 @@ parse_args() {
         ;;
       -b|--batch-size)
         LLAMA_BATCH_SIZE="$2"
-        shift 2
-        ;;
-      -j|--jobs)
-        BUILD_JOBS="$2"
         shift 2
         ;;
       --face-analysis-mode)
@@ -238,32 +230,7 @@ setup_python_env() {
     return 0
   fi
 
-  # If nothing is found/activated, trigger build first!
-  log "No Python environment activated or found. Running build.sh to set up environment..."
-  local build_flags=()
-  if [[ "$PYTHON_ENV" != "auto" ]]; then
-    build_flags+=(--python-env "$PYTHON_ENV")
-  fi
-  if [[ -n "$ORACLE_LLAMA_CPP_DIR" ]]; then
-    build_flags+=(--llama-dir "$ORACLE_LLAMA_CPP_DIR")
-  fi
-  if [[ -n "$BUILD_JOBS" ]]; then
-    build_flags+=(-j "$BUILD_JOBS")
-  fi
-  if [[ -n "$RUN_ORACLE_LLAMA_MODEL_PATH" ]]; then
-    build_flags+=(--model-path "$RUN_ORACLE_LLAMA_MODEL_PATH")
-  fi
-  
-  "$ROOT_DIR/build.sh" "${build_flags[@]}"
-  
-  # Try activating again after build
-  if [[ -f "$VENV_DIR/bin/activate" ]]; then
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
-    return 0
-  else
-    fail "Python environment setup failed after running build.sh"
-  fi
+  fail "Python environment not found. Run ./build.sh first, then run ./run.sh."
 }
 
 load_env() {
@@ -272,13 +239,8 @@ load_env() {
     # shellcheck source=/dev/null
     source "$ROOT_DIR/.env"
     set +a
-  elif [[ -f "$ROOT_DIR/.env.example" ]]; then
-    cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"
-    set -a
-    # shellcheck source=/dev/null
-    source "$ROOT_DIR/.env"
-    set +a
-    log "created .env from .env.example"
+  else
+    fail ".env not found. Run ./build.sh first or restore .env from .env.example."
   fi
 }
 
@@ -319,7 +281,6 @@ apply_run_config() {
   export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"
-  export ORACLE_MANSE_DB_PATH="$RUN_ORACLE_MANSE_DB_PATH"
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
 
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
@@ -751,29 +712,9 @@ main() {
   # Parse options
   parse_args "$@"
 
-  # If build is requested, forward relevant build options
   local cmd="${POSITIONAL_ARGS[0]:-}"
   if [[ "$cmd" == "build" ]]; then
-    local build_args=("${POSITIONAL_ARGS[@]:1}")
-    if [[ -n "$BUILD_JOBS" ]]; then
-      build_args+=(-j "$BUILD_JOBS")
-    fi
-    if [[ -n "$PYTHON_ENV" ]]; then
-      build_args+=(--python-env "$PYTHON_ENV")
-    fi
-    if [[ -n "$RUN_ORACLE_LLAMA_MODEL_PATH" ]]; then
-      build_args+=(--model-path "$RUN_ORACLE_LLAMA_MODEL_PATH")
-    fi
-    if [[ -n "$ORACLE_LLAMA_CPP_DIR" ]]; then
-      build_args+=(--llama-dir "$ORACLE_LLAMA_CPP_DIR")
-    fi
-    if detect_cuda; then
-      build_args+=(--cuda)
-    else
-      build_args+=(--cpu)
-    fi
-    "$ROOT_DIR/build.sh" "${build_args[@]}"
-    return
+    fail "run.sh is execution-only. Use ./build.sh for build/install tasks."
   fi
 
   # Activate python environment

@@ -3,7 +3,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 .deps/
-.env
 runs/
 reports/
 captures/

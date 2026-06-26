@@ -14,10 +14,10 @@
 기본 설치:
 
 ```bash
-./run.sh build
+./build.sh
 ```
 
-`build.sh`는 Python 환경, Python 패키지, llama.cpp, 기본 GGUF 모델, 만세력 DB를 준비합니다. 이미 `models/*.gguf`가 있으면 모델 다운로드를 건너뜁니다.
+`build.sh`는 Python 환경, Python 패키지, llama.cpp, 기본 GGUF 모델을 준비합니다. 이미 `models/*.gguf`가 있으면 모델 다운로드를 건너뜁니다. `run.sh`는 빌드를 수행하지 않고 실행만 담당합니다.
 
 기본 Python 설치 위치는 프로젝트 루트의 `.venv`입니다. 다른 환경을 강제로 쓰려면 `--python-env uv`, `--python-env conda`, `--python-env active-conda`, `--python-env auto` 중 하나를 명시합니다.
 
@@ -40,7 +40,7 @@ python -m pip install -e .
 http://<raspberry-pi-ip>:8501
 ```
 
-태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 만세력 조회는 `12:00` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
+태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 사주 계산은 `12:30` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
 
 ## 3. 실행 모드
 
@@ -158,11 +158,13 @@ http://<raspberry-pi-ip>:8501
 
 ## 6. 설정 파일
 
-자주 수정하는 값은 `run.sh` 상단 또는 `.env`에서 조정합니다.
+자주 수정하는 값은 `.env`에서 조정합니다.
 
 ```env
 ORACLE_APP_PORT=8501
-ORACLE_LLAMA_MODEL_PATH=models/gemma-3-1b-it-Q4_0.gguf
+ORACLE_LLAMA_MODEL_PATH=models/gemma-4-E2B-it-UD-Q2_K_XL.gguf
+ORACLE_LLAMA_MODEL_URL=https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf
+ORACLE_LLAMA_MODEL_SHA256=dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da2429a727de0c
 ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
@@ -217,8 +219,8 @@ test-results/pytest-latest.txt
 
 ## 9. 재현 체크리스트
 
-1. `requirements.txt` 또는 `./run.sh build`로 라이브러리 설치
-2. `models/*.gguf` 또는 `ORACLE_LLAMA_MODEL_PATH` 확인
+1. `requirements.txt` 또는 `./build.sh`로 라이브러리 설치
+2. `.env`의 `ORACLE_LLAMA_MODEL_PATH`와 `models/*.gguf` 확인
 3. `configs/prompts.json` 프롬프트 확인
 4. `python -m pytest` 실행
 5. `./run.sh`로 웹 UI 실행
