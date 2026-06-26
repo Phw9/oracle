@@ -31,6 +31,8 @@ class _WorkflowJob:
     status: str
     html: str = ""
     error: str = ""
+    download_html: str = ""
+    download_filename: str = "oracle_report.html"
 
 
 class _PreviewStream:
@@ -256,6 +258,23 @@ def create_app() -> Flask:
         result = jsonify(payload), status_code
         return result
 
+    @app.get("/api/jobs/<job_id>/download")
+    def job_download(job_id: str):
+        job = _get_job(job_id)
+        if job is None or job.status != "complete" or job.download_html == "":
+            result = ("report not ready", 404)
+        else:
+            result = Response(
+                job.download_html,
+                content_type="text/html; charset=utf-8",
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="{job.download_filename}"'
+                    ),
+                },
+            )
+        return result
+
     @app.get("/video-feed")
     def video_feed():
         result = Response(
@@ -327,7 +346,7 @@ def _personal_workflow_input_from_form() -> PersonalWorkflowInput:
 
 
 def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
-    def run_job() -> str:
+    def run_job() -> _WorkflowJob:
         workflow_result = run_personal_workflow(
             workflow_input=workflow_input,
             capture_config=load_capture_config(),
@@ -337,7 +356,12 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
             recommendation_db_path=_face_db_path(),
             capture_runner=_preview_capture_runner,
         )
-        result = _personal_result(workflow_result)
+        result = _WorkflowJob(
+            status="complete",
+            html=_personal_result(workflow_result),
+            download_html=workflow_result.report_html,
+            download_filename=workflow_result.output_path.name,
+        )
         return result
 
     result = _start_workflow_job(run_job)
@@ -385,8 +409,12 @@ def _run_workflow_job(job_id: str, run_job) -> None:
         )
     else:
         try:
-            html = run_job()
-            _set_job(job_id, _WorkflowJob(status="complete", html=html))
+            job_result = run_job()
+            if isinstance(job_result, _WorkflowJob):
+                completed_job = job_result
+            else:
+                completed_job = _WorkflowJob(status="complete", html=job_result)
+            _set_job(job_id, completed_job)
         except Exception as exc:
             _set_job(
                 job_id,
@@ -577,6 +605,7 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
       <div class="result-actions">
         <a class="text-link" href="/personal">입력 다시 하기</a>
         <a class="text-link" href="/">처음으로</a>
+        <a id="download-report-link" class="text-link download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
       {_capture_preview_panel(job_id=job_id, skip_face=skip_face)}
     </div>
@@ -1218,6 +1247,10 @@ def _render_page(
             color: var(--mok-deep);
             border-bottom-color: var(--mok-deep);
           }}
+          .download-link {{
+            color: var(--mok-deep);
+            font-weight: 700;
+          }}
           .workflow-loading {{
             display: flex;
             align-items: center;
@@ -1380,6 +1413,7 @@ def _render_page(
           }}
 
           async function pollWorkflow(jobId, status, result, loading) {{
+            const downloadLink = document.getElementById("download-report-link");
             let done = false;
             while (!done) {{
               await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -1390,6 +1424,9 @@ def _render_page(
                 status.textContent = "완료";
                 loading.hidden = true;
                 loading.setAttribute("aria-busy", "false");
+                if (downloadLink) {{
+                  downloadLink.hidden = false;
+                }}
                 done = true;
               }} else if (payload.status === "error") {{
                 result.innerHTML = payload.html;

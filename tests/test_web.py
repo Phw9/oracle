@@ -87,6 +87,46 @@ def test_personal_result_page_includes_workflow_loading_state() -> None:
     assert 'role="status"' in html
     assert "사주 리포트 생성 중입니다" in html
     assert "pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading)" in html
+    assert 'id="download-report-link"' in html
+    assert 'href="/api/jobs/test-job/download"' in html
+    assert "리포트 다운로드" in html
+
+
+def test_completed_job_downloads_report_html() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    app = create_app()
+    _set_job(
+        "downloadable-job",
+        _WorkflowJob(
+            status="complete",
+            html="<section>fragment</section>",
+            download_html="<!doctype html><html><body>full report</body></html>",
+            download_filename="personal_report.html",
+        ),
+    )
+
+    response = app.test_client().get("/api/jobs/downloadable-job/download")
+
+    assert response.status_code == 200
+    assert response.content_type == "text/html; charset=utf-8"
+    assert response.headers["Content-Disposition"] == (
+        'attachment; filename="personal_report.html"'
+    )
+    assert "full report" in response.get_data(as_text=True)
+
+
+def test_running_job_download_returns_not_found() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    app = create_app()
+    _set_job("running-job", _WorkflowJob(status="running"))
+
+    response = app.test_client().get("/api/jobs/running-job/download")
+
+    assert response.status_code == 404
 
 
 def test_personal_page_uses_oracle_input_card_layout() -> None:
