@@ -73,6 +73,13 @@ class LlamaCppChatClient:
         image_path: Path | None,
     ) -> dict[str, Any]:
         rendered_prompt = _coerce_rendered_prompt(prompt)
+        if not self._config.prompt_cache:
+            rendered_prompt = RenderedPrompt(
+                name=rendered_prompt.name,
+                prefix="",
+                body=rendered_prompt.text,
+                slot_id=None,
+            )
         content: list[dict[str, Any]] = [{"type": "text", "text": rendered_prompt.body}]
         if image_path is not None and self._config.send_image:
             content.append(

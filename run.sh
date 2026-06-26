@@ -19,6 +19,7 @@ RUN_ORACLE_LLM_TIMEOUT_SECONDS="${RUN_ORACLE_LLM_TIMEOUT_SECONDS:-${ORACLE_LLM_T
 RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS="${RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS:-${ORACLE_REPORT_LLM_TIMEOUT_SECONDS:-3600}}"
 RUN_ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS="${RUN_ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS:-2048}"
 RUN_ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="${RUN_ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS:-8192}"
+RUN_ORACLE_LLM_PROMPT_CACHE="${RUN_ORACLE_LLM_PROMPT_CACHE:-0}"
 
 RUN_ORACLE_START_LLAMA_SERVER="${RUN_ORACLE_START_LLAMA_SERVER:-1}"
 RUN_ORACLE_LLAMA_MODEL_PATH=""
@@ -81,6 +82,7 @@ Usage: $0 [options] [command] [command_args...]
 
 Commands:
   debug <cmd> [args...]    Run in debug mode (saves outputs to runs/debug/)
+  kvfix <cmd> [args...]    Run with fixed prompt cache slots enabled
   release <cmd> [args...]  Run in release mode (temp output dir, deleted after run)
   capture                  Run capture only
   prompt <args...>         Debug prompt generation
@@ -96,7 +98,7 @@ Wrapper Options:
   -t, --threads THREADS    Number of threads for llama.cpp server
   -ngl, --ngl LAYERS       Number of GPU layers to offload to GPU (llama.cpp)
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
-  --parallel N             Number of llama.cpp slots (default: 5)
+  --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
@@ -167,6 +169,16 @@ parse_args() {
         ;;
     esac
   done
+}
+
+apply_kvfix_mode() {
+  if [[ "${POSITIONAL_ARGS[0]:-}" == "kvfix" ]]; then
+    RUN_ORACLE_LLM_PROMPT_CACHE=1
+    if [[ -z "${RUN_LLAMA_PARALLEL:-}" ]]; then
+      RUN_LLAMA_PARALLEL=5
+    fi
+    POSITIONAL_ARGS=("${POSITIONAL_ARGS[@]:1}")
+  fi
 }
 
 detect_cuda() {
@@ -280,12 +292,17 @@ apply_run_config() {
   export ORACLE_REPORT_LLM_TIMEOUT_SECONDS="$RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS"
   export ORACLE_REPORT_LLM_SEND_IMAGE="$RUN_ORACLE_REPORT_LLM_SEND_IMAGE"
   export ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="$RUN_ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS"
+  export ORACLE_LLM_PROMPT_CACHE="$RUN_ORACLE_LLM_PROMPT_CACHE"
 
   export ORACLE_START_LLAMA_SERVER="$RUN_ORACLE_START_LLAMA_SERVER"
   export ORACLE_LLAMA_MODEL_PATH="${ORACLE_LLAMA_MODEL_PATH:-$RUN_ORACLE_LLAMA_MODEL_PATH}"
   export ORACLE_LLAMA_SERVER_BIN="$RUN_ORACLE_LLAMA_SERVER_BIN"
   export LLAMA_CONTEXT_SIZE="$RUN_LLAMA_CONTEXT_SIZE"
-  export LLAMA_PARALLEL="${RUN_LLAMA_PARALLEL:-${LLAMA_PARALLEL:-5}}"
+  if [[ -n "${RUN_LLAMA_PARALLEL:-}" ]]; then
+    export LLAMA_PARALLEL="$RUN_LLAMA_PARALLEL"
+  else
+    unset LLAMA_PARALLEL
+  fi
 
   export ORACLE_CAMERA_INDEX="$RUN_ORACLE_CAMERA_INDEX"
   export ORACLE_FRAME_WIDTH="$RUN_ORACLE_FRAME_WIDTH"
@@ -570,12 +587,15 @@ start_llama_server() {
     --host "$host"
     --port "$port"
     -c "${LLAMA_CONTEXT_SIZE:-4096}"
-    --parallel "${LLAMA_PARALLEL:-5}"
     --cache-type-k q4_0
     --cache-type-v q4_0
     --reasoning off
     --reasoning-format none
   )
+
+  if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
+    server_args+=(--parallel "$LLAMA_PARALLEL")
+  fi
 
   # Check GPU/CUDA and automatically set GPU layers if NGL is not explicitly set
   local use_cuda=0
@@ -740,6 +760,7 @@ needs_llm_server() {
 main() {
   # Parse options
   parse_args "$@"
+  apply_kvfix_mode
 
   local cmd="${POSITIONAL_ARGS[0]:-}"
   if [[ "$cmd" == "build" ]]; then

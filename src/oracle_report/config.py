@@ -45,6 +45,7 @@ class LlmConfig:
     max_output_tokens: int
     temperature: float
     send_image: bool
+    prompt_cache: bool = False
 
 
 @dataclass(frozen=True)
@@ -134,6 +135,10 @@ def _load_llm_config(prefix: str, send_image_default: bool) -> LlmConfig:
         send_image=_read_bool(
             f"{prefix}_SEND_IMAGE",
             _read_bool("ORACLE_LLM_SEND_IMAGE", send_image_default),
+        ),
+        prompt_cache=_read_bool(
+            f"{prefix}_PROMPT_CACHE",
+            _read_bool("ORACLE_LLM_PROMPT_CACHE", False),
         ),
     )
     return result
