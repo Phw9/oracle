@@ -13,7 +13,6 @@ from oracle_report.models import (
     FaceBox,
     FaceQuality,
 )
-from oracle_report.saju.repository import build_manse_database
 from oracle_report.workflow import (
     CompatibilityWorkflowInput,
     PersonalWorkflowInput,
@@ -340,9 +339,7 @@ def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) 
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1997)
-    result = db_path
+    result = tmp_path / "unused-manse.sqlite"
     return result
 
 

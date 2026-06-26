@@ -3,6 +3,10 @@ from __future__ import annotations
 from oracle_report.models import BirthProfile
 from oracle_report.physiognomy import FaceReadingInput, format_face_quality
 from oracle_report.prompt_templates import render_prompt_template
+from oracle_report.saju.repository import (
+    birth_datetime_display_from_profile,
+    birth_time_display_from_profile,
+)
 
 
 def build_personal_face_analysis_prompt(
@@ -50,7 +54,7 @@ def build_personal_final_prompt(
         {
             "name": birth_profile.name,
             "gender": _gender_text(birth_profile),
-            "birth_datetime": birth_profile.birth_datetime.isoformat(sep=" "),
+            "birth_datetime": birth_datetime_display_from_profile(birth_profile),
             "birth_time_text": _birth_time_text(birth_profile),
             "timezone": birth_profile.timezone,
             "saju_text": saju_text,
@@ -70,7 +74,7 @@ def build_saju_reading_prompt(
         {
             "name": birth_profile.name,
             "gender": _gender_text(birth_profile),
-            "birth_datetime": birth_profile.birth_datetime.isoformat(sep=" "),
+            "birth_datetime": birth_datetime_display_from_profile(birth_profile),
             "birth_time_text": _birth_time_text(birth_profile),
             "timezone": birth_profile.timezone,
             "saju_text": saju_text,
@@ -92,11 +96,11 @@ def build_compatibility_final_prompt(
         {
             "left_name": left_profile.name,
             "left_gender": _gender_text(left_profile),
-            "left_birth_datetime": left_profile.birth_datetime.isoformat(sep=" "),
+            "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
             "left_birth_time_text": _birth_time_text(left_profile),
             "right_name": right_profile.name,
             "right_gender": _gender_text(right_profile),
-            "right_birth_datetime": right_profile.birth_datetime.isoformat(sep=" "),
+            "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
             "right_birth_time_text": _birth_time_text(right_profile),
             "mode": mode,
             "left_saju_text": left_saju_text,
@@ -117,7 +121,7 @@ def _build_face_analysis_prompt(
     values = {
         "name": birth_profile.name,
         "gender": _gender_text(birth_profile),
-        "birth_datetime": birth_profile.birth_datetime.isoformat(sep=" "),
+        "birth_datetime": birth_datetime_display_from_profile(birth_profile),
         "birth_time_text": _birth_time_text(birth_profile),
         "quality_text": quality_text,
     }
@@ -134,7 +138,5 @@ def _gender_text(profile: BirthProfile) -> str:
 
 
 def _birth_time_text(profile: BirthProfile) -> str:
-    result = "입력됨"
-    if not profile.birth_time_known:
-        result = "미입력, 정오 기준으로 사주를 보조 계산함"
+    result = birth_time_display_from_profile(profile)
     return result

@@ -23,13 +23,16 @@ from oracle_report.report import (
     build_saju_reading_prompt,
 )
 from oracle_report.saju.engine import SajuReading
-from oracle_report.saju.repository import ManseLookupResult, ManseRepository
+from oracle_report.saju.repository import (
+    ManseLookupResult,
+    ManseRepository,
+    representative_time_from_time_branch,
+)
 from oracle_report.vision.runtime import run_capture
 
 
 _DEFAULT_FACE_ANALYSIS_TEXT = "관상 분석 결과를 여기에 넣습니다."
 _DEFAULT_FACE_DB_PATH = "data/face_recommendations.sqlite"
-_DEFAULT_MANSE_DB_PATH = "data/manse.sqlite"
 _UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
 
 
@@ -108,7 +111,7 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--name", required=True)
     parser.add_argument("--birth-date", required=True, help="YYYY-MM-DD")
-    parser.add_argument("--birth-time", default="", help="HH:MM")
+    parser.add_argument("--birth-time", default="", help="HH:MM or 시진")
     parser.add_argument("--gender", required=True)
     parser.add_argument("--right-name", default="")
     parser.add_argument("--right-birth-date", default="")
@@ -248,12 +251,8 @@ def _lookup_manse(
     args: argparse.Namespace,
     profile: BirthProfile,
 ) -> ManseLookupResult:
-    db_path = _configured_path(
-        args.manse_db,
-        "ORACLE_MANSE_DB_PATH",
-        _DEFAULT_MANSE_DB_PATH,
-    )
-    result = ManseRepository(db_path).lookup(profile)
+    del args
+    result = ManseRepository().lookup(profile)
     return result
 
 
@@ -352,6 +351,10 @@ def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
     parse_time = cleaned_time
     if not birth_time_known:
         parse_time = "12:00"
+    else:
+        time_branch_time = representative_time_from_time_branch(cleaned_time)
+        if time_branch_time is not None:
+            parse_time = time_branch_time
     result = (parse_time, birth_time_known)
     return result
 

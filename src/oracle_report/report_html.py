@@ -9,7 +9,10 @@ from oracle_report.models import BirthProfile
 from oracle_report.recommender import FaceRecommendation
 from oracle_report.saju.calendar import BRANCH_ELEMENTS, STEM_ELEMENTS
 from oracle_report.saju.engine import ELEMENTS
-from oracle_report.saju.repository import ManseLookupResult
+from oracle_report.saju.repository import (
+    ManseLookupResult,
+    birth_time_display_from_profile,
+)
 
 
 _STEM_HANJA = ("甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸")
@@ -303,9 +306,7 @@ def _build_personal_report_view(
         f"{_ELEMENT_HANJA[day_element]}"
     )
     birth_date_text = profile.birth_datetime.strftime("%Y. %m. %d")
-    birth_time_text = profile.birth_datetime.strftime("%H:%M")
-    if not profile.birth_time_known:
-        birth_time_text = "시간 미상 (정오 보조 기준)"
+    birth_time_text = birth_time_display_from_profile(profile)
     birth_text = f"{birth_date_text} · {birth_time_text}"
     meta = f"{birth_text} · {profile.gender or '성별 미입력'} · 양력"
     essence = _payload_text(
@@ -488,9 +489,7 @@ def _compatibility_person_view(
     strongest = _strongest_element(manse_lookup.reading.element_counts)
     weakest = _weakest_element(manse_lookup.reading.element_counts)
     birth_date_text = profile.birth_datetime.strftime("%Y. %m. %d")
-    birth_time_text = profile.birth_datetime.strftime("%H:%M")
-    if not profile.birth_time_known:
-        birth_time_text = "시간 미상 (정오 보조 기준)"
+    birth_time_text = birth_time_display_from_profile(profile)
     meta = f"{birth_date_text} · {birth_time_text} · {profile.gender or '성별 미입력'}"
     result = _CompatibilityPersonView(
         name=profile.name,

@@ -3,59 +3,64 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from oracle_report.models import BirthProfile
 from oracle_report.saju.repository import (
     MANSE_GENDERS,
     MANSE_TIME_BRANCH_LABELS,
-    ManseDataNotFoundError,
     ManseRepository,
-    build_manse_database,
     normalize_gender,
+    representative_time_from_time_branch,
+    time_branch_display_from_index,
+    time_branch_index_from_datetime,
 )
 
 
-def test_builds_complete_manse_rows_for_year_range(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-
-    built = build_manse_database(db_path, start_year=1995, end_year=1995)
-    skipped = build_manse_database(db_path, start_year=1995, end_year=1995)
-
-    assert built is True
-    assert skipped is False
-    assert db_path.exists()
-
-
-def test_manse_lookup_returns_prebuilt_record(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1995)
-    repository = ManseRepository(db_path)
+def test_manse_lookup_calculates_runtime_pillars_without_db() -> None:
+    repository = ManseRepository()
     profile = BirthProfile(
         name="홍길동",
-        birth_datetime=datetime(1995, 3, 15, 14, 30),
+        birth_datetime=datetime(1999, 10, 20, 10, 25),
         gender="남성",
     )
 
     result = repository.lookup(profile)
 
+    assert result.reading.chart.year.label == "기묘"
+    assert result.reading.chart.month.label == "갑술"
+    assert result.reading.chart.day.label == "을사"
+    assert result.reading.chart.hour.label == "신사"
     assert "만세력/사주명식" in result.formatted_text
     assert result.gender in MANSE_GENDERS
     assert result.time_branch_label in MANSE_TIME_BRANCH_LABELS
 
 
-def test_manse_lookup_does_not_calculate_missing_rows(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1995)
-    repository = ManseRepository(db_path)
+def test_manse_lookup_ignores_missing_legacy_db_path(tmp_path: Path) -> None:
+    repository = ManseRepository(tmp_path / "missing.sqlite")
     profile = BirthProfile(
         name="미래",
-        birth_datetime=datetime(1996, 1, 1, 0, 0),
+        birth_datetime=datetime(2300, 1, 1, 0, 0),
         gender="여성",
     )
 
-    with pytest.raises(ManseDataNotFoundError):
-        repository.lookup(profile)
+    result = repository.lookup(profile)
+
+    assert result.daeun_direction in {"순행", "역행"}
+    assert "사주명식" in result.formatted_text
+
+
+def test_time_branch_boundaries_use_two_hour_shichen() -> None:
+    assert time_branch_index_from_datetime(datetime(2024, 3, 10, 23, 0)) == 0
+    assert time_branch_index_from_datetime(datetime(2024, 3, 10, 0, 59)) == 0
+    assert time_branch_index_from_datetime(datetime(2024, 3, 10, 1, 0)) == 1
+    assert time_branch_index_from_datetime(datetime(2024, 3, 10, 21, 0)) == 11
+    assert time_branch_index_from_datetime(datetime(2024, 3, 10, 22, 59)) == 11
+
+
+def test_time_branch_display_and_parsing_use_shichen_names() -> None:
+    assert time_branch_display_from_index(6) == "오시(午時)"
+    assert representative_time_from_time_branch("오시") == "12:00"
+    assert representative_time_from_time_branch("午時") == "12:00"
+    assert representative_time_from_time_branch("오시(午時)") == "12:00"
 
 
 def test_normalizes_supported_gender_aliases() -> None:
