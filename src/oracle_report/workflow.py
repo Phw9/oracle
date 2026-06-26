@@ -619,6 +619,10 @@ def _build_personal_markdown(
     if error == "":
         error = _validate_personal_final_report(markdown)
     if error:
+        print(
+            f"[UI FALLBACK:personal_final] invalid LLM output; "
+            f"UI will use fallback/default content. reason={error}"
+        )
         markdown = _fallback_personal_markdown(
             profile,
             manse_lookup.formatted_text,
@@ -750,7 +754,10 @@ def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
         else:
             error = "final report JSON must be an object"
     except json.JSONDecodeError as exc:
-        error = f"final report JSON parse failed: {exc.msg}"
+        error = (
+            "final report JSON parse failed: "
+            f"{exc.msg} at line {exc.lineno}, column {exc.colno}"
+        )
     result = (payload, error)
     return result
 

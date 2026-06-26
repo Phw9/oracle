@@ -286,6 +286,11 @@ def _build_personal_report_view(
     skip_face: bool = False,
 ) -> _PersonalReportView:
     payload = _load_generated_payload(generated_text)
+    if not payload:
+        print(
+            "[UI FALLBACK:personal_report] generated_text is not valid JSON; "
+            "rendering default UI values."
+        )
     reading = manse_lookup.reading
     chart = reading.chart
     weakest = _weakest_element(reading.element_counts)
