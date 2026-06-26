@@ -1588,7 +1588,7 @@ def _render_page(
             const preview = document.querySelector(".capture-preview");
             let done = false;
             while (!done) {{
-              await new Promise((resolve) => setTimeout(resolve, 10000));
+              await new Promise((resolve) => setTimeout(resolve, 30000));
               const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
               const payload = await response.json();
               if (payload.phase === "generating") {{
