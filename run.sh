@@ -168,6 +168,10 @@ Wrapper Options:
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
   --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
+  --distributed-role ROLE  Distributed role: master or slave
+  --distributed-split      Split prompts for parallel execution
+  --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
+  --slave-addrs ADDRS      Comma-separated list of slave addresses
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
   --llama-dir DIR          Path to llama.cpp repository
   --extra-llama-args ARGS  Additional raw command-line arguments for llama-server
@@ -217,6 +221,22 @@ parse_args() {
         ;;
       --face-analysis-mode)
         RUN_ORACLE_FACE_ANALYSIS_MODE="$2"
+        shift 2
+        ;;
+      --distributed-role)
+        RUN_ORACLE_DISTRIBUTED_ROLE="$2"
+        shift 2
+        ;;
+      --distributed-split)
+        RUN_ORACLE_DISTRIBUTED_SPLIT=1
+        shift 1
+        ;;
+      --master-addr)
+        RUN_ORACLE_MASTER_ADDR="$2"
+        shift 2
+        ;;
+      --slave-addrs)
+        RUN_ORACLE_SLAVE_ADDRS="$2"
         shift 2
         ;;
       --python-env)
@@ -388,6 +408,11 @@ apply_run_config() {
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
+
+  export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-$ORACLE_DISTRIBUTED_ROLE}"
+  export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-$ORACLE_DISTRIBUTED_SPLIT}"
+  export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-$ORACLE_MASTER_ADDR}"
+  export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-$ORACLE_SLAVE_ADDRS}"
 
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
 }

@@ -512,6 +512,32 @@ def _build_single_face_analysis(
     artifact: CaptureArtifact,
     face_analysis_mode: int = FACE_ANALYSIS_MODE_LLM_IMAGE,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+    if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE and app_config.distributed_split and app_config.distributed_role == "master":
+        categories = ["눈과 눈썹", "얼굴 비율과 중심감", "표정과 소통 분위기", "첫인상 리듬", "관상 기반 생활 팁"]
+        values = {
+            "name": profile.name,
+            "gender": profile.gender,
+            "birth_datetime": profile.birth_datetime.isoformat(),
+            "birth_time_text": birth_time_display_from_profile(profile),
+            "quality_text": artifact.quality.face_analysis
+        }
+        image_path = _face_llm_image_path(artifact)
+        try:
+            text = _generate_distributed(
+                "personal_face_analysis",
+                values,
+                categories,
+                image_path,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     if face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
         text = artifact.face_analysis or artifact.quality.face_analysis
         if text == "":
@@ -587,6 +613,38 @@ def _build_couple_face_analysis(
     artifact: SequentialPairCaptureArtifact,
     mode: str,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+    if app_config.distributed_split and app_config.distributed_role == "master":
+        categories = ["첫인상과 분위기", "소통 리듬", "관계 강점", "주의할 점"]
+        values = {
+            "mode": mode,
+            "left_name": left_profile.name,
+            "left_gender": left_profile.gender,
+            "left_birth_datetime": left_profile.birth_datetime.isoformat(),
+            "left_birth_time_text": birth_time_display_from_profile(left_profile),
+            "left_quality_text": artifact.left.quality.face_analysis,
+            "right_name": right_profile.name,
+            "right_gender": right_profile.gender,
+            "right_birth_datetime": right_profile.birth_datetime.isoformat(),
+            "right_birth_time_text": birth_time_display_from_profile(right_profile),
+            "right_quality_text": artifact.right.quality.face_analysis
+        }
+        image_path = _pair_face_llm_image_path(artifact)
+        try:
+            text = _generate_distributed(
+                "face_analysis_copule",
+                values,
+                categories,
+                image_path,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     if client is None:
         raise ValueError("face analysis client is required for mode 1.")
     image_path = _pair_face_llm_image_path(artifact)
@@ -735,6 +793,30 @@ def _build_saju_analysis(
     profile: BirthProfile,
     manse_lookup: ManseLookupResult,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+    if app_config.distributed_split and app_config.distributed_role == "master":
+        categories = ["종합 형국", "타고난 성향과 심리 패턴", "재물운과 적성", "연애운과 인간관계", "올해의 운세", "총평 및 인생의 조언"]
+        values = {
+            "name": profile.name,
+            "gender": manse_lookup.gender,
+            "timezone": "KST",
+            "saju_text": manse_lookup.formatted_text
+        }
+        try:
+            text = _generate_distributed(
+                "saju_reading",
+                values,
+                categories,
+                None,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
     result = _safe_generate(
         client,
@@ -754,6 +836,37 @@ def _build_compatibility_saju_analysis(
     left_manse: ManseLookupResult,
     right_manse: ManseLookupResult,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+    if app_config.distributed_split and app_config.distributed_role == "master":
+        categories = ["관계 구조", "상호 보완", "갈등 관리", "실천 제안"]
+        values = {
+            "mode": mode,
+            "left_name": left_profile.name,
+            "left_gender": left_profile.gender,
+            "left_birth_datetime": left_profile.birth_datetime.isoformat(),
+            "left_birth_time_text": birth_time_display_from_profile(left_profile),
+            "right_name": right_profile.name,
+            "right_gender": right_profile.gender,
+            "right_birth_datetime": right_profile.birth_datetime.isoformat(),
+            "right_birth_time_text": birth_time_display_from_profile(right_profile),
+            "left_saju_text": left_manse.formatted_text,
+            "right_saju_text": right_manse.formatted_text
+        }
+        try:
+            text = _generate_distributed(
+                "saju_reading_couple",
+                values,
+                categories,
+                None,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     prompt = build_couple_saju_reading_prompt(
         left_profile,
         right_profile,
@@ -1177,3 +1290,141 @@ def _new_session_dir(base_dir: Path, prefix: str) -> Path:
     result = base_dir / f"{prefix}_{stamp}"
     result.mkdir(parents=True, exist_ok=True)
     return result
+
+
+class DistributedTaskScheduler:
+    def __init__(self, slave_addrs: list[str]) -> None:
+        self.slave_addrs = slave_addrs
+        self.slave_metadata = {addr: {"cuda": False, "weight": 1.0} for addr in slave_addrs}
+        self._next_index = 0
+
+    def select_slave(self, task_name: str) -> str:
+        if not self.slave_addrs:
+            raise RuntimeError("No slave addresses available for distributed task execution.")
+        addr = self.slave_addrs[self._next_index % len(self.slave_addrs)]
+        self._next_index += 1
+        return addr
+
+
+def _generate_distributed(
+    prompt_name: str,
+    values: dict[str, Any],
+    categories: list[str],
+    image_path: Path | None,
+    app_config,
+    face_llm_config,
+    report_llm_config,
+) -> str:
+    import base64
+    import requests
+    from concurrent.futures import ThreadPoolExecutor
+
+    tasks = [{"is_metadata": True, "target_category": None}]
+    for cat in categories:
+        tasks.append({"is_metadata": False, "target_category": cat})
+
+    image_base64 = None
+    if image_path and image_path.exists():
+        image_base64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
+
+    scheduler = DistributedTaskScheduler(app_config.slave_addrs)
+
+    def execute_task(task):
+        is_meta = task["is_metadata"]
+        cat = task["target_category"]
+        
+        if app_config.slave_addrs:
+            slave_url = scheduler.select_slave(f"{prompt_name}_{cat or 'metadata'}")
+            api_url = f"{slave_url.rstrip('/')}/api/distributed/generate"
+            payload = {
+                "prompt_name": prompt_name,
+                "target_category": cat,
+                "is_metadata": is_meta,
+                "values": values,
+                "image_base64": image_base64
+            }
+            try:
+                res = requests.post(api_url, json=payload, timeout=90.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get("status") == "success":
+                        return {"task": task, "success": True, "output": data.get("output")}
+                    else:
+                        return {"task": task, "success": False, "error": data.get("error")}
+                else:
+                    return {"task": task, "success": False, "error": f"HTTP {res.status_code}"}
+            except Exception as e:
+                return {"task": task, "success": False, "error": str(e)}
+
+        from oracle_report.prompt_templates import render_distributed_prompt_template
+        from oracle_report.llm import LlamaCppChatClient
+        rendered = render_distributed_prompt_template(
+            name=prompt_name,
+            values=values,
+            target_category=cat,
+            is_metadata=is_meta,
+        )
+        is_face = "face" in prompt_name
+        llm_config = face_llm_config if is_face else report_llm_config
+        client = LlamaCppChatClient(llm_config)
+        try:
+            output = client.generate(rendered, image_path=image_path)
+            return {"task": task, "success": True, "output": output}
+        except Exception as e:
+            return {"task": task, "success": False, "error": str(e)}
+
+    max_workers = len(app_config.slave_addrs) if app_config.slave_addrs else 2
+    max_workers = max(2, max_workers)
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(execute_task, tasks))
+
+    meta_output = {}
+    blocks_outputs = []
+    
+    for r in results:
+        if not r["success"]:
+            print(f"[Distributed] Task failed: {r.get('error')}")
+            continue
+            
+        output_str = r["output"]
+        cleaned = output_str.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and (lines[0].startswith("```json") or lines[0] == "```"):
+                cleaned = "\n".join(lines[1:-1])
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start >= 0 and end >= start:
+            cleaned = cleaned[start : end + 1]
+
+        try:
+            parsed = json.loads(cleaned)
+        except Exception as e:
+            print(f"[Distributed] JSON parsing failed: {e}")
+            parsed = {}
+
+        if r["task"]["is_metadata"]:
+            meta_output = parsed
+        else:
+            blocks_outputs.append(parsed)
+
+    final_dict = meta_output
+    block_key = "saju_blocks"
+    if "face" in prompt_name:
+        block_key = "face_blocks" if "couple" not in prompt_name else "pair_blocks"
+        
+    ordered_blocks = []
+    for cat in categories:
+        matched = None
+        for b in blocks_outputs:
+            if b.get("category") == cat:
+                matched = b
+                break
+        if matched:
+            ordered_blocks.append(matched)
+        else:
+            ordered_blocks.append({"category": cat, "title": "분석 오류", "summary": "연산 실패", "body": "해당 카테고리의 분석을 생성하지 못했습니다."})
+            
+    final_dict[block_key] = ordered_blocks
+    return json.dumps(final_dict, ensure_ascii=False)

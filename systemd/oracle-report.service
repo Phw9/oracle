@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/hyukju/oracle
-EnvironmentFile=-/home/hyukju/oracle/.env
-ExecStart=/home/hyukju/oracle/run.sh
+WorkingDirectory=/home/hyukju/work/oracle
+EnvironmentFile=-/home/hyukju/work/oracle/.env
+ExecStart=/home/hyukju/work/oracle/run.sh
 Restart=on-failure
 RestartSec=5
 User=hyukju

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -53,6 +53,10 @@ class AppConfig:
     host: str
     port: int
     debug: bool
+    distributed_role: str | None = None
+    distributed_split: bool = False
+    master_addr: str | None = None
+    slave_addrs: list[str] = field(default_factory=list)
 
 
 def load_capture_config() -> CaptureConfig:
@@ -98,10 +102,19 @@ def load_report_llm_config() -> LlmConfig:
 
 def load_app_config() -> AppConfig:
     _load_dotenv()
+    role = os.getenv("ORACLE_DISTRIBUTED_ROLE")
+    if role not in (None, "", "master", "slave"):
+        raise ValueError("ORACLE_DISTRIBUTED_ROLE must be 'master' or 'slave'.")
+    slave_addrs_raw = os.getenv("ORACLE_SLAVE_ADDRS", "")
+    slave_addrs = [addr.strip() for addr in slave_addrs_raw.split(",") if addr.strip()]
     result = AppConfig(
         host=os.getenv("ORACLE_APP_HOST", "0.0.0.0"),
         port=_read_positive_int("ORACLE_APP_PORT", 8501),
         debug=_read_bool("ORACLE_APP_DEBUG", False),
+        distributed_role=role if role else None,
+        distributed_split=_read_bool("ORACLE_DISTRIBUTED_SPLIT", False),
+        master_addr=os.getenv("ORACLE_MASTER_ADDR"),
+        slave_addrs=slave_addrs,
     )
     return result
 

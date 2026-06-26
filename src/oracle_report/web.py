@@ -306,6 +306,52 @@ def create_app() -> Flask:
         result = "ok"
         return result
 
+    @app.post("/api/distributed/generate")
+    def distributed_generate():
+        payload = request.json or {}
+        prompt_name = payload.get("prompt_name")
+        target_category = payload.get("target_category")
+        is_metadata = payload.get("is_metadata", False)
+        values = payload.get("values", {})
+        image_base64 = payload.get("image_base64")
+
+        from oracle_report.prompt_templates import render_distributed_prompt_template
+        rendered = render_distributed_prompt_template(
+            name=prompt_name,
+            values=values,
+            target_category=target_category,
+            is_metadata=is_metadata,
+        )
+
+        temp_img_path = None
+        if image_base64:
+            import base64
+            img_data = base64.b64decode(image_base64)
+            temp_dir = Path("runs/temp")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_img_path = temp_dir / f"distributed_temp_{uuid.uuid4().hex}.jpg"
+            temp_img_path.write_bytes(img_data)
+
+        from oracle_report.llm import LlamaCppChatClient
+        from oracle_report.config import load_face_llm_config, load_report_llm_config
+
+        is_face = "face" in prompt_name
+        llm_config = load_face_llm_config() if is_face else load_report_llm_config()
+        client = LlamaCppChatClient(llm_config)
+
+        try:
+            output = client.generate(rendered, image_path=temp_img_path)
+            result = jsonify({"status": "success", "output": output})
+        except Exception as exc:
+            result = jsonify({"status": "error", "error": str(exc)}), 500
+        finally:
+            if temp_img_path and temp_img_path.exists():
+                try:
+                    temp_img_path.unlink()
+                except Exception:
+                    pass
+        return result
+
     @app.get("/favicon.ico")
     def favicon():
         result = ("", 204)
