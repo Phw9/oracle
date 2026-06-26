@@ -226,7 +226,7 @@ configs/prompts_debug.json
 - `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 - `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
-운영 프롬프트는 첫 `${...}` 치환값 이전까지를 cache prefix로 자동 분리합니다. LLM 요청에는 전체 프롬프트를 계속 보내되, prefix는 system message로, 가변 입력은 user message로 나누고 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
+운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. `prefix`에는 고정 지시문과 출력 스키마를 두고, `body`에는 이름, 생년월일시, 만세력 결과, 캡처 품질 같은 실행 시점 입력값을 둡니다. LLM 요청에는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보냅니다.
 
 관상 모드:
 

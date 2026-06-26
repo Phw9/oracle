@@ -15,6 +15,32 @@ from oracle_report.report import (
 )
 
 
+_PROMPT_TEMPLATE_NAMES = (
+    "personal_face_analysis",
+    "saju_reading",
+    "saju_reading_couple",
+    "compatibility_face_analysis",
+    "face_analysis_copule",
+)
+
+
+def test_runtime_prompts_define_explicit_cache_prefixes() -> None:
+    prompt_path = Path("configs/prompts.json")
+    root = json.loads(prompt_path.read_text(encoding="utf-8"))
+
+    for prompt_name in _PROMPT_TEMPLATE_NAMES:
+        prompt_config = root[prompt_name]
+
+        assert isinstance(prompt_config, dict)
+        assert isinstance(prompt_config["id_slot"], int)
+        assert isinstance(prompt_config["prefix"], list)
+        assert isinstance(prompt_config["body"], list)
+        assert prompt_config["prefix"]
+        assert prompt_config["body"]
+        assert "${" not in "\n".join(prompt_config["prefix"])
+        assert "${" in "\n".join(prompt_config["body"])
+
+
 def test_personal_face_analysis_prompt_contains_required_context() -> None:
     profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
 
