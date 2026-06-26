@@ -17,7 +17,7 @@ def test_day_pillar_known_reference_from_sexagenary_table() -> None:
 
 
 def test_1984_after_ipchun_is_jiazi_year() -> None:
-    chart = build_saju_chart(datetime(1984, 2, 4, 10, 0))
+    chart = build_saju_chart(datetime(1984, 2, 5, 10, 0))
     assert chart.year.label == "갑자"
 
 

@@ -21,7 +21,7 @@ def test_personal_face_analysis_prompt_contains_required_context() -> None:
     prompt = build_personal_face_analysis_prompt(profile, FaceReadingInput(None, None))
 
     assert "개인 리포트" in prompt
-    assert "1995-03-15 14:30:00" in prompt
+    assert "1995-03-15 미시(未時)" in prompt
     assert "신원, 나이, 성별, 민족, 건강" in prompt
     assert "\"face_blocks\"" in prompt
 

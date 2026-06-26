@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from oracle_report.cli import main
-from oracle_report.saju.repository import build_manse_database
 
 
 def test_prompt_command_prints_face_analysis_prompt(capsys) -> None:
@@ -25,7 +24,7 @@ def test_prompt_command_prints_face_analysis_prompt(capsys) -> None:
     output = capsys.readouterr().out
 
     assert result == 0
-    assert "1995-03-15 14:30:00" in output
+    assert "1995-03-15 미시(未時)" in output
 
 
 def test_prompt_command_prints_compatibility_face_analysis_prompt(capsys) -> None:
@@ -114,8 +113,8 @@ def test_prompt_command_prints_personal_final_prompt(
 
     assert result == 0
     assert "1995-03-15" in output
-    assert "미입력" in output
-    assert "정오 기준" in output
+    assert "시간 미상" in output
+    assert "오시(午時) 보조 기준" in output
     assert "face analysis fixture" in output
 
 
@@ -159,15 +158,13 @@ def test_prompt_command_prints_compatibility_final_prompt(
     assert result == 0
     assert "left" in output
     assert "right" in output
-    assert "미입력" in output
-    assert "정오 기준" in output
+    assert "시간 미상" in output
+    assert "오시(午時) 보조 기준" in output
     assert "pair face analysis fixture" in output
     assert "\"pair_blocks\"" in output
     assert "\"action_title\"" in output
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1995)
-    result = db_path
+    result = tmp_path / "unused-manse.sqlite"
     return result

@@ -31,7 +31,12 @@ from oracle_report.report_html import (
     render_compatibility_report_html,
     render_personal_report_html,
 )
-from oracle_report.saju.repository import ManseLookupResult, ManseRepository
+from oracle_report.saju.repository import (
+    ManseLookupResult,
+    ManseRepository,
+    UNKNOWN_BIRTH_TIME_REPRESENTATIVE,
+    representative_time_from_time_branch,
+)
 from oracle_report.vision.runtime import run_capture
 
 
@@ -176,6 +181,7 @@ def run_personal_workflow(
     report_client: TextGenerator | None = None,
     capture_runner=run_capture,
 ) -> PersonalWorkflowResult:
+    del manse_db_path
     face_analysis_mode = _validate_face_analysis_mode(
         workflow_input.face_analysis_mode,
     )
@@ -191,7 +197,7 @@ def run_personal_workflow(
     )
     output_dir = _new_session_dir(active_capture_config.output_dir, "personal")
     timing_recorder = _WorkflowTimingRecorder("personal_workflow")
-    repository = ManseRepository(manse_db_path)
+    repository = ManseRepository()
     active_face_client = face_client
     if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE:
         active_face_client = face_client or LlamaCppChatClient(face_llm_config)
@@ -324,6 +330,7 @@ def run_compatibility_workflow(
     capture_runner=run_capture,
     inter_capture_delay_seconds: float = 3.0,
 ) -> CompatibilityWorkflowResult:
+    del manse_db_path
     mode = _validate_mode(workflow_input.mode)
     face_analysis_mode = _validate_face_analysis_mode(
         workflow_input.face_analysis_mode,
@@ -346,7 +353,7 @@ def run_compatibility_workflow(
     )
     output_dir = _new_session_dir(active_capture_config.output_dir, "compatibility")
     timing_recorder = _WorkflowTimingRecorder("compatibility_workflow")
-    repository = ManseRepository(manse_db_path)
+    repository = ManseRepository()
     active_face_client = face_client
     if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE:
         active_face_client = face_client or LlamaCppChatClient(face_llm_config)
@@ -1016,7 +1023,11 @@ def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
     birth_time_known = cleaned_time.lower() not in _UNKNOWN_BIRTH_TIME_VALUES
     time_text = cleaned_time
     if not birth_time_known:
-        time_text = "12:00"
+        time_text = UNKNOWN_BIRTH_TIME_REPRESENTATIVE
+    else:
+        time_branch_time = representative_time_from_time_branch(cleaned_time)
+        if time_branch_time is not None:
+            time_text = time_branch_time
     result = (time_text, birth_time_known)
     return result
 

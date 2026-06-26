@@ -23,6 +23,10 @@ from oracle_report.workflow import (
     run_compatibility_workflow,
     run_personal_workflow,
 )
+from oracle_report.saju.repository import (
+    MANSE_TIME_BRANCH_LABELS,
+    time_branch_range_display_from_index,
+)
 from oracle_report.vision.runtime import run_capture
 
 
@@ -440,7 +444,7 @@ def _get_job(job_id: str) -> _WorkflowJob | None:
 
 
 def _manse_db_path() -> Path:
-    result = Path(os.getenv("ORACLE_MANSE_DB_PATH", "data/manse.sqlite"))
+    result = Path(".")
     return result
 
 
@@ -561,21 +565,14 @@ def _gender_options(required: bool) -> str:
 
 
 def _birth_time_options() -> str:
-    options = (
-        ("", "모름"),
-        ("00:00", "자시 (23:00-00:59)"),
-        ("02:00", "축시 (01:00-02:59)"),
-        ("04:00", "인시 (03:00-04:59)"),
-        ("06:00", "묘시 (05:00-06:59)"),
-        ("08:00", "진시 (07:00-08:59)"),
-        ("10:00", "사시 (09:00-10:59)"),
-        ("12:00", "오시 (11:00-12:59)"),
-        ("14:00", "미시 (13:00-14:59)"),
-        ("16:00", "신시 (15:00-16:59)"),
-        ("18:00", "유시 (17:00-18:59)"),
-        ("20:00", "술시 (19:00-20:59)"),
-        ("22:00", "해시 (21:00-22:59)"),
+    branch_options = tuple(
+        (
+            label,
+            time_branch_range_display_from_index(index),
+        )
+        for index, label in enumerate(MANSE_TIME_BRANCH_LABELS)
     )
+    options = (("", "모름"),) + branch_options
     result = "\n".join(
         f'<option value="{escape(value)}">{escape(label)}</option>'
         for value, label in options

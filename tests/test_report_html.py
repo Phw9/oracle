@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 from oracle_report.models import BirthProfile
 from oracle_report.recommender import FaceRecommendation
@@ -9,18 +8,16 @@ from oracle_report.report_html import (
     render_compatibility_report_html,
     render_personal_report_html,
 )
-from oracle_report.saju.repository import ManseRepository, build_manse_database
+from oracle_report.saju.repository import ManseRepository
 
 
-def test_report_html_fallback_face_blocks_explain_terms(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1995)
+def test_report_html_fallback_face_blocks_explain_terms() -> None:
     profile = BirthProfile(
         name="tester",
         birth_datetime=datetime(1995, 3, 15, 12, 0),
         gender="남성",
     )
-    manse_lookup = ManseRepository(db_path).lookup(profile)
+    manse_lookup = ManseRepository().lookup(profile)
 
     html = render_personal_report_html(
         profile,
@@ -37,9 +34,7 @@ def test_report_html_fallback_face_blocks_explain_terms(tmp_path: Path) -> None:
     assert "삼정은 얼굴을 위" in html
 
 
-def test_personal_saju_only_report_hides_face_recommendations(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1995)
+def test_personal_saju_only_report_hides_face_recommendations() -> None:
     profile = BirthProfile(
         name="tester",
         birth_datetime=datetime(1995, 3, 15, 12, 0),
@@ -57,7 +52,7 @@ def test_personal_saju_only_report_hides_face_recommendations(tmp_path: Path) ->
 
     html = render_personal_report_html(
         profile,
-        ManseRepository(db_path).lookup(profile),
+        ManseRepository().lookup(profile),
         "",
         (recommendation,),
         '{"essence":"사주 핵심","saju_blocks":[]}',
@@ -71,10 +66,8 @@ def test_personal_saju_only_report_hides_face_recommendations(tmp_path: Path) ->
     assert "관상 — 얼굴이 말하는 것" not in html
 
 
-def test_compatibility_report_html_uses_structured_layout(tmp_path: Path) -> None:
-    db_path = tmp_path / "manse.sqlite"
-    build_manse_database(db_path, start_year=1995, end_year=1997)
-    repository = ManseRepository(db_path)
+def test_compatibility_report_html_uses_structured_layout() -> None:
+    repository = ManseRepository()
     left = BirthProfile(
         name="left",
         birth_datetime=datetime(1995, 3, 15, 12, 0),
@@ -101,3 +94,39 @@ def test_compatibility_report_html_uses_structured_layout(tmp_path: Path) -> Non
     assert "궁합 핵심" in html
     assert "행동 제목" in html
     assert "left 님과 right 님" in html
+
+
+def test_profile_hanja_marks_use_readable_text_color() -> None:
+    repository = ManseRepository()
+    left = BirthProfile(
+        name="left",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    right = BirthProfile(
+        name="right",
+        birth_datetime=datetime(1997, 5, 20, 12, 0),
+        gender="여성",
+    )
+
+    html = render_compatibility_report_html(
+        left,
+        right,
+        "연인",
+        repository.lookup(left),
+        repository.lookup(right),
+        "얼굴 관찰 fixture",
+        '{"essence":"궁합 핵심"}',
+    )
+
+    assert ".person-mark" in html
+    assert ".person-day" in html
+    assert (
+        ".person-mark{display:flex;flex-direction:column;align-items:center;"
+        "justify-content:center;width:116px;height:116px;border-radius:50%;"
+        "color:#fff}"
+    ) not in html
+    assert (
+        '.person-day{font-family:"Song Myung",serif;font-size:48px;'
+        "line-height:1;color:#fff;"
+    ) not in html

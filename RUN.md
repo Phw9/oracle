@@ -167,7 +167,6 @@ ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
 ORACLE_FACE_ANALYSIS_MODE=1
 ORACLE_PROMPTS_PATH=configs/prompts.json
-ORACLE_MANSE_DB_PATH=data/manse.sqlite
 ORACLE_FACE_DB_PATH=data/face_recommendations.sqlite
 ```
 
@@ -179,7 +178,7 @@ configs/prompts.json
 
 주요 템플릿 키:
 
-- `saju_reading`: 만세력 DB 조회 결과를 LLM에 보내는 사주 해설 프롬프트
+- `saju_reading`: 런타임 만세력 계산 결과를 LLM에 보내는 사주 해설 프롬프트
 - `personal_face_analysis`: 캡처 이미지 기반 개인 관상 메모 프롬프트
 - `compatibility_face_analysis`: 캡처 이미지 기반 궁합 관상 메모 프롬프트
 - `personal_final`: 사주/만세력, 관상 메모, 얼굴 추천 정보를 합친 개인 최종 JSON 리포트 프롬프트
@@ -192,15 +191,8 @@ configs/prompts.json
 
 ## 7. 데이터 파일
 
-- `data/manse.sqlite`: 사전 생성된 만세력 DB
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB
 - `data/face_recommendations.sqlite`: 개인 리포트 추천 후보용 로컬 샘플 DB. 없으면 실행 중 자동 생성됩니다.
-
-만세력 DB를 다시 생성:
-
-```bash
-oracle-build-manse-db --db data/manse.sqlite --start-year 1900 --end-year 2100
-```
 
 ## 8. 테스트 및 결과 저장
 
@@ -226,8 +218,7 @@ test-results/pytest-latest.txt
 ## 9. 재현 체크리스트
 
 1. `requirements.txt` 또는 `./run.sh build`로 라이브러리 설치
-2. `data/manse.sqlite` 존재 확인
-3. `models/*.gguf` 또는 `ORACLE_LLAMA_MODEL_PATH` 확인
-4. `configs/prompts.json` 프롬프트 확인
-5. `python -m pytest` 실행
-6. `./run.sh`로 웹 UI 실행
+2. `models/*.gguf` 또는 `ORACLE_LLAMA_MODEL_PATH` 확인
+3. `configs/prompts.json` 프롬프트 확인
+4. `python -m pytest` 실행
+5. `./run.sh`로 웹 UI 실행

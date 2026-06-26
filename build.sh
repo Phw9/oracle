@@ -309,8 +309,7 @@ install_deps() {
 
 ensure_python_env() {
   if python_deps_ready &&
-    command_exists oracle-report &&
-    command_exists oracle-build-manse-db; then
+    command_exists oracle-report; then
     log "Python dependencies already installed"
     return
   fi
@@ -623,26 +622,6 @@ ensure_gemma3_1b_q4_model_file() {
   ensure_model_file_at "$model_path" "$model_url" "$model_hash"
 }
 
-ensure_manse_db() {
-  if [[ "${ORACLE_BUILD_MANSE_DB:-1}" != "1" ]]; then
-    log "skipping manse DB build because ORACLE_BUILD_MANSE_DB is not 1"
-    return
-  fi
-
-  local db_path
-  local start_year
-  local end_year
-  db_path="${ORACLE_MANSE_DB_PATH:-$ROOT_DIR/data/manse.sqlite}"
-  start_year="${ORACLE_MANSE_START_YEAR:-1900}"
-  end_year="${ORACLE_MANSE_END_YEAR:-2100}"
-
-  log "ensuring manse DB at $db_path for $start_year-$end_year"
-  oracle-build-manse-db \
-    --db "$db_path" \
-    --start-year "$start_year" \
-    --end-year "$end_year"
-}
-
 generate_systemd_services() {
   local template_dir="$ROOT_DIR/systemd"
   local current_user
@@ -709,7 +688,6 @@ main() {
   ensure_runtime_dirs
   ensure_model_file
   ensure_gemma3_1b_q4_model_file
-  ensure_manse_db
   generate_systemd_services
   run_verification
   log "build complete"
