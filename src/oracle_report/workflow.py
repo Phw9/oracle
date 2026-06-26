@@ -1316,77 +1316,215 @@ def _generate_distributed(
     report_llm_config,
 ) -> str:
     import base64
+    import queue
+    import threading
     import requests
-    from concurrent.futures import ThreadPoolExecutor
 
-    tasks = [{"is_metadata": True, "target_category": None}]
+    tasks = [{"is_metadata": True, "target_category": None, "retries": 0}]
     for cat in categories:
-        tasks.append({"is_metadata": False, "target_category": cat})
+        tasks.append({"is_metadata": False, "target_category": cat, "retries": 0})
 
     image_base64 = None
     if image_path and image_path.exists():
         image_base64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
 
-    scheduler = DistributedTaskScheduler(app_config.slave_addrs)
+    task_queue = queue.Queue()
+    for task in tasks:
+        task_queue.put(task)
 
-    def execute_task(task):
-        is_meta = task["is_metadata"]
-        cat = task["target_category"]
-        
-        if app_config.slave_addrs:
-            slave_url = scheduler.select_slave(f"{prompt_name}_{cat or 'metadata'}")
-            api_url = f"{slave_url.rstrip('/')}/api/distributed/generate"
-            payload = {
-                "prompt_name": prompt_name,
-                "target_category": cat,
-                "is_metadata": is_meta,
-                "values": values,
-                "image_base64": image_base64
-            }
-            try:
-                res = requests.post(api_url, json=payload, timeout=90.0)
-                if res.status_code == 200:
-                    data = res.json()
-                    if data.get("status") == "success":
-                        return {"task": task, "success": True, "output": data.get("output")}
+    results = []
+    results_lock = threading.Lock()
+
+    def worker_loop(slave_url: str) -> None:
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
+        # Determine if the target slave URL is actually the localhost/master itself to bypass HTTP
+        is_local = False
+        from urllib.parse import urlparse
+        import socket
+        try:
+            parsed = urlparse(slave_url)
+            hostname = parsed.hostname or ""
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            if hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+                is_local = True
+            elif port == app_config.port:
+                try:
+                    ip = socket.gethostbyname(hostname)
+                    if ip.startswith("127."):
+                        is_local = True
                     else:
-                        return {"task": task, "success": False, "error": data.get("error")}
-                else:
-                    return {"task": task, "success": False, "error": f"HTTP {res.status_code}"}
-            except Exception as e:
-                return {"task": task, "success": False, "error": str(e)}
+                        my_hostname = socket.gethostname()
+                        if hostname == my_hostname:
+                            is_local = True
+                        else:
+                            my_ips = socket.gethostbyname_ex(my_hostname)[2]
+                            if ip in my_ips:
+                                is_local = True
+                except Exception:
+                    # Fallback check for the user's specific IP
+                    if hostname == "192.168.0.13":
+                        is_local = True
+        except Exception:
+            pass
 
+        local_client = None
+        if is_local:
+            from oracle_report.prompt_templates import render_distributed_prompt_template
+            from oracle_report.llm import LlamaCppChatClient
+            is_face = "face" in prompt_name
+            llm_config = face_llm_config if is_face else report_llm_config
+            local_client = LlamaCppChatClient(llm_config)
+            print(f"[Distributed] URL {slave_url} detected as local. Bypassing HTTP to run directly via LlamaCppChatClient.")
+
+        while True:
+            if consecutive_failures >= max_consecutive_failures:
+                print(f"[Distributed][Offline] Slave {slave_url} failed consecutively {max_consecutive_failures} times. Stopping worker thread.")
+                break
+            try:
+                task = task_queue.get(block=True, timeout=1.0)
+            except queue.Empty:
+                break
+
+            is_meta = task["is_metadata"]
+            cat = task["target_category"]
+
+            success = False
+            output = None
+            error_msg = ""
+
+            if is_local:
+                try:
+                    rendered = render_distributed_prompt_template(
+                        name=prompt_name,
+                        values=values,
+                        target_category=cat,
+                        is_metadata=is_meta,
+                    )
+                    output = local_client.generate(rendered, image_path=image_path)
+                    success = True
+                except Exception as e:
+                    error_msg = f"Direct local generation failed: {e}"
+            else:
+                api_url = f"{slave_url.rstrip('/')}/api/distributed/generate"
+                payload = {
+                    "prompt_name": prompt_name,
+                    "target_category": cat,
+                    "is_metadata": is_meta,
+                    "values": values,
+                    "image_base64": image_base64
+                }
+                try:
+                    # Increase timeout to 180s to handle resource-constrained edge devices gracefully
+                    res = requests.post(api_url, json=payload, timeout=180.0)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if data.get("status") == "success":
+                            success = True
+                            output = data.get("output")
+                        else:
+                            error_msg = data.get("error", "Unknown slave error")
+                    else:
+                        error_msg = f"HTTP status {res.status_code}"
+                except Exception as e:
+                    error_msg = str(e)
+
+            if success:
+                consecutive_failures = 0
+                with results_lock:
+                    results.append({"task": task, "success": True, "output": output})
+                task_queue.task_done()
+            else:
+                consecutive_failures += 1
+                task["retries"] += 1
+                if task["retries"] <= 3:
+                    print(f"[Distributed][Retry] Task {cat or 'metadata'} failed on {slave_url} (Error: {error_msg}). Retrying ({task['retries']}/3)...")
+                    task_queue.put(task)
+                    time.sleep(1.0)
+                else:
+                    print(f"[Distributed][Error] Task {cat or 'metadata'} failed on {slave_url} after 3 retries. Error: {error_msg}")
+                    with results_lock:
+                        results.append({"task": task, "success": False, "error": error_msg})
+                    task_queue.task_done()
+
+    def local_worker_loop() -> None:
         from oracle_report.prompt_templates import render_distributed_prompt_template
         from oracle_report.llm import LlamaCppChatClient
-        rendered = render_distributed_prompt_template(
-            name=prompt_name,
-            values=values,
-            target_category=cat,
-            is_metadata=is_meta,
-        )
+
         is_face = "face" in prompt_name
         llm_config = face_llm_config if is_face else report_llm_config
         client = LlamaCppChatClient(llm_config)
-        try:
-            output = client.generate(rendered, image_path=image_path)
-            return {"task": task, "success": True, "output": output}
-        except Exception as e:
-            return {"task": task, "success": False, "error": str(e)}
 
-    max_workers = len(app_config.slave_addrs) if app_config.slave_addrs else 2
-    max_workers = max(2, max_workers)
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = list(executor.map(execute_task, tasks))
+        while True:
+            try:
+                task = task_queue.get(block=True, timeout=1.0)
+            except queue.Empty:
+                break
+
+            is_meta = task["is_metadata"]
+            cat = task["target_category"]
+            rendered = render_distributed_prompt_template(
+                name=prompt_name,
+                values=values,
+                target_category=cat,
+                is_metadata=is_meta,
+            )
+
+            success = False
+            output = None
+            error_msg = ""
+            try:
+                output = client.generate(rendered, image_path=image_path)
+                success = True
+            except Exception as e:
+                error_msg = str(e)
+
+            if success:
+                with results_lock:
+                    results.append({"task": task, "success": True, "output": output})
+                task_queue.task_done()
+            else:
+                task["retries"] += 1
+                if task["retries"] <= 3:
+                    print(f"[Distributed][Retry] Local task {cat or 'metadata'} failed (Error: {error_msg}). Retrying ({task['retries']}/3)...")
+                    task_queue.put(task)
+                    time.sleep(1.0)
+                else:
+                    print(f"[Distributed][Error] Local task {cat or 'metadata'} failed after 3 retries. Error: {error_msg}")
+                    with results_lock:
+                        results.append({"task": task, "success": False, "error": error_msg})
+                    task_queue.task_done()
+
+    threads = []
+    if app_config.slave_addrs:
+        for slave_url in app_config.slave_addrs:
+            t = threading.Thread(target=worker_loop, args=(slave_url,), daemon=True)
+            t.start()
+            threads.append(t)
+    else:
+        # Fallback to local execution threads
+        for _ in range(2):
+            t = threading.Thread(target=local_worker_loop, daemon=True)
+            t.start()
+            threads.append(t)
+
+    # Monitor queue completion and guard against thread crashes (deadlock avoidance)
+    while task_queue.unfinished_tasks > 0:
+        active_workers = any(t.is_alive() for t in threads)
+        if not active_workers:
+            print("[Distributed][Fatal] All worker threads have terminated, but some tasks are still unfinished. Breaking to avoid deadlock.")
+            break
+        time.sleep(0.5)
 
     meta_output = {}
     blocks_outputs = []
-    
+
     for r in results:
         if not r["success"]:
             print(f"[Distributed] Task failed: {r.get('error')}")
             continue
-            
+
         output_str = r["output"]
         cleaned = output_str.strip()
         if cleaned.startswith("```"):
@@ -1413,7 +1551,7 @@ def _generate_distributed(
     block_key = "saju_blocks"
     if "face" in prompt_name:
         block_key = "face_blocks" if "couple" not in prompt_name else "pair_blocks"
-        
+
     ordered_blocks = []
     for cat in categories:
         matched = None
@@ -1425,6 +1563,6 @@ def _generate_distributed(
             ordered_blocks.append(matched)
         else:
             ordered_blocks.append({"category": cat, "title": "분석 오류", "summary": "연산 실패", "body": "해당 카테고리의 분석을 생성하지 못했습니다."})
-            
+
     final_dict[block_key] = ordered_blocks
     return json.dumps(final_dict, ensure_ascii=False)
