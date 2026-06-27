@@ -114,10 +114,14 @@ class LlamaCppChatClient:
         if rendered_prompt.prefix.strip() != "":
             messages.append({"role": "system", "content": rendered_prompt.prefix})
         messages.append({"role": "user", "content": content})
+        max_tokens = self._config.max_output_tokens
+        if self._config.reasoning:
+            max_tokens = max(max_tokens, 8192)
+
         result = {
             "model": self._config.model,
             "messages": messages,
-            "max_tokens": self._config.max_output_tokens,
+            "max_tokens": max_tokens,
             "temperature": self._config.temperature,
             "stream": False,
         }

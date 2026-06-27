@@ -9,6 +9,7 @@ RUN_ORACLE_APP_HOST="${RUN_ORACLE_APP_HOST:-0.0.0.0}"
 RUN_ORACLE_APP_PORT="${RUN_ORACLE_APP_PORT:-8501}"
 RUN_ORACLE_APP_DEBUG="${RUN_ORACLE_APP_DEBUG:-0}"
 RUN_ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}"
+RUN_ORACLE_REASONING="${RUN_ORACLE_REASONING:-0}"
 
 RUN_ORACLE_LLM_BASE_URL="${RUN_ORACLE_LLM_BASE_URL:-http://127.0.0.1:8080/v1}"
 RUN_ORACLE_LLM_MODEL="${RUN_ORACLE_LLM_MODEL:-local-model}"
@@ -173,6 +174,7 @@ Wrapper Options:
   --distributed-role ROLE  Distributed role: master, slave, or hybrid
   --distributed-split      Split prompts for parallel execution
   --distributed-warmup     Warmup LLM KV cache on start
+  --reasoning              Enable reasoning mode (think tags) for LLM
   --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
   --slave-addrs ADDRS      Comma-separated list of slave addresses
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
@@ -236,6 +238,10 @@ parse_args() {
         ;;
       --distributed-warmup)
         RUN_ORACLE_DISTRIBUTED_WARMUP=1
+        shift 1
+        ;;
+      --reasoning)
+        RUN_ORACLE_REASONING=1
         shift 1
         ;;
       --debug)
@@ -423,6 +429,7 @@ apply_run_config() {
   export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-${ORACLE_DISTRIBUTED_ROLE:-}}"
   export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-${ORACLE_DISTRIBUTED_SPLIT:-0}}"
   export ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}}"
+  export ORACLE_REASONING="${RUN_ORACLE_REASONING:-${ORACLE_REASONING:-0}}"
   export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-${ORACLE_MASTER_ADDR:-}}"
   export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-${ORACLE_SLAVE_ADDRS:-}}"
 
@@ -697,9 +704,13 @@ start_llama_server() {
     -c "${LLAMA_CONTEXT_SIZE:-4096}"
     --cache-type-k q4_0
     --cache-type-v q4_0
-    --reasoning off
-    --reasoning-format none
   )
+
+  if [[ "${ORACLE_REASONING:-0}" == "1" ]]; then
+    server_args+=(--reasoning on --reasoning-format deepseek)
+  else
+    server_args+=(--reasoning off --reasoning-format none)
+  fi
 
   if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
     server_args+=(--parallel "$LLAMA_PARALLEL")

@@ -46,6 +46,7 @@ class LlmConfig:
     temperature: float
     send_image: bool
     prompt_cache: bool = False
+    reasoning: bool = False
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,10 @@ def _load_llm_config(prefix: str, send_image_default: bool) -> LlmConfig:
         prompt_cache=_read_bool(
             f"{prefix}_PROMPT_CACHE",
             _read_bool("ORACLE_LLM_PROMPT_CACHE", False),
+        ),
+        reasoning=_read_bool(
+            f"{prefix}_REASONING",
+            _read_bool("ORACLE_REASONING", False),
         ),
     )
     return result
