@@ -732,5 +732,12 @@ def _import_mediapipe() -> Any:
             "mediapipe is required for face analysis mode 2. "
             "Install pip install -e '.[quality]' or use mode 1.",
         ) from exc
+    if not hasattr(mp, "solutions") or not hasattr(mp.solutions, "face_mesh"):
+        version = getattr(mp, "__version__", "unknown")
+        raise RuntimeError(
+            "installed mediapipe package is missing solutions.face_mesh "
+            f"(version: {version}). Reinstall a compatible mediapipe build "
+            "or use face analysis mode 1."
+        )
     result = mp
     return result

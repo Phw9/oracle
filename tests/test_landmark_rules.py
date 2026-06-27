@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 from oracle_report.vision.landmarks import (
@@ -8,6 +10,7 @@ from oracle_report.vision.landmarks import (
     _FRONT_MOUTH_LEVEL_TOLERANCE,
     _FRONT_NOSE_CENTER_TOLERANCE,
     _MIN_POSE_SCORE,
+    _import_mediapipe,
     _face_box_from_points,
     _landmark_geometry_score,
     _score_from_delta,
@@ -23,6 +26,7 @@ from oracle_report.vision.physiognomy_rule_repository import (
     PhysiognomyRuleRepository,
     build_physio_rule_database,
 )
+from oracle_report.vision.quality import MediaPipeFaceQualityAnalyzer
 
 
 def test_rule_data_is_sourced() -> None:
@@ -38,6 +42,40 @@ def test_rule_data_is_sourced() -> None:
         for rule in PHYSIOGNOMY_RULES
         for source_id in rule.source_ids
     )
+
+
+def test_landmark_import_reports_missing_face_mesh(monkeypatch) -> None:
+    fake_mp = SimpleNamespace(__version__="broken", solutions=SimpleNamespace())
+
+    monkeypatch.setitem(sys.modules, "mediapipe", fake_mp)
+
+    try:
+        _import_mediapipe()
+    except RuntimeError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected mediapipe validation failure")
+
+    assert "missing solutions.face_mesh" in message
+    assert "version: broken" in message
+
+
+def test_quality_import_reports_missing_face_mesh(monkeypatch) -> None:
+    fake_mp = SimpleNamespace(__version__="broken", solutions=SimpleNamespace())
+
+    monkeypatch.setitem(sys.modules, "mediapipe", fake_mp)
+
+    analyzer = MediaPipeFaceQualityAnalyzer.__new__(MediaPipeFaceQualityAnalyzer)
+
+    try:
+        analyzer._import_mediapipe()
+    except RuntimeError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected mediapipe validation failure")
+
+    assert "missing solutions.face_mesh" in message
+    assert "OpenCV backend" in message
 
 
 def test_rule_database_queries_ranges_by_ratio(tmp_path: Path) -> None:
