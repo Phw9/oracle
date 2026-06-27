@@ -35,7 +35,13 @@
       "- 태어난 시간: ${birth_time_text}",
       "",
       "[캡처 품질]",
-      "${quality_text}"
+      "${quality_text}",
+      "",
+      "[랜드마크 원시 비율]",
+      "${landmark_metrics_text}",
+      "",
+      "[랜드마크 규칙 해석 힌트]",
+      "${landmark_rules_text}"
     ]
   },
   "saju_reading": {

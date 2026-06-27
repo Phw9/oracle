@@ -313,6 +313,7 @@ def test_personal_workflow_uses_separate_cropped_face_and_saju_llm(
 def test_personal_workflow_uses_rule_based_face_mode(tmp_path: Path) -> None:
     capture_config = _capture_config(tmp_path)
     manse_db_path = _build_test_manse_db(tmp_path)
+    face_client = RecordingFaceClient()
     workflow_input = PersonalWorkflowInput(
         name="홍길동",
         birth_date="1995-03-15",
@@ -329,15 +330,19 @@ def test_personal_workflow_uses_rule_based_face_mode(tmp_path: Path) -> None:
         report_llm_config=_llm_config(),
         manse_db_path=manse_db_path,
         recommendation_db_path=tmp_path / "faces.sqlite",
-        face_client=FailingFaceClient(),
+        face_client=face_client,
         report_client=FakeLlmClient(),
         capture_runner=_fake_single_capture,
     )
 
-    assert "랜드마크 룰 기반" in result.face_analysis
+    assert len(face_client.prompts) == 1
+    assert "[랜드마크 원시 비율]" in face_client.prompts[0]
+    assert "눈 가로폭/얼굴 폭" in face_client.prompts[0]
+    assert "[랜드마크 규칙 해석 힌트]" in face_client.prompts[0]
     assert result.output_path.suffix == ".html"
     assert "oracle-report" in result.report_html
     assert "시간 미상" in result.report_html
+    assert "크롭 관상 제목 1" in result.report_html
 
 
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:
@@ -483,6 +488,8 @@ def _fake_single_capture(
             ready=True,
             eye_count=2,
             eyebrow_score=0.05,
+            landmark_metrics_text="- 눈 가로폭/얼굴 폭: 0.180\n- 코 길이/얼굴 높이: 0.240",
+            landmark_rules_text="- 눈 가로 크기: 눈 가로폭 균형형 | 관찰: 눈의 가로폭이 얼굴 폭 대비 무난하게 균형을 이룹니다. | 해석 힌트: 전통 관상에서는 눈의 폭이 과하지 않으면 또렷하면서도 편안한 인상으로 보므로 리포트에는 안정적인 시선 흐름을 보조로 넣습니다.",
             face_analysis="## 관상정보\n- 분석 모드: 랜드마크 룰 기반",
         ),
         face_analysis="## 관상정보\n- 분석 모드: 랜드마크 룰 기반",

@@ -50,6 +50,8 @@ def test_personal_face_analysis_prompt_contains_required_context() -> None:
     assert "1995-03-15 미시(未時)" in prompt
     assert "신원, 나이, 성별, 민족, 건강" in prompt
     assert "\"face_blocks\"" in prompt
+    assert "[랜드마크 원시 비율]" in prompt
+    assert "- 랜드마크 측정값 없음" in prompt
 
 
 def test_compatibility_face_analysis_prompt_contains_pair_context() -> None:

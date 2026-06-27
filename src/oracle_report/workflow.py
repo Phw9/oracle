@@ -198,9 +198,7 @@ def run_personal_workflow(
     output_dir = _new_session_dir(active_capture_config.output_dir, "personal")
     timing_recorder = _WorkflowTimingRecorder("personal_workflow")
     repository = ManseRepository()
-    active_face_client = face_client
-    if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE:
-        active_face_client = face_client or LlamaCppChatClient(face_llm_config)
+    active_face_client = face_client or LlamaCppChatClient(face_llm_config)
     active_report_client = report_client or LlamaCppChatClient(report_llm_config)
 
     capture_artifact = None
@@ -242,6 +240,7 @@ def run_personal_workflow(
             profile,
             capture_artifact,
             face_analysis_mode,
+            True,
         )
         face_analysis_text = face_analysis.text
     else:
@@ -511,8 +510,9 @@ def _build_single_face_analysis(
     profile: BirthProfile,
     artifact: CaptureArtifact,
     face_analysis_mode: int = FACE_ANALYSIS_MODE_LLM_IMAGE,
+    use_landmark_prompt: bool = False,
 ) -> _GeneratedText:
-    if face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+    if face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE and not use_landmark_prompt:
         text = artifact.face_analysis or artifact.quality.face_analysis
         if text == "":
             text = "## 관상정보\n- 랜드마크 룰 기반 관상정보를 생성하지 못했습니다."

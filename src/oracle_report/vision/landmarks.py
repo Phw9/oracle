@@ -115,9 +115,16 @@ class LandmarkMetrics:
     eye_count: int
     eyebrow_score: float
     face_aspect_ratio: float
+    eye_width_ratio: float
+    eye_height_ratio: float
+    eye_aspect_ratio: float
     eye_spacing_ratio: float
+    eye_tail_tilt: float
+    nose_length_ratio: float
     mouth_width_ratio: float
+    mouth_height_ratio: float
     lower_face_ratio: float
+    nose_length_width_ratio: float
     mouth_corner_delta: float
     upper_zone_ratio: float
     middle_zone_ratio: float
@@ -127,6 +134,7 @@ class LandmarkMetrics:
     brow_eye_gap_ratio: float
     nose_width_ratio: float
     philtrum_chin_ratio: float
+    chin_length_ratio: float
     jaw_width_ratio: float
     mouth_balance_delta: float
 
@@ -211,16 +219,22 @@ class MediaPipeLandmarkQualityAnalyzer:
         detection = self._detector.latest_detection()
         warnings: list[str] = []
         metrics = _empty_metrics()
+        landmark_metrics_text = "- 랜드마크 측정값 없음"
+        landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
         face_analysis = ""
         if detection.face is None or not detection.landmarks:
             warnings.append("얼굴 랜드마크를 안정적으로 찾지 못했습니다.")
         else:
             metrics = _compute_landmark_metrics(detection.landmarks)
+            repository = _physiognomy_rule_repository()
+            matches = _evaluate_physio_rules(metrics, repository)
             if metrics.frontality_score < _MIN_POSE_SCORE:
                 warnings.append("정면을 바라봐 주세요.")
             if metrics.eye_count < 2:
                 warnings.append("눈을 뜨고 카메라를 정면으로 봐 주세요.")
-            face_analysis = build_rule_based_face_analysis(metrics)
+            landmark_metrics_text = _format_prompt_metric_snapshot(metrics)
+            landmark_rules_text = _format_prompt_rule_hints(matches)
+            face_analysis = build_rule_based_face_analysis(metrics, matches)
 
         result = FaceQuality(
             ready=len(warnings) == 0,
@@ -230,17 +244,24 @@ class MediaPipeLandmarkQualityAnalyzer:
             frontality_score=metrics.frontality_score,
             occlusion_score=metrics.occlusion_score,
             landmark_points=detection.draw_points,
+            landmark_metrics_text=landmark_metrics_text,
+            landmark_rules_text=landmark_rules_text,
             face_analysis=face_analysis,
         )
         return result
 
 
-def build_rule_based_face_analysis(metrics: LandmarkMetrics) -> str:
+def build_rule_based_face_analysis(
+    metrics: LandmarkMetrics,
+    matches: tuple[PhysiognomyRuleMatch, ...] | None = None,
+) -> str:
     repository = _physiognomy_rule_repository()
-    matches = _evaluate_physio_rules(metrics, repository)
-    tags = _format_rule_tags(matches)
-    detail_lines = _format_rule_details(matches)
-    auxiliary_text = _format_auxiliary_interpretation(matches)
+    resolved_matches = matches
+    if resolved_matches is None:
+        resolved_matches = _evaluate_physio_rules(metrics, repository)
+    tags = _format_rule_tags(resolved_matches)
+    detail_lines = _format_rule_details(resolved_matches)
+    auxiliary_text = _format_auxiliary_interpretation(resolved_matches)
     unsupported = ", ".join(repository.unsupported_features())
     safety_note = _clean_auxiliary_text(repository.safety_note())
     result = f"""
@@ -248,7 +269,7 @@ def build_rule_based_face_analysis(metrics: LandmarkMetrics) -> str:
 - 분석 모드: {_LANDMARK_MODE_NAME}
 - 참고 기준: 삼정, 오관, 십이궁, 얼굴형, 하관 비율을 랜드마크로 측정 가능한 항목에 맞춰 변환
 - 주요 태그: {tags}
-- 비율 지표: 삼정 상/중/하 {metrics.upper_zone_ratio:.2f}/{metrics.middle_zone_ratio:.2f}/{metrics.lower_zone_ratio:.2f}, 삼정 편차 {metrics.third_balance_error:.2f}, 얼굴 세로/가로 {metrics.face_aspect_ratio:.2f}, 미간 {metrics.eye_spacing_ratio:.2f}, 눈썹/눈 폭 {metrics.brow_eye_span_ratio:.2f}, 코 폭 {metrics.nose_width_ratio:.2f}, 입 폭 {metrics.mouth_width_ratio:.2f}, 하관 폭 {metrics.jaw_width_ratio:.2f}
+- 비율 지표: 삼정 상/중/하 {metrics.upper_zone_ratio:.2f}/{metrics.middle_zone_ratio:.2f}/{metrics.lower_zone_ratio:.2f}, 삼정 편차 {metrics.third_balance_error:.2f}, 얼굴 세로/가로 {metrics.face_aspect_ratio:.2f}, 눈 가로 {metrics.eye_width_ratio:.2f}, 눈 세로 {metrics.eye_height_ratio:.2f}, 눈 세로/가로 {metrics.eye_aspect_ratio:.2f}, 미간 {metrics.eye_spacing_ratio:.2f}, 눈꼬리 기울기 {metrics.eye_tail_tilt:.2f}, 코 길이 {metrics.nose_length_ratio:.2f}, 코 폭 {metrics.nose_width_ratio:.2f}, 코 길이/폭 {metrics.nose_length_width_ratio:.2f}, 입 폭 {metrics.mouth_width_ratio:.2f}, 입 높이 {metrics.mouth_height_ratio:.2f}, 턱 길이 {metrics.chin_length_ratio:.2f}, 하관 폭 {metrics.jaw_width_ratio:.2f}
 - 세부 관찰:
 {detail_lines}
 - 리포트에 넣을 설명 문장: {auxiliary_text}
@@ -328,9 +349,15 @@ def _compute_landmark_metrics(
     right_eye = landmarks[263]
     left_eye_inner = landmarks[133]
     right_eye_inner = landmarks[362]
+    left_eye_lower = landmarks[145]
+    left_eye_upper = landmarks[159]
+    right_eye_lower = landmarks[374]
+    right_eye_upper = landmarks[386]
+    nose_root = landmarks[168]
     nose_tip = landmarks[1]
     nose_base = landmarks[2]
     upper_lip = landmarks[13]
+    lower_lip = landmarks[14]
     left_mouth = landmarks[61]
     right_mouth = landmarks[291]
     chin = landmarks[152]
@@ -348,6 +375,12 @@ def _compute_landmark_metrics(
     face_width = max(0.001, _distance(left_face, right_face))
     face_height = max(0.001, abs(chin.y - forehead.y))
     eye_line = max(0.001, _distance(left_eye, right_eye))
+    left_eye_width = max(0.001, _distance(left_eye, left_eye_inner))
+    right_eye_width = max(0.001, _distance(right_eye, right_eye_inner))
+    average_eye_width = (left_eye_width + right_eye_width) / 2.0
+    left_eye_height = max(0.001, abs(left_eye_lower.y - left_eye_upper.y))
+    right_eye_height = max(0.001, abs(right_eye_lower.y - right_eye_upper.y))
+    average_eye_height = (left_eye_height + right_eye_height) / 2.0
     eye_y_delta = abs(left_eye.y - right_eye.y) / face_height
     nose_center_delta = abs(nose_tip.x - ((left_eye.x + right_eye.x) * 0.5)) / eye_line
     mouth_y_delta = abs(left_mouth.y - right_mouth.y) / face_height
@@ -364,6 +397,14 @@ def _compute_landmark_metrics(
     brow_span = max(0.001, abs(right_brow_outer.x - left_brow_outer.x))
     eye_span = max(0.001, abs(right_eye.x - left_eye.x))
     lower_height = max(0.001, abs(chin.y - nose_base.y))
+    nose_length = max(0.001, abs(nose_base.y - nose_root.y))
+    nose_width = max(0.001, _distance(left_nose, right_nose))
+    mouth_height = max(0.001, abs(lower_lip.y - upper_lip.y))
+    chin_length = max(0.001, abs(chin.y - lower_lip.y))
+    eye_tail_tilt = (
+        ((left_eye_inner.y - left_eye.y) / left_eye_width)
+        + ((right_eye_inner.y - right_eye.y) / right_eye_width)
+    ) / 2.0
     frontality = (
         _score_from_delta(eye_y_delta, _FRONT_EYE_LEVEL_TOLERANCE)
         + _score_from_delta(nose_center_delta, _FRONT_NOSE_CENTER_TOLERANCE)
@@ -381,9 +422,16 @@ def _compute_landmark_metrics(
         eye_count=eye_count,
         eyebrow_score=eyebrow_gap_ratio,
         face_aspect_ratio=face_height / face_width,
+        eye_width_ratio=average_eye_width / face_width,
+        eye_height_ratio=average_eye_height / face_height,
+        eye_aspect_ratio=average_eye_height / average_eye_width,
         eye_spacing_ratio=_distance(left_eye_inner, right_eye_inner) / face_width,
+        eye_tail_tilt=eye_tail_tilt,
+        nose_length_ratio=nose_length / face_height,
         mouth_width_ratio=_distance(left_mouth, right_mouth) / face_width,
+        mouth_height_ratio=mouth_height / face_height,
         lower_face_ratio=lower_zone_ratio,
+        nose_length_width_ratio=nose_length / nose_width,
         mouth_corner_delta=right_mouth.y - left_mouth.y,
         upper_zone_ratio=upper_zone_ratio,
         middle_zone_ratio=middle_zone_ratio,
@@ -391,8 +439,9 @@ def _compute_landmark_metrics(
         third_balance_error=third_balance_error,
         brow_eye_span_ratio=brow_span / eye_span,
         brow_eye_gap_ratio=eyebrow_gap_ratio,
-        nose_width_ratio=_distance(left_nose, right_nose) / face_width,
+        nose_width_ratio=nose_width / face_width,
         philtrum_chin_ratio=abs(upper_lip.y - nose_base.y) / lower_height,
+        chin_length_ratio=chin_length / face_height,
         jaw_width_ratio=_distance(left_jaw, right_jaw) / face_width,
         mouth_balance_delta=abs(right_mouth.y - left_mouth.y) / face_height,
     )
@@ -406,9 +455,16 @@ def _empty_metrics() -> LandmarkMetrics:
         eye_count=0,
         eyebrow_score=0.0,
         face_aspect_ratio=0.0,
+        eye_width_ratio=0.0,
+        eye_height_ratio=0.0,
+        eye_aspect_ratio=0.0,
         eye_spacing_ratio=0.0,
+        eye_tail_tilt=0.0,
+        nose_length_ratio=0.0,
         mouth_width_ratio=0.0,
+        mouth_height_ratio=0.0,
         lower_face_ratio=0.0,
+        nose_length_width_ratio=0.0,
         mouth_corner_delta=0.0,
         upper_zone_ratio=0.0,
         middle_zone_ratio=0.0,
@@ -418,10 +474,49 @@ def _empty_metrics() -> LandmarkMetrics:
         brow_eye_gap_ratio=0.0,
         nose_width_ratio=0.0,
         philtrum_chin_ratio=0.0,
+        chin_length_ratio=0.0,
         jaw_width_ratio=0.0,
         mouth_balance_delta=0.0,
     )
     return result
+
+
+def _format_prompt_metric_snapshot(metrics: LandmarkMetrics) -> str:
+    lines = (
+        f"- 얼굴 세로/가로 비율: {metrics.face_aspect_ratio:.3f}",
+        f"- 삼정 비율(상/중/하): {metrics.upper_zone_ratio:.3f} / {metrics.middle_zone_ratio:.3f} / {metrics.lower_zone_ratio:.3f}",
+        f"- 삼정 편차: {metrics.third_balance_error:.3f}",
+        f"- 눈 가로폭/얼굴 폭: {metrics.eye_width_ratio:.3f}",
+        f"- 눈 세로높이/얼굴 높이: {metrics.eye_height_ratio:.3f}",
+        f"- 눈 세로/가로 비율: {metrics.eye_aspect_ratio:.3f}",
+        f"- 미간 간격/얼굴 폭: {metrics.eye_spacing_ratio:.3f}",
+        f"- 눈꼬리 기울기: {metrics.eye_tail_tilt:.3f}",
+        f"- 눈썹 길이/눈 간 거리: {metrics.brow_eye_span_ratio:.3f}",
+        f"- 눈썹-눈 간격/얼굴 높이: {metrics.brow_eye_gap_ratio:.3f}",
+        f"- 코 길이/얼굴 높이: {metrics.nose_length_ratio:.3f}",
+        f"- 코 폭/얼굴 폭: {metrics.nose_width_ratio:.3f}",
+        f"- 코 길이/코 폭: {metrics.nose_length_width_ratio:.3f}",
+        f"- 입 폭/얼굴 폭: {metrics.mouth_width_ratio:.3f}",
+        f"- 입 높이/얼굴 높이: {metrics.mouth_height_ratio:.3f}",
+        f"- 인중 길이/하관 높이: {metrics.philtrum_chin_ratio:.3f}",
+        f"- 턱 길이/얼굴 높이: {metrics.chin_length_ratio:.3f}",
+        f"- 하관 폭/얼굴 폭: {metrics.jaw_width_ratio:.3f}",
+        f"- 표정 좌우 균형: {metrics.mouth_balance_delta:.3f}",
+        f"- 정면 점수: {metrics.frontality_score:.3f}",
+        f"- 랜드마크 배치 점수: {metrics.occlusion_score:.3f}",
+    )
+    return "\n".join(lines)
+
+
+def _format_prompt_rule_hints(matches: tuple[PhysiognomyRuleMatch, ...]) -> str:
+    if not matches:
+        return "- 해석 가능한 랜드마크 규칙 없음"
+    lines = []
+    for match in matches:
+        lines.append(
+            f"- {match.title}: {match.tag} | 관찰: {match.observation} | 해석 힌트: {match.interpretation}"
+        )
+    return "\n".join(lines)
 
 
 def _normalize_landmarks(landmarks: Any) -> tuple[NormalizedLandmark, ...]:

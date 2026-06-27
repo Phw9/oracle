@@ -108,9 +108,16 @@ def test_rule_based_face_analysis_includes_auxiliary_interpretation() -> None:
         eye_count=2,
         eyebrow_score=0.08,
         face_aspect_ratio=1.32,
+        eye_width_ratio=0.18,
+        eye_height_ratio=0.05,
+        eye_aspect_ratio=0.28,
         eye_spacing_ratio=0.28,
+        eye_tail_tilt=0.01,
+        nose_length_ratio=0.24,
         mouth_width_ratio=0.36,
+        mouth_height_ratio=0.04,
         lower_face_ratio=0.33,
+        nose_length_width_ratio=1.41,
         mouth_corner_delta=0.0,
         upper_zone_ratio=0.33,
         middle_zone_ratio=0.34,
@@ -120,6 +127,7 @@ def test_rule_based_face_analysis_includes_auxiliary_interpretation() -> None:
         brow_eye_gap_ratio=0.08,
         nose_width_ratio=0.19,
         philtrum_chin_ratio=0.26,
+        chin_length_ratio=0.21,
         jaw_width_ratio=0.66,
         mouth_balance_delta=0.01,
     )
@@ -129,6 +137,8 @@ def test_rule_based_face_analysis_includes_auxiliary_interpretation() -> None:
     assert "랜드마크 룰 기반" in result
     assert "삼정" in result
     assert "비율 지표" in result
+    assert "눈 가로" in result
+    assert "코 길이" in result
     assert "세부 관찰" in result
     assert "리포트에 넣을 설명 문장" in result
     assert "적용 제외 기준" in result
