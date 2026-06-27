@@ -24,8 +24,87 @@ def is_local_llm_running() -> bool:
 
 
 class LlamaCppChatClient:
+    _measured_tps: float | None = None
+    _tps_lock = threading.Lock()
+
     def __init__(self, config: LlmConfig) -> None:
         self._config = config
+
+    def get_or_measure_tps(self) -> float:
+        """
+        이 디바이스의 LLM 추론 속도(TPS)를 안전하게 실측하거나 캐싱된 값을 반환합니다.
+        벤치마크 시 시스템 프롬프트 캐시(KV cache) 슬롯을 Evict/오염시키지 않기 위해
+        'cache_prompt: False' 와 콤팩트한 더미 메시지 세트를 사용합니다.
+        """
+        with self._tps_lock:
+            if self._measured_tps is not None:
+                return self._measured_tps
+
+        import requests
+        import time
+
+        payload = {
+            "model": self._config.model,
+            "messages": [
+                {"role": "user", "content": "1"}
+            ],
+            "max_tokens": 5,
+            "temperature": 0.1,
+            "stream": False,
+            "cache_prompt": False  # 프롬프트 캐시 기능 절대 미사용 (캐시 오염 방지)
+        }
+
+        try:
+            t0 = time.perf_counter()
+            response = requests.post(
+                self._chat_completions_url(),
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=10.0
+            )
+            t1 = time.perf_counter()
+            if response.status_code == 200:
+                root = response.json()
+                usage = root.get("usage", {})
+                completion_tokens = usage.get("completion_tokens", 0)
+                elapsed = t1 - t0
+                if completion_tokens > 0 and elapsed > 0:
+                    tps = completion_tokens / elapsed
+                    with self._tps_lock:
+                        self._measured_tps = tps
+                    print(f"[LLM][Benchmark] Auto-profiling complete: {tps:.2f} tokens/sec (Cache bypass enabled)")
+                    return tps
+        except Exception as e:
+            print(f"[LLM][Benchmark] Auto-profiling failed: {e}. Defaulting to 1.0 TPS.")
+        
+        return 1.0
+
+    def get_model_parameter_size(self) -> float:
+        """
+        모델 파일명/이름을 기반으로 대략적인 파라미터 크기(Billion 단위)를 유추합니다.
+        """
+        model_name = self._config.model.lower()
+        if "1b" in model_name:
+            return 1.0
+        elif "2b" in model_name:
+            return 2.0
+        elif "7b" in model_name:
+            return 7.0
+        elif "8b" in model_name:
+            return 8.0
+        elif "9b" in model_name:
+            return 9.0
+        elif "27b" in model_name:
+            return 27.0
+        elif "e2b" in model_name or "gemma-4" in model_name:
+            return 9.0
+        return 2.0
+
+    def get_compute_score(self) -> float:
+        tps = self.get_or_measure_tps()
+        param_size = self.get_model_parameter_size()
+        score = tps * param_size
+        return score
 
     def generate(
         self,

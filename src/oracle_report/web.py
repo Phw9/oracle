@@ -354,10 +354,28 @@ def create_app() -> Flask:
 
     @app.get("/api/distributed/status")
     def distributed_status():
-        from oracle_report.llm import is_local_llm_running
+        from oracle_report.llm import is_local_llm_running, LlamaCppChatClient
+        from oracle_report.config import load_llm_config
         is_busy = _CAPTURE_LOCK.locked() or is_local_llm_running()
+        
+        llm_config = load_llm_config()
+        client = LlamaCppChatClient(llm_config)
+        
+        tps = 1.0
+        score = 2.0
+        model_name = llm_config.model
+        if not is_busy:
+            try:
+                tps = client.get_or_measure_tps()
+                score = client.get_compute_score()
+            except Exception:
+                pass
+                
         result = jsonify({
-            "status": "busy" if is_busy else "idle"
+            "status": "busy" if is_busy else "idle",
+            "tps": tps,
+            "compute_score": score,
+            "model": model_name
         })
         return result
 

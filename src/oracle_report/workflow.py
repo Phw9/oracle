@@ -1295,7 +1295,10 @@ def _new_session_dir(base_dir: Path, prefix: str) -> Path:
 class DistributedTaskScheduler:
     def __init__(self, slave_addrs: list[str]) -> None:
         self.slave_addrs = slave_addrs
-        self.slave_metadata = {addr: {"cuda": False, "weight": 1.0} for addr in slave_addrs}
+        self.slave_metadata = {
+            addr: {"cuda": False, "weight": 1.0, "compute_score": 5.0}
+            for addr in slave_addrs
+        }
         self._next_index = 0
 
     def select_slave(self, task_name: str) -> str:
@@ -1331,6 +1334,8 @@ def _generate_distributed(
     task_queue = queue.Queue()
     for task in tasks:
         task_queue.put(task)
+
+    scheduler = DistributedTaskScheduler(app_config.slave_addrs)
 
     results = []
     results_lock = threading.Lock()
@@ -1391,6 +1396,7 @@ def _generate_distributed(
             cat = task["target_category"]
 
             # If it's a remote slave, check its availability status first (Hybrid Mode Support)
+            compute_score = 5.0
             if not is_local:
                 try:
                     status_url = f"{slave_url.rstrip('/')}/api/distributed/status"
@@ -1402,8 +1408,30 @@ def _generate_distributed(
                             task_queue.task_done()  # Keep unfinished_tasks counter in sync
                             time.sleep(1.0)
                             continue
+                        score = status_data.get("compute_score")
+                        if score is not None:
+                            scheduler.slave_metadata[slave_url]["compute_score"] = float(score)
+                            compute_score = float(score)
                 except Exception:
-                    pass
+                    compute_score = scheduler.slave_metadata.get(slave_url, {}).get("compute_score", 5.0)
+            else:
+                try:
+                    compute_score = local_client.get_compute_score()
+                except Exception:
+                    compute_score = 5.0
+
+            # 중요도 기반 태스크 라우팅 (Task-to-Model Routing)
+            is_core_category = cat in ("종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언")
+            if is_core_category and compute_score < 20.0:
+                other_high_perf_exists = any(
+                    meta.get("compute_score", 0.0) >= 20.0 
+                    for meta in scheduler.slave_metadata.values()
+                )
+                if other_high_perf_exists:
+                    task_queue.put(task)
+                    task_queue.task_done()
+                    time.sleep(0.5)
+                    continue
 
             # Render prompt for local generation or debugging
             rendered = None
@@ -1493,6 +1521,11 @@ def _generate_distributed(
         llm_config = face_llm_config if is_face else report_llm_config
         client = LlamaCppChatClient(llm_config)
 
+        try:
+            local_score = client.get_compute_score()
+        except Exception:
+            local_score = 5.0
+
         while True:
             try:
                 task = task_queue.get(block=True, timeout=1.0)
@@ -1501,6 +1534,19 @@ def _generate_distributed(
 
             is_meta = task["is_metadata"]
             cat = task["target_category"]
+
+            # 중요도 기반 태스크 라우팅 (Task-to-Model Routing)
+            is_core_category = cat in ("종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언")
+            if is_core_category and local_score < 20.0:
+                other_high_perf_exists = any(
+                    meta.get("compute_score", 0.0) >= 20.0 
+                    for meta in scheduler.slave_metadata.values()
+                )
+                if other_high_perf_exists:
+                    task_queue.put(task)
+                    task_queue.task_done()
+                    time.sleep(0.5)
+                    continue
             rendered = render_distributed_prompt_template(
                 name=prompt_name,
                 values=values,
