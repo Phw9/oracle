@@ -175,6 +175,25 @@ def test_open_camera_falls_back_to_next_device(monkeypatch) -> None:
     assert capture.isOpened() is True
 
 
+def test_open_camera_reports_permission_hint_for_inaccessible_video_devices(monkeypatch) -> None:
+    fake_cv2 = FakeCv2Open(set())
+
+    monkeypatch.setattr(camera, "_import_cv2", lambda: fake_cv2)
+    monkeypatch.setattr(camera, "_discover_video_device_paths", lambda: ["/dev/video0"])
+    monkeypatch.setattr(camera.os, "access", lambda path, mode: False)
+
+    try:
+        camera.open_camera(_capture_config())
+    except RuntimeError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected open_camera to fail")
+
+    assert "attempted indices: 0, 1, 2, 3, 4, 5" in message
+    assert "/dev/video0" in message
+    assert "video group membership" in message
+
+
 def _capture_config() -> CaptureConfig:
     result = CaptureConfig(
         camera_index=0,

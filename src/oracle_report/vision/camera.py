@@ -48,9 +48,11 @@ def open_camera(config: CaptureConfig) -> tuple[Any, Any]:
             break
         _release_capture(candidate)
     if capture is None or selected_index is None:
+        access_hint = _build_camera_access_hint()
         raise RuntimeError(
             "failed to open camera device; "
             f"attempted indices: {', '.join(str(index) for index in attempted_indices)}"
+            f"{access_hint}"
         )
     _configure_capture(cv2, capture, config)
     result = (cv2, capture)
@@ -75,6 +77,25 @@ def _camera_candidate_indices(config: CaptureConfig, max_auto_index: int = 5) ->
 def _release_capture(capture: Any) -> None:
     if hasattr(capture, "release"):
         capture.release()
+
+
+def _build_camera_access_hint() -> str:
+    if os.name != "posix":
+        return ""
+    inaccessible_devices = [
+        path for path in _discover_video_device_paths() if not os.access(path, os.R_OK | os.W_OK)
+    ]
+    if not inaccessible_devices:
+        return ""
+    return (
+        "; detected video devices but the current user cannot access them: "
+        f"{', '.join(inaccessible_devices)}; check video group membership or device permissions"
+    )
+
+
+def _discover_video_device_paths() -> list[str]:
+    result = sorted(str(path) for path in Path("/dev").glob("video*"))
+    return result
 
 
 def _open_video_capture(cv2: Any, camera_index: int) -> Any:

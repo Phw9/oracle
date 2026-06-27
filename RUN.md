@@ -42,6 +42,12 @@ http://<raspberry-pi-ip>:8501
 
 `./run.sh`가 직접 시작한 llama.cpp 서버는 `./run.sh` 종료 시 함께 종료됩니다. 웹 UI 실행 중 `Ctrl+C`로 끄면 Flask UI와 이번 실행에서 시작된 llama-server가 같이 내려갑니다. 이미 실행 중이던 외부 llama-server를 재사용한 경우에는 해당 프로세스를 종료하지 않습니다.
 
+리눅스에서 `/dev/video*` 장치가 보이지만 현재 사용자에게 읽기/쓰기 권한이 없으면 `./run.sh`는 카메라가 필요한 실행 경로(`serve`, `capture`, `debug capture`, `release capture`)에서 권한 보정을 먼저 시도합니다. 가능하면 `setfacl`로 현재 사용자 ACL만 추가하고, `setfacl`이 없으면 `chmod a+rw`로 폴백합니다. 이 동작을 끄려면 아래처럼 실행합니다.
+
+```bash
+RUN_ORACLE_AUTO_CAMERA_PERMISSIONS=0 ./run.sh
+```
+
 태어난 시간을 모르면 웹 UI의 태어난 시간에서 `모름`을 선택합니다. 내부 사주 계산은 `12:30` 오시 대표값을 사용하지만, 프로필에는 `birth_time_known=False`로 저장하고 리포트에는 시간 미상으로 표시합니다.
 
 ## 3. 실행 모드

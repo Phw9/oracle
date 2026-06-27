@@ -35,6 +35,7 @@ RUN_ORACLE_FACE_DETECTION_SCALE="${RUN_ORACLE_FACE_DETECTION_SCALE:-0.5}"
 RUN_ORACLE_FACE_DETECTION_INTERVAL="${RUN_ORACLE_FACE_DETECTION_INTERVAL:-2}"
 RUN_ORACLE_SHOW_PREVIEW="${RUN_ORACLE_SHOW_PREVIEW:-0}"
 RUN_ORACLE_FACE_ANALYSIS_MODE="${RUN_ORACLE_FACE_ANALYSIS_MODE:-1}"
+RUN_ORACLE_AUTO_CAMERA_PERMISSIONS="${RUN_ORACLE_AUTO_CAMERA_PERMISSIONS:-1}"
 
 RUN_ORACLE_OUTPUT_DIR="${RUN_ORACLE_OUTPUT_DIR:-$ROOT_DIR/runs}"
 RUN_ORACLE_FACE_DB_PATH="${RUN_ORACLE_FACE_DB_PATH:-$ROOT_DIR/data/face_recommendations.sqlite}"
@@ -75,6 +76,29 @@ fail() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+is_linux() {
+  [[ "$(uname -s)" == "Linux" ]]
+}
+
+run_with_elevation() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return
+  fi
+  if ! command_exists sudo; then
+    return 1
+  fi
+  if sudo -n true >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+  if [[ -t 0 ]]; then
+    sudo "$@"
+    return
+  fi
+  return 1
 }
 
 process_running() {
@@ -390,6 +414,76 @@ apply_run_config() {
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
 
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
+}
+
+camera_device_paths() {
+  local device_path
+  for device_path in /dev/video*; do
+    if [[ -e "$device_path" ]]; then
+      printf '%s\n' "$device_path"
+    fi
+  done
+}
+
+camera_devices_need_access_fix() {
+  local device_path
+  for device_path in "$@"; do
+    if [[ ! -r "$device_path" || ! -w "$device_path" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+grant_camera_device_access() {
+  local devices=("$@")
+  local current_user
+  current_user="$(id -un)"
+  if command_exists setfacl; then
+    run_with_elevation setfacl -m "u:${current_user}:rw" "${devices[@]}"
+    return
+  fi
+  run_with_elevation chmod a+rw "${devices[@]}"
+}
+
+ensure_camera_device_access() {
+  if [[ "${RUN_ORACLE_AUTO_CAMERA_PERMISSIONS:-1}" != "1" ]]; then
+    return
+  fi
+  if ! is_linux; then
+    return
+  fi
+
+  local devices=()
+  local blocked_devices=()
+  local device_path
+  while IFS= read -r device_path; do
+    if [[ -n "$device_path" ]]; then
+      devices+=("$device_path")
+      if [[ ! -r "$device_path" || ! -w "$device_path" ]]; then
+        blocked_devices+=("$device_path")
+      fi
+    fi
+  done < <(camera_device_paths)
+
+  if [[ "${#devices[@]}" -eq 0 ]]; then
+    return
+  fi
+  if ! camera_devices_need_access_fix "${devices[@]}"; then
+    return
+  fi
+
+  log "camera devices detected without user access; attempting permission repair: ${blocked_devices[*]}"
+  if grant_camera_device_access "${blocked_devices[@]}"; then
+    if camera_devices_need_access_fix "${blocked_devices[@]}"; then
+      log "Warning: camera permission repair ran, but access is still unavailable. Re-login or add $(id -un) to the video group."
+    else
+      log "camera device permissions repaired for current user"
+    fi
+    return
+  fi
+
+  log "Warning: could not automatically grant camera permissions. Try: sudo usermod -aG video $(id -un)"
 }
 
 llm_host_port() {
@@ -830,6 +924,25 @@ needs_llm_server() {
   return "$result"
 }
 
+needs_camera_device() {
+  if [[ "$#" -eq 0 ]]; then
+    return 0
+  fi
+  case "$1" in
+    capture | serve)
+      return 0
+      ;;
+    debug | release)
+      case "${2:-}" in
+        capture | serve)
+          return 0
+          ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
 main() {
   # Parse options
   parse_args "$@"
@@ -857,6 +970,10 @@ main() {
   fi
 
   apply_run_config
+
+  if needs_camera_device "${POSITIONAL_ARGS[@]}"; then
+    ensure_camera_device_access
+  fi
 
   # Re-evaluate command from positional arguments
   case "$cmd" in

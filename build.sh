@@ -678,6 +678,7 @@ main() {
     python3-pip \
     python3-opencv \
     opencv-data \
+    acl \
     libatlas-base-dev \
     git \
     cmake \
