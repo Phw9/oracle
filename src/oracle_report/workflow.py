@@ -233,26 +233,39 @@ def run_personal_workflow(
         manse_lookup = manse_timed.value
 
     if not workflow_input.skip_face and capture_artifact is not None:
-        face_analysis = timing_recorder.run(
-            "face_analysis",
-            _build_single_face_analysis,
-            active_face_client,
-            profile,
-            capture_artifact,
-            face_analysis_mode,
-            True,
+        face_analysis, saju_analysis = _run_parallel_analyses(
+            timing_recorder,
+            (
+                "face_analysis",
+                _build_single_face_analysis,
+                (
+                    active_face_client,
+                    profile,
+                    capture_artifact,
+                    face_analysis_mode,
+                    True,
+                ),
+            ),
+            (
+                "saju_analysis",
+                _build_saju_analysis,
+                (
+                    active_report_client,
+                    profile,
+                    manse_lookup,
+                ),
+            ),
         )
         face_analysis_text = face_analysis.text
     else:
         face_analysis_text = ""
-
-    saju_analysis = timing_recorder.run(
-        "saju_analysis",
-        _build_saju_analysis,
-        active_report_client,
-        profile,
-        manse_lookup,
-    )
+        saju_analysis = timing_recorder.run(
+            "saju_analysis",
+            _build_saju_analysis,
+            active_report_client,
+            profile,
+            manse_lookup,
+        )
     saju_analysis_text = saju_analysis.text
     recommendations: tuple[FaceRecommendation, ...] = ()
     if not workflow_input.skip_face:
@@ -383,25 +396,32 @@ def run_compatibility_workflow(
         timing_recorder.add(manse_timed.timing)
         left_manse, right_manse = manse_timed.value
 
-    face_analysis = timing_recorder.run(
-        "face_analysis_pair",
-        _build_pair_face_analysis,
-        active_face_client,
-        left_profile,
-        right_profile,
-        capture_artifact,
-        mode,
-        face_analysis_mode,
-    )
-    saju_analysis = timing_recorder.run(
-        "saju_analysis_pair",
-        _build_compatibility_saju_analysis,
-        active_report_client,
-        left_profile,
-        right_profile,
-        mode,
-        left_manse,
-        right_manse,
+    face_analysis, saju_analysis = _run_parallel_analyses(
+        timing_recorder,
+        (
+            "face_analysis_pair",
+            _build_pair_face_analysis,
+            (
+                active_face_client,
+                left_profile,
+                right_profile,
+                capture_artifact,
+                mode,
+                face_analysis_mode,
+            ),
+        ),
+        (
+            "saju_analysis_pair",
+            _build_compatibility_saju_analysis,
+            (
+                active_report_client,
+                left_profile,
+                right_profile,
+                mode,
+                left_manse,
+                right_manse,
+            ),
+        ),
     )
     markdown = timing_recorder.run(
         "final_report",
@@ -1083,6 +1103,31 @@ def _safe_generate(
         print(f"\n[LLM RAW:{debug_label}:ERROR] {error}\n")
     result = _GeneratedText(text=text, error=error)
     return result
+
+
+def _run_parallel_analyses(
+    timing_recorder: _WorkflowTimingRecorder,
+    left_job: tuple[str, Callable[..., _T], tuple[object, ...]],
+    right_job: tuple[str, Callable[..., _T], tuple[object, ...]],
+) -> tuple[_T, _T]:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        left_future = executor.submit(
+            _timed_call,
+            left_job[0],
+            left_job[1],
+            *left_job[2],
+        )
+        right_future = executor.submit(
+            _timed_call,
+            right_job[0],
+            right_job[1],
+            *right_job[2],
+        )
+        left_timed = left_future.result()
+        right_timed = right_future.result()
+    timing_recorder.add(left_timed.timing)
+    timing_recorder.add(right_timed.timing)
+    return left_timed.value, right_timed.value
 
 
 def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
