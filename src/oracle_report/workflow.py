@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Generic, Protocol, TypeVar
@@ -803,9 +804,15 @@ def _build_personal_report_json(
     skip_face: bool = False,
 ) -> str:
     face_payload, face_error = ({}, "")
-    saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
+    saju_payload, saju_error = _load_json_payload_or_error(
+        saju_analysis,
+        label="saju_analysis",
+    )
     if not skip_face:
-        face_payload, face_error = _load_json_payload_or_error(face_analysis)
+        face_payload, face_error = _load_json_payload_or_error(
+            face_analysis,
+            label="personal_face_analysis",
+        )
         if not face_error:
             face_error = _validate_personal_face_payload(face_payload)
             if face_error:
@@ -835,12 +842,18 @@ def _build_compatibility_report_json(
     face_analysis: str,
     saju_analysis: str,
 ) -> str:
-    face_payload, face_error = _load_json_payload_or_error(face_analysis)
+    face_payload, face_error = _load_json_payload_or_error(
+        face_analysis,
+        label="face_analysis_copule",
+    )
     if not face_error:
         face_error = _validate_pair_face_payload(face_payload)
         if face_error:
             face_payload = {}
-    saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
+    saju_payload, saju_error = _load_json_payload_or_error(
+        saju_analysis,
+        label="saju_analysis_couple",
+    )
     if face_error:
         print(
             "[UI FALLBACK:face_analysis_copule] invalid LLM output; "
@@ -1142,7 +1155,10 @@ def _run_parallel_analyses(
     return left_timed.value, right_timed.value
 
 
-def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
+def _load_json_payload_or_error(
+    text: str,
+    label: str = "llm_json",
+) -> tuple[dict[str, Any], str]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = _strip_markdown_fence_text(cleaned)
@@ -1153,7 +1169,12 @@ def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
     payload: dict[str, Any] = {}
     error = ""
     try:
-        loaded = json.loads(cleaned)
+        loaded, repair_steps = _load_json_with_repairs(cleaned)
+        if repair_steps:
+            print(
+                f"[LLM JSON REPAIR:{label}] applied repairs: "
+                + ", ".join(repair_steps),
+            )
         if isinstance(loaded, dict):
             payload = loaded
         else:
@@ -1165,6 +1186,72 @@ def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
         )
     result = (payload, error)
     return result
+
+
+def _load_json_with_repairs(text: str) -> tuple[Any, tuple[str, ...]]:
+    candidates = [text]
+    candidate_steps = [tuple()]
+    normalized_quotes = _normalize_json_quotes(text)
+    if normalized_quotes != text:
+        candidates.append(normalized_quotes)
+        candidate_steps.append(("normalize_quotes",))
+    repaired = normalized_quotes
+    repaired_steps = list(candidate_steps[-1])
+    for _ in range(3):
+        next_repaired, step_names = _repair_json_text(repaired)
+        if next_repaired == repaired:
+            break
+        repaired = next_repaired
+        repaired_steps.extend(step_names)
+        candidates.append(repaired)
+        candidate_steps.append(tuple(repaired_steps))
+    last_error: json.JSONDecodeError | None = None
+    for candidate, steps in zip(candidates, candidate_steps):
+        try:
+            loaded = json.loads(candidate)
+            return loaded, steps
+        except json.JSONDecodeError as exc:
+            last_error = exc
+    if last_error is None:
+        raise json.JSONDecodeError("empty JSON", text, 0)
+    raise last_error
+
+
+def _normalize_json_quotes(text: str) -> str:
+    replacements = {
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "‟": '"',
+        "’": "'",
+        "‘": "'",
+    }
+    result = text
+    for old_text, new_text in replacements.items():
+        result = result.replace(old_text, new_text)
+    return result
+
+
+def _repair_json_text(text: str) -> tuple[str, tuple[str, ...]]:
+    result = text
+    applied_steps: list[str] = []
+    without_trailing_commas = re.sub(r",\s*([}\]])", r"\1", result)
+    if without_trailing_commas != result:
+        applied_steps.append("remove_trailing_commas")
+        result = without_trailing_commas
+    with_missing_commas = re.sub(r'("(?:[^"\\]|\\.)*"|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[}\]])(\s*)(?=(?:"|[{\[]|\btrue\b|\bfalse\b|\bnull\b|-?\d))', _insert_missing_comma, result)
+    if with_missing_commas != result:
+        applied_steps.append("insert_missing_commas")
+        result = with_missing_commas
+    return result, tuple(applied_steps)
+
+
+def _insert_missing_comma(match: re.Match[str]) -> str:
+    token = match.group(1)
+    whitespace = match.group(2)
+    if "," in whitespace:
+        return match.group(0)
+    return f"{token},{whitespace}"
 
 
 def _validate_personal_face_payload(payload: dict[str, Any]) -> str:
