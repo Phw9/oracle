@@ -13,3 +13,5 @@ data/face_recommendations.sqlite
 data/face_recommenations.sqlite
 llama.cpp/
 data/*.sqlite
+systemd/llama-server.service
+systemd/oracle-report.service
