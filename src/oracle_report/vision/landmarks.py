@@ -26,6 +26,53 @@ _AUXILIARY_TEXT_REPLACEMENTS = (
     ("보조로 넣습니다", "함께 설명합니다"),
     ("보조 정보", "참고 자료"),
 )
+_OBSERVATION_CONTEXT_GROUPS = (
+    (
+        "삼정과 전체 균형",
+        (
+            "third_balance_error",
+            "upper_zone_ratio",
+            "middle_zone_ratio",
+            "lower_zone_ratio",
+            "face_aspect_ratio",
+        ),
+    ),
+    (
+        "눈과 눈썹",
+        (
+            "eye_width_ratio",
+            "eye_aspect_ratio",
+            "eye_spacing_ratio",
+            "eye_tail_tilt",
+            "brow_eye_span_ratio",
+            "brow_eye_gap_ratio",
+        ),
+    ),
+    (
+        "코와 중심감",
+        (
+            "nose_length_ratio",
+            "nose_width_ratio",
+            "nose_length_width_ratio",
+        ),
+    ),
+    (
+        "입매와 표정 흐름",
+        (
+            "mouth_width_ratio",
+            "mouth_height_ratio",
+            "mouth_balance_delta",
+        ),
+    ),
+    (
+        "하관과 마무리 인상",
+        (
+            "philtrum_chin_ratio",
+            "chin_length_ratio",
+            "jaw_width_ratio",
+        ),
+    ),
+)
 _MIN_POSE_SCORE = 0.50
 _FRONT_EYE_LEVEL_TOLERANCE = 0.09
 _FRONT_NOSE_CENTER_TOLERANCE = 0.35
@@ -300,12 +347,19 @@ def _evaluate_physio_rules(
             "middle_zone_ratio": metrics.middle_zone_ratio,
             "lower_zone_ratio": metrics.lower_zone_ratio,
             "face_aspect_ratio": metrics.face_aspect_ratio,
+            "eye_width_ratio": metrics.eye_width_ratio,
+            "eye_aspect_ratio": metrics.eye_aspect_ratio,
             "eye_spacing_ratio": metrics.eye_spacing_ratio,
+            "eye_tail_tilt": metrics.eye_tail_tilt,
             "brow_eye_span_ratio": metrics.brow_eye_span_ratio,
             "brow_eye_gap_ratio": metrics.brow_eye_gap_ratio,
+            "nose_length_ratio": metrics.nose_length_ratio,
             "nose_width_ratio": metrics.nose_width_ratio,
+            "nose_length_width_ratio": metrics.nose_length_width_ratio,
             "mouth_width_ratio": metrics.mouth_width_ratio,
+            "mouth_height_ratio": metrics.mouth_height_ratio,
             "philtrum_chin_ratio": metrics.philtrum_chin_ratio,
+            "chin_length_ratio": metrics.chin_length_ratio,
             "jaw_width_ratio": metrics.jaw_width_ratio,
             "mouth_balance_delta": metrics.mouth_balance_delta,
         },
@@ -516,20 +570,39 @@ def _format_prompt_observation_context(
 ) -> str:
     if not matches:
         return "- 구조화된 관찰 컨텍스트 없음"
-    lines = []
-    for match in matches:
-        lines.append(
-            " | ".join(
-                (
-                    f"- 항목: {match.title}",
-                    f"판정: {match.tag}",
-                    f"근거: {match.basis}",
-                    f"관찰: {match.observation}",
-                    f"측정값: {match.value:.3f}",
+    grouped_matches = _group_observation_matches(matches)
+    lines: list[str] = []
+    for group_name, group_matches in grouped_matches:
+        lines.append(f"[{group_name}]")
+        for match in group_matches:
+            lines.append(
+                " | ".join(
+                    (
+                        f"- 항목: {match.title}",
+                        f"판정: {match.tag}",
+                        f"근거: {match.basis}",
+                        f"관찰: {match.observation}",
+                        f"측정값: {match.value:.3f}",
+                    ),
                 ),
-            ),
-        )
+            )
     return "\n".join(lines)
+
+
+def _group_observation_matches(
+    matches: tuple[PhysiognomyRuleMatch, ...],
+) -> tuple[tuple[str, tuple[PhysiognomyRuleMatch, ...]], ...]:
+    grouped: list[tuple[str, tuple[PhysiognomyRuleMatch, ...]]] = []
+    used_metrics: set[str] = set()
+    for group_name, metrics in _OBSERVATION_CONTEXT_GROUPS:
+        group_matches = tuple(match for match in matches if match.metric in metrics)
+        if group_matches:
+            grouped.append((group_name, group_matches))
+            used_metrics.update(match.metric for match in group_matches)
+    remaining_matches = tuple(match for match in matches if match.metric not in used_metrics)
+    if remaining_matches:
+        grouped.append(("기타 관찰", remaining_matches))
+    return tuple(grouped)
 
 
 def _format_prompt_rule_hints(matches: tuple[PhysiognomyRuleMatch, ...]) -> str:

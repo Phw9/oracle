@@ -10,6 +10,7 @@ from oracle_report.vision.landmarks import (
     _FRONT_MOUTH_LEVEL_TOLERANCE,
     _FRONT_NOSE_CENTER_TOLERANCE,
     _MIN_POSE_SCORE,
+    _evaluate_physio_rules,
     _import_mediapipe,
     _face_box_from_points,
     _landmark_geometry_score,
@@ -183,6 +184,54 @@ def test_rule_based_face_analysis_includes_auxiliary_interpretation() -> None:
     assert "엔터테인먼트" in result
     assert "보조 해석" not in result
     assert "보조 정보" not in result
+
+
+def test_evaluate_physio_rules_uses_existing_source_backed_metric_rules(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "physiognomy_rules.sqlite"
+    build_physio_rule_database(db_path)
+    repository = PhysiognomyRuleRepository(db_path)
+    metrics = LandmarkMetrics(
+        frontality_score=0.91,
+        occlusion_score=0.94,
+        eye_count=2,
+        eyebrow_score=0.08,
+        face_aspect_ratio=1.32,
+        eye_width_ratio=0.18,
+        eye_height_ratio=0.05,
+        eye_aspect_ratio=0.28,
+        eye_spacing_ratio=0.28,
+        eye_tail_tilt=0.01,
+        nose_length_ratio=0.24,
+        mouth_width_ratio=0.36,
+        mouth_height_ratio=0.04,
+        lower_face_ratio=0.33,
+        nose_length_width_ratio=1.41,
+        mouth_corner_delta=0.0,
+        upper_zone_ratio=0.33,
+        middle_zone_ratio=0.34,
+        lower_zone_ratio=0.33,
+        third_balance_error=0.01,
+        brow_eye_span_ratio=1.08,
+        brow_eye_gap_ratio=0.08,
+        nose_width_ratio=0.19,
+        philtrum_chin_ratio=0.26,
+        chin_length_ratio=0.21,
+        jaw_width_ratio=0.66,
+        mouth_balance_delta=0.01,
+    )
+
+    matches = _evaluate_physio_rules(metrics, repository)
+    titles = {match.title for match in matches}
+
+    assert "눈 가로 크기" in titles
+    assert "눈 세로 개방감" in titles
+    assert "눈꼬리 기울기" in titles
+    assert "코 길이" in titles
+    assert "코 길이 대비 폭" in titles
+    assert "입 높이" in titles
+    assert "턱 길이" in titles
 
 
 def _build_centered_face_landmarks(

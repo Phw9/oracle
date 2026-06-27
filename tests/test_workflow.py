@@ -40,6 +40,49 @@ def _report_blocks(prefix: str, count: int) -> list[dict[str, str]]:
     return result
 
 
+def _personal_saju_blocks(prefix: str) -> list[dict[str, str]]:
+    categories = (
+        "종합 형국",
+        "타고난 성향과 심리 패턴",
+        "재물운과 적성",
+        "연애운과 인간관계",
+        "올해의 운세",
+        "총평 및 인생의 조언",
+    )
+    result = []
+    for index, category in enumerate(categories, start=1):
+        result.append(
+            {
+                "category": category,
+                "title": f"{prefix} 제목 {index}",
+                "summary": f"{prefix} 요약 {index}는 핵심 관찰 포인트를 충분히 담아 정리합니다.",
+                "body": (
+                    f"{prefix} 본문 {index}에서는 관찰 근거가 어떤 인상으로 이어지는지 한 단계 더 풀어서 설명합니다. "
+                    "같은 말을 반복하지 않고 실제 분위기와 해석의 연결점을 드러냅니다."
+                ),
+            },
+        )
+    return result
+
+
+def _couple_saju_blocks(prefix: str) -> list[dict[str, str]]:
+    categories = ("관계 구조", "상호 보완", "갈등 관리", "실천 제안")
+    result = []
+    for index, category in enumerate(categories, start=1):
+        result.append(
+            {
+                "category": category,
+                "title": f"{prefix} 제목 {index}",
+                "summary": f"{prefix} 요약 {index}는 핵심 관찰 포인트를 충분히 담아 정리합니다.",
+                "body": (
+                    f"{prefix} 본문 {index}에서는 관찰 근거가 어떤 인상으로 이어지는지 한 단계 더 풀어서 설명합니다. "
+                    "같은 말을 반복하지 않고 실제 분위기와 해석의 연결점을 드러냅니다."
+                ),
+            },
+        )
+    return result
+
+
 class FakeLlmClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         result = "LLM 결과"
@@ -92,7 +135,7 @@ class FakeLlmClient:
                     "essence": "사주 핵심 문장",
                     "element_note": "사주 오행 메모",
                     "saju_subtitle": "사주 소제목",
-                    "saju_blocks": _report_blocks("사주", 6),
+                    "saju_blocks": _personal_saju_blocks("사주"),
                     "tags": ["사주 태그"],
                     "disclaimer": "사주 고지",
                 },
@@ -106,7 +149,7 @@ class FakeLlmClient:
                     "face_subtitle": "테스트 관상 소제목",
                     "face_blocks": _report_blocks("관상", 5),
                     "saju_subtitle": "테스트 사주 소제목",
-                    "saju_blocks": _report_blocks("사주", 6),
+                    "saju_blocks": _personal_saju_blocks("사주"),
                     "synthesis_title": "종합 제목",
                     "synthesis_body": "종합 본문",
                     "convergence": [
@@ -193,7 +236,7 @@ class RecordingSajuClient:
                 "essence": "분리 사주 핵심",
                 "element_note": "분리 사주 오행",
                 "saju_subtitle": "분리 사주 소제목",
-                "saju_blocks": _report_blocks("분리 사주", 6),
+                "saju_blocks": _personal_saju_blocks("분리 사주"),
                 "tags": ["분리 사주 태그"],
                 "disclaimer": "분리 사주 고지",
             },
@@ -233,7 +276,7 @@ class RecordingPairSajuClient:
             {
                 "essence": "PAIR SAJU ESSENCE",
                 "saju_subtitle": "PAIR SAJU SUBTITLE",
-                "saju_blocks": _report_blocks("PAIR SAJU", 4),
+                "saju_blocks": _couple_saju_blocks("PAIR SAJU"),
                 "synthesis_title": "PAIR SYNTHESIS TITLE",
                 "synthesis_body": "PAIR SYNTHESIS BODY",
                 "action_title": "PAIR ACTION TITLE",
@@ -272,6 +315,36 @@ class PartialFinalReportClient:
         return result
 
 
+class InvalidSajuCategoryReportClient:
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        del prompt
+        del image_path
+        result = json.dumps(
+            {
+                "essence": "잘못된 사주 결과",
+                "element_note": "잘못된 오행 메모",
+                "saju_subtitle": "잘못된 소제목",
+                "saju_blocks": [
+                    {
+                        "category": "종합 형국",
+                        "title": "제목 1",
+                        "summary": "요약 1은 충분한 길이를 갖고 있어요.",
+                        "body": "본문 1은 충분한 길이를 갖고 있고 실제 내용도 들어 있어요.",
+                    },
+                    {
+                        "category": "재물운과 적성",
+                        "title": "제목 2",
+                        "summary": "요약 2는 충분한 길이를 갖고 있어요.",
+                        "body": "본문 2는 충분한 길이를 갖고 있고 실제 내용도 들어 있어요.",
+                    },
+                ],
+                "disclaimer": "잘못된 고지",
+            },
+            ensure_ascii=False,
+        )
+        return result
+
+
 class MalformedJsonReportClient:
         def generate(self, prompt: str, image_path: Path | None = None) -> str:
                 del prompt
@@ -279,12 +352,44 @@ class MalformedJsonReportClient:
                 return """```json
 {
     “essence”: “보정된 결과예요.”,
+    “element_note”: “보정된 오행 메모예요.”,
+    “saju_subtitle”: “보정된 사주 소제목이에요.”,
     “saju_blocks”: [
         {
-            “category”: “보정 카테고리”
+            “category”: “종합 형국”,
             “title”: “보정 제목”,
             “summary”: “보정 요약은 충분한 길이를 갖고 있어요.”,
             “body”: “보정 본문은 쉼표가 빠졌더라도 후처리로 복구되어 UI에 반영되어야 해요.”
+        },
+        {
+            “category”: “타고난 성향과 심리 패턴”,
+            “title”: “보정 제목 2”,
+            “summary”: “보정 요약 2는 충분한 길이를 갖고 있어요.”,
+            “body”: “보정 본문 2는 사주의 심리 패턴을 충분히 설명하도록 작성되어 있어요.”
+        },
+        {
+            “category”: “재물운과 적성”,
+            “title”: “보정 제목 3”,
+            “summary”: “보정 요약 3은 충분한 길이를 갖고 있어요.”,
+            “body”: “보정 본문 3은 재물운과 적성을 실제 생활 감각과 함께 설명하고 있어요.”
+        },
+        {
+            “category”: “연애운과 인간관계”,
+            “title”: “보정 제목 4”,
+            “summary”: “보정 요약 4는 충분한 길이를 갖고 있어요.”,
+            “body”: “보정 본문 4는 인간관계의 패턴과 조심할 점을 자연스럽게 설명하고 있어요.”
+        },
+        {
+            “category”: “올해의 운세”,
+            “title”: “보정 제목 5”,
+            “summary”: “보정 요약 5는 충분한 길이를 갖고 있어요.”,
+            “body”: “보정 본문 5는 올해의 변수와 대응 포인트를 함께 설명하고 있어요.”
+        },
+        {
+            “category”: “총평 및 인생의 조언”,
+            “title”: “보정 제목 6”,
+            “summary”: “보정 요약 6은 충분한 길이를 갖고 있어요.”,
+            “body”: “보정 본문 6은 장기적으로 가져갈 실천 기준과 조언을 담고 있어요.”
         },
     ],
     “disclaimer”: “보정 고지예요.”
@@ -631,7 +736,7 @@ def test_personal_workflow_skips_face(tmp_path: Path) -> None:
     assert "관상" not in result.report_html
 
 
-def test_personal_workflow_keeps_partial_saju_json_without_full_ui_fallback(
+def test_personal_workflow_falls_back_when_saju_payload_is_sparse_or_invalid(
     tmp_path: Path,
 ) -> None:
     capture_config = _capture_config(tmp_path)
@@ -657,10 +762,43 @@ def test_personal_workflow_keeps_partial_saju_json_without_full_ui_fallback(
         capture_runner=None,
     )
 
-    assert "부분 제목" in result.report_html
+    assert "부분 제목" not in result.report_html
     assert "오행 분포는" in result.report_html
     assert "사주 데이터는 강점과 보완점을 함께 보여주는 참고 지도입니다." in result.report_html
-    assert "final report JSON field saju_blocks has 1 blocks" not in result.markdown
+
+
+def test_personal_workflow_falls_back_when_saju_categories_are_missing(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="",
+        gender="남성",
+        target_gender="여성",
+        skip_face=True,
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        face_llm_config=_llm_config(),
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        face_client=FailingFaceClient(),
+        report_client=InvalidSajuCategoryReportClient(),
+        capture_runner=None,
+    )
+
+    captured = capsys.readouterr()
+    assert "[UI FALLBACK:saju_analysis]" in captured.out
+    assert "saju_blocks must contain exactly 6 blocks" in captured.out
+    assert "잘못된 사주 결과" not in result.report_html
+    assert "사주 데이터는 강점과 보완점을 함께 보여주는 참고 지도입니다." in result.report_html
 
 
 def test_json_payload_loader_repairs_common_llm_format_errors(capsys) -> None:
@@ -686,7 +824,7 @@ def test_json_payload_loader_repairs_common_llm_format_errors(capsys) -> None:
     assert error == ""
     assert "[LLM JSON REPAIR:personal_face_analysis] applied repairs:" in captured.out
     assert "normalize_quotes" in captured.out
-    assert "insert_missing_commas" in captured.out
+    assert "separate_adjacent_fields" in captured.out
     assert "remove_trailing_commas" in captured.out
     assert payload["face_subtitle"] == "보정된 관상 소제목"
     assert payload["face_blocks"][0]["title"] == "보정 제목"
@@ -717,6 +855,7 @@ def test_personal_workflow_uses_repaired_saju_json_output(tmp_path: Path) -> Non
     )
 
     assert "보정 제목" in result.report_html
+    assert "보정 제목 6" in result.report_html
     assert "보정된 결과예요." in result.report_html
     assert "보정 고지예요." in result.report_html
 

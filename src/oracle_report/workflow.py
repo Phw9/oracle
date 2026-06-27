@@ -51,6 +51,20 @@ _PERSONAL_FACE_BLOCK_COUNT = 5
 _PAIR_FACE_BLOCK_COUNT = 4
 _MIN_FACE_SUMMARY_LENGTH = 18
 _MIN_FACE_BODY_LENGTH = 36
+_PERSONAL_SAJU_CATEGORIES = (
+    "종합 형국",
+    "타고난 성향과 심리 패턴",
+    "재물운과 적성",
+    "연애운과 인간관계",
+    "올해의 운세",
+    "총평 및 인생의 조언",
+)
+_COUPLE_SAJU_CATEGORIES = (
+    "관계 구조",
+    "상호 보완",
+    "갈등 관리",
+    "실천 제안",
+)
 _T = TypeVar("_T")
 
 
@@ -808,6 +822,10 @@ def _build_personal_report_json(
         saju_analysis,
         label="saju_analysis",
     )
+    if not saju_error:
+        saju_error = _validate_personal_saju_payload(saju_payload)
+        if saju_error:
+            saju_payload = {}
     if not skip_face:
         face_payload, face_error = _load_json_payload_or_error(
             face_analysis,
@@ -854,6 +872,10 @@ def _build_compatibility_report_json(
         saju_analysis,
         label="saju_analysis_couple",
     )
+    if not saju_error:
+        saju_error = _validate_couple_saju_payload(saju_payload)
+        if saju_error:
+            saju_payload = {}
     if face_error:
         print(
             "[UI FALLBACK:face_analysis_copule] invalid LLM output; "
@@ -1235,6 +1257,18 @@ def _normalize_json_quotes(text: str) -> str:
 def _repair_json_text(text: str) -> tuple[str, tuple[str, ...]]:
     result = text
     applied_steps: list[str] = []
+    adjacent_objects_fixed = re.sub(r"([}\]])(\s*)(?=[{\[])", r"\1,\2", result)
+    if adjacent_objects_fixed != result:
+        applied_steps.append("separate_adjacent_objects")
+        result = adjacent_objects_fixed
+    adjacent_fields_fixed = re.sub(
+        r'("(?:[^"\\]|\\.)*"|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(\s*)(?=")',
+        _insert_missing_comma,
+        result,
+    )
+    if adjacent_fields_fixed != result:
+        applied_steps.append("separate_adjacent_fields")
+        result = adjacent_fields_fixed
     without_trailing_commas = re.sub(r",\s*([}\]])", r"\1", result)
     if without_trailing_commas != result:
         applied_steps.append("remove_trailing_commas")
@@ -1279,6 +1313,34 @@ def _validate_pair_face_payload(payload: dict[str, Any]) -> str:
     )
 
 
+def _validate_personal_saju_payload(payload: dict[str, Any]) -> str:
+    essence = payload.get("essence")
+    if not isinstance(essence, str) or essence.strip() == "":
+        return "essence is missing"
+    subtitle = payload.get("saju_subtitle")
+    if not isinstance(subtitle, str) or subtitle.strip() == "":
+        return "saju_subtitle is missing"
+    return _validate_saju_block_payload(
+        payload,
+        "saju_blocks",
+        _PERSONAL_SAJU_CATEGORIES,
+    )
+
+
+def _validate_couple_saju_payload(payload: dict[str, Any]) -> str:
+    essence = payload.get("essence")
+    if not isinstance(essence, str) or essence.strip() == "":
+        return "essence is missing"
+    subtitle = payload.get("saju_subtitle")
+    if not isinstance(subtitle, str) or subtitle.strip() == "":
+        return "saju_subtitle is missing"
+    return _validate_saju_block_payload(
+        payload,
+        "saju_blocks",
+        _COUPLE_SAJU_CATEGORIES,
+    )
+
+
 def _validate_block_payload(
     payload: dict[str, Any],
     key: str,
@@ -1300,6 +1362,32 @@ def _validate_block_payload(
             return f"{key}[{index}].summary is too short"
         if len(raw_block["body"].strip()) < _MIN_FACE_BODY_LENGTH:
             return f"{key}[{index}].body is too short"
+    return ""
+
+
+def _validate_saju_block_payload(
+    payload: dict[str, Any],
+    key: str,
+    expected_categories: tuple[str, ...],
+) -> str:
+    raw_blocks = payload.get(key)
+    if not isinstance(raw_blocks, list):
+        return f"{key} must be a list"
+    if len(raw_blocks) != len(expected_categories):
+        return f"{key} must contain exactly {len(expected_categories)} blocks"
+    for index, expected_category in enumerate(expected_categories, start=1):
+        raw_block = raw_blocks[index - 1]
+        if not isinstance(raw_block, dict):
+            return f"{key}[{index}] must be an object"
+        for field_name in ("category", "title", "summary", "body"):
+            value = raw_block.get(field_name)
+            if not isinstance(value, str) or value.strip() == "":
+                return f"{key}[{index}].{field_name} is missing"
+        if raw_block["category"].strip() != expected_category:
+            return (
+                f"{key}[{index}].category must be "
+                f"'{expected_category}'"
+            )
     return ""
 
 
