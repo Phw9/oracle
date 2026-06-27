@@ -29,8 +29,11 @@ def _report_blocks(prefix: str, count: int) -> list[dict[str, str]]:
             {
                 "category": f"{prefix} 카테고리 {number}",
                 "title": f"{prefix} 제목 {number}",
-                "summary": f"{prefix} 요약 {number}",
-                "body": f"{prefix} 본문 {number}",
+                "summary": f"{prefix} 요약 {number}는 핵심 관찰 포인트를 충분히 담아 정리합니다.",
+                "body": (
+                    f"{prefix} 본문 {number}에서는 관찰 근거가 어떤 인상으로 이어지는지 한 단계 더 풀어서 설명합니다. "
+                    "같은 말을 반복하지 않고 실제 분위기와 해석의 연결점을 드러냅니다."
+                ),
             },
         )
     return result
@@ -132,6 +135,44 @@ class RecordingFaceClient:
                 "face_subtitle": "크롭 관상 소제목",
                 "face_blocks": _report_blocks("크롭 관상", 5),
                 "face_summary": "크롭 관상 요약",
+            },
+            ensure_ascii=False,
+        )
+        return result
+
+
+class SparseFaceClient:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+        self.image_paths: list[Path | None] = []
+
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        self.prompts.append(prompt)
+        self.image_paths.append(image_path)
+        result = json.dumps(
+            {
+                "face_subtitle": "균형 잡힌 인상",
+                "face_blocks": [
+                    {
+                        "category": "눈과 눈썹",
+                        "title": "눈과 눈썹의 구조",
+                        "summary": "눈의 모양과 눈썹의 간격이 안정적입니다.",
+                        "body": "눈과 눈썹 배치가 무난해 보입니다.",
+                    },
+                    {
+                        "category": "얼굴 비율과 중심감",
+                        "title": "얼굴 윤곽의 조화",
+                        "summary": "얼굴 윤곽이 과하게 치우치지 않습니다.",
+                        "body": "전반적으로 조화로운 분위기입니다.",
+                    },
+                    {
+                        "category": "표정과 소통 분위기",
+                        "title": "표정의 안정성",
+                        "summary": "입꼬리 높이 차이가 적습니다.",
+                        "body": "표정이 비교적 안정적입니다.",
+                    },
+                ],
+                "face_summary": "전반적으로 균형 잡힌 인상입니다.",
             },
             ensure_ascii=False,
         )
@@ -338,11 +379,45 @@ def test_personal_workflow_uses_rule_based_face_mode(tmp_path: Path) -> None:
     assert len(face_client.prompts) == 1
     assert "[랜드마크 원시 비율]" in face_client.prompts[0]
     assert "눈 가로폭/얼굴 폭" in face_client.prompts[0]
-    assert "[랜드마크 규칙 해석 힌트]" in face_client.prompts[0]
+    assert "[구조화된 관찰 컨텍스트]" in face_client.prompts[0]
     assert result.output_path.suffix == ".html"
     assert "oracle-report" in result.report_html
     assert "시간 미상" in result.report_html
     assert "크롭 관상 제목 1" in result.report_html
+
+
+def test_personal_workflow_falls_back_when_face_payload_is_sparse(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="모름",
+        gender="남성",
+        target_gender="여성",
+        face_analysis_mode=2,
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        face_llm_config=_llm_config(),
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        face_client=SparseFaceClient(),
+        report_client=FakeLlmClient(),
+        capture_runner=_fake_single_capture,
+    )
+
+    captured = capsys.readouterr()
+    assert "[UI FALLBACK:face_analysis]" in captured.out
+    assert "face_blocks must contain at least 5 blocks" in captured.out
+    assert "삼정은 얼굴을 위" in result.report_html
+    assert "표정이 비교적 안정적입니다." not in result.report_html
 
 
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:
@@ -489,6 +564,7 @@ def _fake_single_capture(
             eye_count=2,
             eyebrow_score=0.05,
             landmark_metrics_text="- 눈 가로폭/얼굴 폭: 0.180\n- 코 길이/얼굴 높이: 0.240",
+            landmark_context_text="- 항목: 눈 가로 크기 | 판정: 눈 가로폭 균형형 | 근거: 눈 가로폭/얼굴 폭 | 관찰: 눈의 가로폭이 얼굴 폭 대비 무난하게 균형을 이룹니다. | 측정값: 0.180",
             landmark_rules_text="- 눈 가로 크기: 눈 가로폭 균형형 | 관찰: 눈의 가로폭이 얼굴 폭 대비 무난하게 균형을 이룹니다. | 해석 힌트: 전통 관상에서는 눈의 폭이 과하지 않으면 또렷하면서도 편안한 인상으로 보므로 리포트에는 안정적인 시선 흐름을 보조로 넣습니다.",
             face_analysis="## 관상정보\n- 분석 모드: 랜드마크 룰 기반",
         ),

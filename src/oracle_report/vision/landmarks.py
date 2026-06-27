@@ -220,6 +220,7 @@ class MediaPipeLandmarkQualityAnalyzer:
         warnings: list[str] = []
         metrics = _empty_metrics()
         landmark_metrics_text = "- 랜드마크 측정값 없음"
+        landmark_context_text = "- 구조화된 관찰 컨텍스트 없음"
         landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
         face_analysis = ""
         if detection.face is None or not detection.landmarks:
@@ -233,6 +234,7 @@ class MediaPipeLandmarkQualityAnalyzer:
             if metrics.eye_count < 2:
                 warnings.append("눈을 뜨고 카메라를 정면으로 봐 주세요.")
             landmark_metrics_text = _format_prompt_metric_snapshot(metrics)
+            landmark_context_text = _format_prompt_observation_context(matches)
             landmark_rules_text = _format_prompt_rule_hints(matches)
             face_analysis = build_rule_based_face_analysis(metrics, matches)
 
@@ -245,6 +247,7 @@ class MediaPipeLandmarkQualityAnalyzer:
             occlusion_score=metrics.occlusion_score,
             landmark_points=detection.draw_points,
             landmark_metrics_text=landmark_metrics_text,
+            landmark_context_text=landmark_context_text,
             landmark_rules_text=landmark_rules_text,
             face_analysis=face_analysis,
         )
@@ -505,6 +508,27 @@ def _format_prompt_metric_snapshot(metrics: LandmarkMetrics) -> str:
         f"- 정면 점수: {metrics.frontality_score:.3f}",
         f"- 랜드마크 배치 점수: {metrics.occlusion_score:.3f}",
     )
+    return "\n".join(lines)
+
+
+def _format_prompt_observation_context(
+    matches: tuple[PhysiognomyRuleMatch, ...],
+) -> str:
+    if not matches:
+        return "- 구조화된 관찰 컨텍스트 없음"
+    lines = []
+    for match in matches:
+        lines.append(
+            " | ".join(
+                (
+                    f"- 항목: {match.title}",
+                    f"판정: {match.tag}",
+                    f"근거: {match.basis}",
+                    f"관찰: {match.observation}",
+                    f"측정값: {match.value:.3f}",
+                ),
+            ),
+        )
     return "\n".join(lines)
 
 

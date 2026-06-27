@@ -19,6 +19,7 @@ from oracle_report.vision.camera import (
 from oracle_report.vision.landmarks import (
     LandmarkMetrics,
     _evaluate_physio_rules,
+    _format_prompt_observation_context,
     _format_prompt_metric_snapshot,
     _format_prompt_rule_hints,
     _physiognomy_rule_repository,
@@ -115,6 +116,7 @@ def _build_mock_capture_artifact(
         occlusion_score=metrics.occlusion_score,
         landmark_points=((220, 170), (420, 170), (320, 250), (260, 340), (380, 340)),
         landmark_metrics_text=_format_prompt_metric_snapshot(metrics),
+        landmark_context_text=_format_prompt_observation_context(matches),
         landmark_rules_text=_format_prompt_rule_hints(matches),
         face_analysis=build_rule_based_face_analysis(metrics, matches),
     )

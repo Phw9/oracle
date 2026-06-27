@@ -121,10 +121,13 @@ def _build_face_analysis_prompt(
 ) -> str:
     quality_text = format_face_quality(face_input.quality)
     landmark_metrics_text = "- 랜드마크 측정값 없음"
+    landmark_context_text = "- 구조화된 관찰 컨텍스트 없음"
     landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
     if face_input.quality is not None:
         if face_input.quality.landmark_metrics_text.strip() != "":
             landmark_metrics_text = face_input.quality.landmark_metrics_text
+        if face_input.quality.landmark_context_text.strip() != "":
+            landmark_context_text = face_input.quality.landmark_context_text
         if face_input.quality.landmark_rules_text.strip() != "":
             landmark_rules_text = face_input.quality.landmark_rules_text
     values = {
@@ -134,6 +137,7 @@ def _build_face_analysis_prompt(
         "birth_time_text": _birth_time_text(birth_profile),
         "quality_text": quality_text,
         "landmark_metrics_text": landmark_metrics_text,
+        "landmark_context_text": landmark_context_text,
         "landmark_rules_text": landmark_rules_text,
     }
     values.update(extra_values)

@@ -46,6 +46,10 @@ FACE_ANALYSIS_MODE_LANDMARK_RULE = 2
 FACE_ANALYSIS_MODES = (FACE_ANALYSIS_MODE_LLM_IMAGE, FACE_ANALYSIS_MODE_LANDMARK_RULE)
 _UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
 _FACE_CROP_MARGIN_RATIO = 0.2
+_PERSONAL_FACE_BLOCK_COUNT = 5
+_PAIR_FACE_BLOCK_COUNT = 4
+_MIN_FACE_SUMMARY_LENGTH = 18
+_MIN_FACE_BODY_LENGTH = 36
 _T = TypeVar("_T")
 
 
@@ -802,6 +806,10 @@ def _build_personal_report_json(
     saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
     if not skip_face:
         face_payload, face_error = _load_json_payload_or_error(face_analysis)
+        if not face_error:
+            face_error = _validate_personal_face_payload(face_payload)
+            if face_error:
+                face_payload = {}
     if saju_error:
         print(
             "[UI FALLBACK:saju_analysis] invalid LLM output; "
@@ -828,6 +836,10 @@ def _build_compatibility_report_json(
     saju_analysis: str,
 ) -> str:
     face_payload, face_error = _load_json_payload_or_error(face_analysis)
+    if not face_error:
+        face_error = _validate_pair_face_payload(face_payload)
+        if face_error:
+            face_payload = {}
     saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
     if face_error:
         print(
@@ -1153,6 +1165,55 @@ def _load_json_payload_or_error(text: str) -> tuple[dict[str, Any], str]:
         )
     result = (payload, error)
     return result
+
+
+def _validate_personal_face_payload(payload: dict[str, Any]) -> str:
+    subtitle = payload.get("face_subtitle")
+    if not isinstance(subtitle, str) or subtitle.strip() == "":
+        return "face_subtitle is missing"
+    summary = payload.get("face_summary")
+    if not isinstance(summary, str) or summary.strip() == "":
+        return "face_summary is missing"
+    return _validate_block_payload(
+        payload,
+        "face_blocks",
+        _PERSONAL_FACE_BLOCK_COUNT,
+    )
+
+
+def _validate_pair_face_payload(payload: dict[str, Any]) -> str:
+    subtitle = payload.get("pair_subtitle")
+    if not isinstance(subtitle, str) or subtitle.strip() == "":
+        return "pair_subtitle is missing"
+    return _validate_block_payload(
+        payload,
+        "pair_blocks",
+        _PAIR_FACE_BLOCK_COUNT,
+    )
+
+
+def _validate_block_payload(
+    payload: dict[str, Any],
+    key: str,
+    expected_count: int,
+) -> str:
+    raw_blocks = payload.get(key)
+    if not isinstance(raw_blocks, list):
+        return f"{key} must be a list"
+    if len(raw_blocks) < expected_count:
+        return f"{key} must contain at least {expected_count} blocks"
+    for index, raw_block in enumerate(raw_blocks[:expected_count], start=1):
+        if not isinstance(raw_block, dict):
+            return f"{key}[{index}] must be an object"
+        for field_name in ("category", "title", "summary", "body"):
+            value = raw_block.get(field_name)
+            if not isinstance(value, str) or value.strip() == "":
+                return f"{key}[{index}].{field_name} is missing"
+        if len(raw_block["summary"].strip()) < _MIN_FACE_SUMMARY_LENGTH:
+            return f"{key}[{index}].summary is too short"
+        if len(raw_block["body"].strip()) < _MIN_FACE_BODY_LENGTH:
+            return f"{key}[{index}].body is too short"
+    return ""
 
 
 def _strip_markdown_fence_text(text: str) -> str:

@@ -51,7 +51,9 @@ def test_personal_face_analysis_prompt_contains_required_context() -> None:
     assert "신원, 나이, 성별, 민족, 건강" in prompt
     assert "\"face_blocks\"" in prompt
     assert "[랜드마크 원시 비율]" in prompt
+    assert "[구조화된 관찰 컨텍스트]" in prompt
     assert "- 랜드마크 측정값 없음" in prompt
+    assert "- 구조화된 관찰 컨텍스트 없음" in prompt
 
 
 def test_compatibility_face_analysis_prompt_contains_pair_context() -> None:
@@ -67,6 +69,7 @@ def test_compatibility_face_analysis_prompt_contains_pair_context() -> None:
     assert "두 사람 궁합 리포트" in prompt
     assert "궁합 모드: 연인" in prompt
     assert "현재 분석 대상: 첫 번째 사람" in prompt
+    assert "[구조화된 관찰 컨텍스트]" in prompt
 
 
 def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
