@@ -5,12 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/hyukju/oracle
-EnvironmentFile=-/home/hyukju/oracle/.env
-ExecStart=/home/hyukju/oracle/run.sh
+WorkingDirectory=/home/tmdwls/projects/oracle
+EnvironmentFile=-/home/tmdwls/projects/oracle/.env
+ExecStart=/home/tmdwls/projects/oracle/run.sh
 Restart=on-failure
 RestartSec=5
-User=hyukju
+User=tmdwls
 
 [Install]
 WantedBy=multi-user.target
