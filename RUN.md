@@ -241,6 +241,27 @@ configs/prompts_debug.json
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
+카메라 상태가 불안정하지만 프롬프트와 리포트 흐름만 개발해야 할 때는 mock 캡처를 켤 수 있습니다. 이 모드에서는 실제 카메라를 열지 않고 고정된 샘플 얼굴 박스와 placeholder 이미지를 사용하되, 랜드마크 metric 값만 synthetic 숫자로 넣고 규칙 힌트와 얼굴 관찰 메모는 기존 랜드마크 룰 엔진으로 계산합니다. 관상 분석 모드는 웹 UI에서 선택하면 되므로, mock 사용 자체를 위해 별도의 모드 고정 환경변수는 필요하지 않습니다.
+
+```bash
+export ORACLE_MOCK_CAPTURE_ENABLED=1
+```
+
+mock 캡처를 다시 끄고 실제 카메라 경로로 돌아가려면 아래처럼 설정한 뒤 다시 실행합니다.
+
+```bash
+export ORACLE_MOCK_CAPTURE_ENABLED=0
+bash run.sh
+```
+
+웹 UI에서 랜드마크 기반 분석을 사용할 때만 관상 분석 모드에서 해당 옵션을 선택하면 됩니다. CLI나 별도 스크립트에서 직접 랜드마크 모드를 강제해야 할 때만 `ORACLE_FACE_ANALYSIS_MODE=2`를 추가로 사용합니다.
+
+원하면 synthetic metric 값 자체를 JSON으로 일부 덮어쓸 수 있습니다. 규칙 힌트는 그 숫자를 바탕으로 기존 로직에서 다시 계산됩니다.
+
+```bash
+export ORACLE_MOCK_LANDMARK_METRICS_JSON='{"eye_width_ratio": 0.190, "eye_spacing_ratio": 0.280}'
+```
+
 ## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB

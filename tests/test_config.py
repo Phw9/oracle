@@ -17,6 +17,7 @@ def test_default_capture_config_uses_lightweight_face_detection(monkeypatch) -> 
     assert config.face_detection_scale == 0.5
     assert config.face_detection_interval == 2
     assert config.face_analysis_mode == 1
+    assert config.mock_capture_enabled is False
 
 
 def test_rejects_invalid_face_detection_scale(monkeypatch) -> None:
@@ -31,3 +32,13 @@ def test_rejects_invalid_face_analysis_mode(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="ORACLE_FACE_ANALYSIS_MODE"):
         load_capture_config()
+
+
+def test_loads_mock_capture_settings(monkeypatch) -> None:
+    monkeypatch.setenv("ORACLE_MOCK_CAPTURE_ENABLED", "1")
+    monkeypatch.setenv("ORACLE_MOCK_LANDMARK_METRICS_JSON", '{"eye_width_ratio": 0.19}')
+
+    config = load_capture_config()
+
+    assert config.mock_capture_enabled is True
+    assert config.mock_landmark_metrics_json == '{"eye_width_ratio": 0.19}'

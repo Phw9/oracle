@@ -36,6 +36,8 @@ class CaptureConfig:
     eyebrow_min_edge_density: float
     face_analysis_mode: int = 1
     camera_auto_detect: bool = True
+    mock_capture_enabled: bool = False
+    mock_landmark_metrics_json: str = ""
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,8 @@ def load_capture_config() -> CaptureConfig:
         ),
         face_analysis_mode=_read_face_analysis_mode(),
         camera_auto_detect=_read_bool("ORACLE_CAMERA_AUTO_DETECT", True),
+        mock_capture_enabled=_read_bool("ORACLE_MOCK_CAPTURE_ENABLED", False),
+        mock_landmark_metrics_json=os.getenv("ORACLE_MOCK_LANDMARK_METRICS_JSON", ""),
     )
     return result
 
