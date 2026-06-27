@@ -35,6 +35,7 @@ class CaptureConfig:
     eye_min_count: int
     eyebrow_min_edge_density: float
     face_analysis_mode: int = 1
+    camera_auto_detect: bool = True
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ def load_capture_config() -> CaptureConfig:
             0.018,
         ),
         face_analysis_mode=_read_face_analysis_mode(),
+        camera_auto_detect=_read_bool("ORACLE_CAMERA_AUTO_DETECT", True),
     )
     return result
 
