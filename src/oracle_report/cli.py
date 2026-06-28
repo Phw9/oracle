@@ -575,3 +575,8 @@ def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
 def _parse_birth_datetime(birth_date: str, birth_time: str) -> datetime:
     result = datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
     return result
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
