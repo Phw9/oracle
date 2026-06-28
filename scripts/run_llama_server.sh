@@ -23,8 +23,14 @@ if [[ -n "${ORACLE_LLAMA_SERVER_BIN:-}" ]]; then
   LLAMA_SERVER_BIN="$ORACLE_LLAMA_SERVER_BIN"
 elif command -v llama-server >/dev/null 2>&1; then
   LLAMA_SERVER_BIN="$(command -v llama-server)"
+elif command -v llama-server.exe >/dev/null 2>&1; then
+  LLAMA_SERVER_BIN="$(command -v llama-server.exe)"
 elif [[ -x "$LLAMA_CPP_DIR/build/bin/llama-server" ]]; then
   LLAMA_SERVER_BIN="$LLAMA_CPP_DIR/build/bin/llama-server"
+elif [[ -x "$LLAMA_CPP_DIR/build/bin/llama-server.exe" ]]; then
+  LLAMA_SERVER_BIN="$LLAMA_CPP_DIR/build/bin/llama-server.exe"
+elif [[ -x "$LLAMA_CPP_DIR/build/bin/Release/llama-server.exe" ]]; then
+  LLAMA_SERVER_BIN="$LLAMA_CPP_DIR/build/bin/Release/llama-server.exe"
 else
   printf '[llama][error] llama-server not found; run ./build.sh first\n' >&2
   exit 1

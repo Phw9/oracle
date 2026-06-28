@@ -20,7 +20,7 @@ PACKAGED_MODEL_SHA256="$GEMMA4_E2B_Q2_MODEL_SHA256"
 
 # Options populated by parser
 BUILD_JOBS=""
-FORCE_CUDA="auto"
+FORCE_CUDA="0"
 PYTHON_ENV="auto"
 MODEL_PATH=""
 python_env_mode="venv"
@@ -60,8 +60,8 @@ Options:
   -h, --help               Show this help message
   -j, --jobs JOBS          Number of build jobs (default: auto-detected CPU cores)
   --cuda                   Force build llama.cpp with CUDA support
-  --cpu                    Force build llama.cpp in CPU-only mode
-  --auto-gpu               Auto-detect CUDA capability (default)
+  --cpu                    Force build llama.cpp in CPU-only mode (default)
+  --auto-gpu               Auto-detect CUDA capability
   --python-env ENV         Force python env type: active-conda, active-venv, conda, uv, venv, or auto (default: auto)
   --model-path PATH        Set GGUF model path (default: models/gemma-4-E2B-it-UD-Q2_K_XL.gguf)
   --llama-dir DIR          Directory for llama.cpp source/build (default: ./llama.cpp)
@@ -339,15 +339,30 @@ ensure_python_env() {
     fail "OpenCV import failed after installation"
 }
 
+llama_server_built() {
+  [[ -x "$LLAMA_CPP_DIR/build/bin/llama-server" ||
+     -x "$LLAMA_CPP_DIR/build/bin/llama-server.exe" ||
+     -x "$LLAMA_CPP_DIR/build/bin/Release/llama-server.exe" ]]
+}
+
+llama_cuda_cache_enabled() {
+  local cache_path="$LLAMA_CPP_DIR/build/CMakeCache.txt"
+  [[ -f "$cache_path" ]] && grep -Eq '^GGML_CUDA(:[A-Z]+)?=ON$' "$cache_path"
+}
+
 ensure_llama_cpp() {
   if command_exists llama-server; then
     log "llama-server already installed on PATH"
     return
   fi
 
-  if [[ -x "$LLAMA_CPP_DIR/build/bin/llama-server" ]]; then
-    log "llama.cpp already built at $LLAMA_CPP_DIR"
-    return
+  if llama_server_built; then
+    if [[ "${FORCE_CUDA:-0}" == "0" ]] && llama_cuda_cache_enabled; then
+      log "llama.cpp was built with CUDA; reconfiguring CPU-only build"
+    else
+      log "llama.cpp already built at $LLAMA_CPP_DIR"
+      return
+    fi
   fi
 
   command_exists git || fail "git is required to clone llama.cpp"
@@ -384,6 +399,7 @@ ensure_llama_cpp() {
     cmake_flags+=(-DGGML_CUDA=ON)
   else
     log "Building llama.cpp in CPU-only mode..."
+    cmake_flags+=(-DGGML_CUDA=OFF)
   fi
 
   cmake -S "$LLAMA_CPP_DIR" -B "$LLAMA_CPP_DIR/build" "${cmake_flags[@]}"
