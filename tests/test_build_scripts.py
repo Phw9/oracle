@@ -23,6 +23,13 @@ def test_run_script_keeps_llama_cpu_by_default() -> None:
     assert "automatically setting --n-gpu-layers 99" not in script_text
 
 
+def test_run_script_accepts_windows_virtualenv() -> None:
+    script_text = (ROOT_DIR / "run.sh").read_text(encoding="utf-8")
+
+    assert "activate_repo_venv" in script_text
+    assert "Scripts/activate" in script_text
+
+
 def test_scripts_find_windows_llama_server_binary() -> None:
     build_script = (ROOT_DIR / "build.sh").read_text(encoding="utf-8")
     run_script = (ROOT_DIR / "run.sh").read_text(encoding="utf-8")

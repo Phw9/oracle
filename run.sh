@@ -77,6 +77,20 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+activate_repo_venv() {
+  if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/bin/activate"
+    return 0
+  fi
+  if [[ -f "$VENV_DIR/Scripts/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/Scripts/activate"
+    return 0
+  fi
+  return 1
+}
+
 process_running() {
   local pid="$1"
   local state
@@ -296,17 +310,13 @@ setup_python_env() {
 
   # 3. UV virtualenv
   if [[ "$env_type" == "uv" || "$env_type" == "auto" ]] && command_exists uv; then
-    if [[ -f "$VENV_DIR/bin/activate" ]]; then
-      # shellcheck source=/dev/null
-      source "$VENV_DIR/bin/activate"
+    if activate_repo_venv; then
       return 0
     fi
   fi
 
   # 4. Fallback to standard venv
-  if [[ -f "$VENV_DIR/bin/activate" ]]; then
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
+  if activate_repo_venv; then
     return 0
   fi
 
