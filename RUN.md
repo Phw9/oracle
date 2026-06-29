@@ -237,8 +237,16 @@ configs/prompts_debug.json
 
 개인 리포트를 실제 촬영 대신 임의 랜드마크 값으로 테스트하려면 mock capture를 켭니다.
 
+- `ORACLE_MOCK_LANDMARK_PRESET=1`: 개인 리포트에서 preset mock 랜드마크 값을 자동 적용
 - `ORACLE_MOCK_CAPTURE_ENABLED=1`: 카메라 촬영 대신 mock capture 사용
 - `ORACLE_MOCK_LANDMARK_METRICS_JSON`: mock capture에 적용할 랜드마크 metric JSON
+
+```bash
+export ORACLE_MOCK_LANDMARK_PRESET=1
+./run.sh --face-rulebase
+```
+
+직접 값을 바꿔 테스트하고 싶을 때는 아래처럼 실행합니다.
 
 ```bash
 export ORACLE_MOCK_CAPTURE_ENABLED=1

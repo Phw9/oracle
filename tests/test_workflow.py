@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from oracle_report.config import CaptureConfig, LlmConfig
+from oracle_report.config import CaptureConfig, LlmConfig, load_capture_config
 from oracle_report.models import (
     CaptureArtifact,
     FaceBox,
@@ -410,6 +410,15 @@ def test_compatibility_workflow_rulebase_mode_skips_face_llm(
     assert payload["pair_subtitle"]
     assert len(payload["pair_blocks"]) == 4
     assert "두 사람의 관계 분위기" in result.report_html
+
+
+def test_mock_landmark_preset_env_enables_default_metrics(monkeypatch) -> None:
+    monkeypatch.setenv("ORACLE_MOCK_LANDMARK_PRESET", "1")
+
+    result = load_capture_config()
+
+    assert result.mock_capture_enabled is True
+    assert "eye_width_ratio" in result.mock_landmark_metrics_json
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:
