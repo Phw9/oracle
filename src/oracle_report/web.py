@@ -569,12 +569,18 @@ def _personal_result_url(job_id: str, skip_face: bool) -> str:
 
 
 def _preview_capture_runner(config, output_dir: Path | None = None):
-    result = run_capture(
-        config,
-        output_dir=output_dir,
-        frame_callback=_PREVIEW_STREAM.publish,
-    )
-    return result
+    acquired = _CAPTURE_LOCK.acquire(blocking=False)
+    if not acquired:
+        raise RuntimeError("다른 촬영 작업이 진행 중입니다.")
+    try:
+        result = run_capture(
+            config,
+            output_dir=output_dir,
+            frame_callback=_PREVIEW_STREAM.publish,
+        )
+        return result
+    finally:
+        _CAPTURE_LOCK.release()
 
 
 def _start_workflow_job(
@@ -596,35 +602,22 @@ def _start_workflow_job(
 
 
 def _run_workflow_job(job_id: str, run_job) -> None:
-    acquired = _CAPTURE_LOCK.acquire(blocking=False)
-    if not acquired:
+    try:
+        job_result = run_job()
+        if isinstance(job_result, _WorkflowJob):
+            completed_job = job_result
+        else:
+            completed_job = _WorkflowJob(status="complete", html=job_result)
+        _set_job(job_id, completed_job)
+    except Exception as exc:
         _set_job(
             job_id,
             _WorkflowJob(
                 status="error",
-                html=_error_panel(RuntimeError("다른 촬영 작업이 진행 중입니다.")),
-                error="다른 촬영 작업이 진행 중입니다.",
+                html=_error_panel(exc),
+                error=str(exc),
             ),
         )
-    else:
-        try:
-            job_result = run_job()
-            if isinstance(job_result, _WorkflowJob):
-                completed_job = job_result
-            else:
-                completed_job = _WorkflowJob(status="complete", html=job_result)
-            _set_job(job_id, completed_job)
-        except Exception as exc:
-            _set_job(
-                job_id,
-                _WorkflowJob(
-                    status="error",
-                    html=_error_panel(exc),
-                    error=str(exc),
-                ),
-            )
-        finally:
-            _CAPTURE_LOCK.release()
 
 
 def _set_job(job_id: str, job: _WorkflowJob) -> None:
