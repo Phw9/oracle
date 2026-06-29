@@ -544,18 +544,29 @@ def _build_single_face_analysis(
 
     if app_config.distributed_split and app_config.distributed_role in ("master", "hybrid"):
         categories = ["타고난 인상과 기본 상", "강점으로 읽히는 복과 기세", "관계와 대인운", "앞으로 살릴 운의 방향", "조심할 점과 생활 조언"]
-        from oracle_report.physiognomy import FaceReadingInput
-        from oracle_report.report import _format_quality_text, _format_landmark_metrics, _format_landmark_context
+        from oracle_report.report import format_face_quality
         
-        face_input = FaceReadingInput(image_path=None, quality=artifact.quality)
+        quality_text = format_face_quality(artifact.quality)
+        landmark_metrics_text = "- 랜드마크 측정값 없음"
+        landmark_context_text = "- 구조화된 관찰 컨텍스트 없음"
+        landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
+        if artifact.quality is not None:
+            if artifact.quality.landmark_metrics_text.strip() != "":
+                landmark_metrics_text = artifact.quality.landmark_metrics_text
+            if artifact.quality.landmark_context_text.strip() != "":
+                landmark_context_text = artifact.quality.landmark_context_text
+            if artifact.quality.landmark_rules_text.strip() != "":
+                landmark_rules_text = artifact.quality.landmark_rules_text
+
         values = {
             "name": profile.name,
             "gender": profile.gender,
             "birth_datetime": profile.birth_datetime.isoformat(),
             "birth_time_text": profile.birth_time_text,
-            "quality_text": _format_quality_text(face_input.quality),
-            "landmark_metrics_text": _format_landmark_metrics(artifact.data),
-            "landmark_context_text": _format_landmark_context(artifact.data),
+            "quality_text": quality_text,
+            "landmark_metrics_text": landmark_metrics_text,
+            "landmark_context_text": landmark_context_text,
+            "landmark_rules_text": landmark_rules_text,
         }
         try:
             text = _generate_distributed(
@@ -605,11 +616,7 @@ def _build_pair_face_analysis(
 
     if app_config.distributed_split and app_config.distributed_role in ("master", "hybrid"):
         categories = ["첫인상과 분위기", "소통 리듬", "관계 강점", "주의할 점"]
-        from oracle_report.physiognomy import FaceReadingInput
-        from oracle_report.report import _format_quality_text
-        
-        left_face_input = FaceReadingInput(image_path=None, quality=artifact.left.quality)
-        right_face_input = FaceReadingInput(image_path=None, quality=artifact.right.quality)
+        from oracle_report.report import format_face_quality
         
         values = {
             "mode": mode,
@@ -617,12 +624,12 @@ def _build_pair_face_analysis(
             "left_gender": left_profile.gender,
             "left_birth_datetime": left_profile.birth_datetime.isoformat(),
             "left_birth_time_text": left_profile.birth_time_text,
-            "left_quality_text": _format_quality_text(left_face_input.quality),
+            "left_quality_text": format_face_quality(artifact.left.quality),
             "right_name": right_profile.name,
             "right_gender": right_profile.gender,
             "right_birth_datetime": right_profile.birth_datetime.isoformat(),
             "right_birth_time_text": right_profile.birth_time_text,
-            "right_quality_text": _format_quality_text(right_face_input.quality),
+            "right_quality_text": format_face_quality(artifact.right.quality),
         }
         try:
             text = _generate_distributed(
@@ -1493,7 +1500,11 @@ def _generate_distributed(
 
             # Task Routing based on performance
             if not speculative:
-                is_core_category = cat in ("종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언")
+                is_core_category = cat in (
+                    "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
+                    "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
+                    "첫인상과 분위기", "관계 강점"
+                )
                 if is_core_category and compute_score < 20.0:
                     other_high_perf_exists = any(
                         meta.get("compute_score", 0.0) >= 20.0 
@@ -1629,7 +1640,11 @@ def _generate_distributed(
 
             # Task Routing based on performance
             if not speculative:
-                is_core_category = cat in ("종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언")
+                is_core_category = cat in (
+                    "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
+                    "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
+                    "첫인상과 분위기", "관계 강점"
+                )
                 if is_core_category and local_score < 20.0:
                     other_high_perf_exists = any(
                         meta.get("compute_score", 0.0) >= 20.0 
