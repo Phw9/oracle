@@ -1290,6 +1290,8 @@ def _generate_distributed(
     active_assignments = {}
     assignments_lock = threading.Lock()
 
+    import copy
+
     def is_task_done(task):
         with completed_lock:
             key = (task["is_metadata"], task["target_category"])
@@ -1298,7 +1300,9 @@ def _generate_distributed(
     def mark_task_done(task):
         with completed_lock:
             key = (task["is_metadata"], task["target_category"])
-            completed_tasks.add(key)
+            if key not in completed_tasks:
+                completed_tasks.add(key)
+                task_queue.task_done()  # Increment queue completion safely exactly once
 
     def find_unfinished_speculative_task(my_url, is_my_local):
         # Speculative work stealing: find any task currently assigned to another slower node 
@@ -1312,14 +1316,14 @@ def _generate_distributed(
                 is_other_local = (worker_url == "local")
                 if is_my_local and not is_other_local:
                     if not is_task_done(assigned_task):
-                        return assigned_task
+                        return copy.deepcopy(assigned_task)
                 elif not is_my_local and not is_other_local and worker_url != my_url:
                     # Remote to remote stealing based on compute score
                     my_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
                     other_score = scheduler.slave_metadata.get(worker_url, {}).get("compute_score", 5.0)
                     if my_score > other_score:
                         if not is_task_done(assigned_task):
-                            return assigned_task
+                            return copy.deepcopy(assigned_task)
         return None
 
     def worker_loop(slave_url: str) -> None:
@@ -1499,17 +1503,11 @@ def _generate_distributed(
             if success:
                 consecutive_failures = 0
                 print(f"[Distributed] Task '{cat or 'metadata'}' completed on {device_name} in {elapsed:.2f}s")
-                # Check if we won the speculative race
                 already_done = is_task_done(task)
                 if not already_done:
                     mark_task_done(task)
                     with results_lock:
                         results.append({"task": task, "success": True, "output": output})
-                    if not speculative:
-                        task_queue.task_done()
-                else:
-                    if not speculative:
-                        task_queue.task_done()
             else:
                 consecutive_failures += 1
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on {device_name} in {elapsed:.2f}s. Error: {error_msg}")
@@ -1612,11 +1610,6 @@ def _generate_distributed(
                     mark_task_done(task)
                     with results_lock:
                         results.append({"task": task, "success": True, "output": output})
-                    if not speculative:
-                        task_queue.task_done()
-                else:
-                    if not speculative:
-                        task_queue.task_done()
             else:
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on local in {elapsed:.2f}s. Error: {error_msg}")
                 if not speculative:
@@ -1630,7 +1623,6 @@ def _generate_distributed(
                         mark_task_done(task)
                         with results_lock:
                             results.append({"task": task, "success": False, "error": error_msg})
-                        task_queue.task_done()
 
     threads = []
     if app_config.slave_addrs:
