@@ -538,6 +538,7 @@ def _build_single_face_analysis(
     text = artifact.face_analysis or artifact.quality.face_analysis
     if text == "":
         text = "## 관상정보\n- 랜드마크 룰 기반 관상정보를 생성하지 못했습니다."
+    print(f"\n[LLM RAW:face_analysis:BEGIN]\n{text}\n[LLM RAW:face_analysis:END]\n")
     result = _GeneratedText(text=text, error="")
     return result
 
