@@ -337,6 +337,41 @@ def test_personal_workflow_rulebase_mode_skips_face_llm(
     assert "랜드마크 룰 기반" not in result.face_analysis
 
 
+def test_personal_workflow_rulebase_mode_can_log_llm_comparison(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+    monkeypatch.setenv("ORACLE_FACE_RULEBASE_COMPARE_LLM", "1")
+    capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="모름",
+        gender="남성",
+        target_gender="여성",
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        report_client=FakeLlmClient(),
+        capture_runner=run_capture,
+    )
+    output = capsys.readouterr().out
+    payload = json.loads(result.face_analysis)
+
+    assert payload["face_subtitle"] != "테스트 관상 소제목"
+    assert "[FACE COMPARE:single_rulebase:BEGIN]" in output
+    assert "[FACE COMPARE:single_llm:BEGIN]" in output
+    assert "테스트 관상 소제목" in output
+
+
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:
     capture_config = _capture_config(tmp_path)
     manse_db_path = _build_test_manse_db(tmp_path)
@@ -412,6 +447,43 @@ def test_compatibility_workflow_rulebase_mode_skips_face_llm(
     assert "두 사람의 관계 분위기" in result.report_html
 
 
+def test_compatibility_workflow_rulebase_mode_can_log_llm_comparison(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+    monkeypatch.setenv("ORACLE_FACE_RULEBASE_COMPARE_LLM", "1")
+    capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = CompatibilityWorkflowInput(
+        left_name="갑",
+        left_birth_date="1995-03-15",
+        left_birth_time="14:30",
+        left_gender="남성",
+        right_name="을",
+        right_birth_date="1997-05-20",
+        right_birth_time="",
+        right_gender="여성",
+        mode="연인",
+    )
+
+    result = run_compatibility_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        report_client=FakeLlmClient(),
+        capture_runner=run_capture,
+        inter_capture_delay_seconds=0.0,
+    )
+    output = capsys.readouterr().out
+    payload = json.loads(result.face_analysis)
+
+    assert payload["pair_subtitle"] != "관계 분위기 테스트"
+    assert "[FACE COMPARE:pair_rulebase:BEGIN]" in output
+    assert "[FACE COMPARE:pair_llm:BEGIN]" in output
+    assert "관계 분위기 테스트" in output
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:

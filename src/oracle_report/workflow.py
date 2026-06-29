@@ -222,11 +222,15 @@ def run_personal_workflow(
         manse_lookup = manse_timed.value
 
     if not workflow_input.skip_face and capture_artifact is not None:
+        face_mode = _configured_face_analysis_mode()
         face_builder = _build_single_face_analysis
         face_args: tuple[object, ...] = (profile, capture_artifact, active_report_client)
-        if _configured_face_analysis_mode() == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+        if face_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
             face_builder = _build_single_rule_based_face_analysis
             face_args = (profile, capture_artifact)
+            if _configured_rulebase_compare_llm():
+                face_builder = _build_single_rule_based_face_analysis_with_llm_log
+                face_args = (profile, capture_artifact, active_report_client)
         face_analysis = timing_recorder.run("face_analysis", face_builder, *face_args)
         face_analysis_text = face_analysis.text
     else:
@@ -390,6 +394,7 @@ def run_compatibility_workflow(
         timing_recorder.add(manse_timed.timing)
         left_manse, right_manse = manse_timed.value
 
+    face_mode = _configured_face_analysis_mode()
     pair_face_builder = _build_pair_face_analysis
     pair_face_args: tuple[object, ...] = (
         left_profile,
@@ -398,9 +403,18 @@ def run_compatibility_workflow(
         mode,
         active_report_client,
     )
-    if _configured_face_analysis_mode() == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+    if face_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
         pair_face_builder = _build_pair_rule_based_face_analysis
         pair_face_args = (left_profile, right_profile, capture_artifact)
+        if _configured_rulebase_compare_llm():
+            pair_face_builder = _build_pair_rule_based_face_analysis_with_llm_log
+            pair_face_args = (
+                left_profile,
+                right_profile,
+                capture_artifact,
+                mode,
+                active_report_client,
+            )
     face_analysis = timing_recorder.run(
         "face_analysis_pair",
         pair_face_builder,
@@ -593,6 +607,18 @@ def _build_single_rule_based_face_analysis(
     return result
 
 
+def _build_single_rule_based_face_analysis_with_llm_log(
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+    client: TextGenerator | None = None,
+) -> _GeneratedText:
+    rule_result = _build_single_rule_based_face_analysis(profile, artifact)
+    _print_face_compare_log("single_rulebase", rule_result.text)
+    llm_result = _build_single_face_analysis(profile, artifact, client)
+    _print_face_compare_log("single_llm", llm_result.text)
+    return rule_result
+
+
 def _build_pair_face_analysis(
     left_profile: BirthProfile,
     right_profile: BirthProfile,
@@ -653,6 +679,34 @@ def _build_pair_rule_based_face_analysis(
     text = json.dumps(payload, ensure_ascii=False)
     result = _GeneratedText(text=text, error="")
     return result
+
+
+def _build_pair_rule_based_face_analysis_with_llm_log(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+    mode: str,
+    client: TextGenerator | None = None,
+) -> _GeneratedText:
+    rule_result = _build_pair_rule_based_face_analysis(
+        left_profile,
+        right_profile,
+        artifact,
+    )
+    _print_face_compare_log("pair_rulebase", rule_result.text)
+    llm_result = _build_pair_face_analysis(
+        left_profile,
+        right_profile,
+        artifact,
+        mode,
+        client,
+    )
+    _print_face_compare_log("pair_llm", llm_result.text)
+    return rule_result
+
+
+def _print_face_compare_log(label: str, text: str) -> None:
+    print(f"\n[FACE COMPARE:{label}:BEGIN]\n{text}\n[FACE COMPARE:{label}:END]\n")
 
 
 def _quality_rule_matches(quality) -> tuple[Any, ...]:
@@ -1345,6 +1399,12 @@ def _validate_face_analysis_mode(mode: int | str) -> int:
 def _configured_face_analysis_mode() -> int:
     raw_mode = os.getenv("ORACLE_FACE_ANALYSIS_MODE", str(FACE_ANALYSIS_MODE_LLM_IMAGE))
     result = _validate_face_analysis_mode(raw_mode)
+    return result
+
+
+def _configured_rulebase_compare_llm() -> bool:
+    raw_value = os.getenv("ORACLE_FACE_RULEBASE_COMPARE_LLM", "0").strip().lower()
+    result = raw_value in ("1", "true", "yes", "on")
     return result
 
 
