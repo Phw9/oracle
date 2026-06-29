@@ -870,8 +870,16 @@ start_llama_server() {
 }
 
 run_oracle() {
-  if [[ "$#" -gt 0 ]]; then
-    PYTHONPATH="$ROOT_DIR/src" python -m oracle_report.cli "$@"
+  local filtered_args=()
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" != -* ]]; then
+      filtered_args+=("$arg")
+    fi
+  done
+
+  if [[ "${#filtered_args[@]}" -gt 0 ]]; then
+    PYTHONPATH="$ROOT_DIR/src" python -m oracle_report.cli "${filtered_args[@]}"
     return
   fi
 
