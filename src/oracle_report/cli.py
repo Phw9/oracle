@@ -46,9 +46,16 @@ _TOKEN_TABLE_HEADERS = (
 )
 
 
+def _apply_temperature_override(args: argparse.Namespace) -> None:
+    if getattr(args, "temperature", None) is not None:
+        os.environ["ORACLE_LLM_TEMPERATURE"] = str(args.temperature)
+        os.environ["ORACLE_REPORT_LLM_TEMPERATURE"] = str(args.temperature)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    _apply_temperature_override(args)
     result = 0
     try:
         if args.command == "capture":
@@ -87,6 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--debug", action="store_true")
     serve.add_argument("--distributed-warmup", action="store_true")
+    serve.add_argument("--temperature", type=float, help="LLM generation temperature")
 
     prompt = subparsers.add_parser("prompt", help="print workflow prompt inputs")
     _add_prompt_args(prompt)
@@ -151,6 +159,7 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--face-analysis-file", type=Path)
     parser.add_argument("--recommendation-text", default="")
     parser.add_argument("--recommendation-file", type=Path)
+    parser.add_argument("--temperature", type=float, help="LLM generation temperature")
 
 
 def _run_capture_command(args: argparse.Namespace) -> int:
