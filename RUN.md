@@ -235,6 +235,17 @@ configs/prompts_debug.json
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
+개인 리포트를 실제 촬영 대신 임의 랜드마크 값으로 테스트하려면 mock capture를 켭니다.
+
+- `ORACLE_MOCK_CAPTURE_ENABLED=1`: 카메라 촬영 대신 mock capture 사용
+- `ORACLE_MOCK_LANDMARK_METRICS_JSON`: mock capture에 적용할 랜드마크 metric JSON
+
+```bash
+export ORACLE_MOCK_CAPTURE_ENABLED=1
+export ORACLE_MOCK_LANDMARK_METRICS_JSON='{"eye_width_ratio":0.19,"eye_spacing_ratio":0.28}'
+./run.sh --face-rulebase
+```
+
 ## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB
