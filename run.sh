@@ -77,6 +77,20 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+activate_repo_venv() {
+  if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/bin/activate"
+    return 0
+  fi
+  if [[ -f "$VENV_DIR/Scripts/activate" ]]; then
+    # shellcheck source=/dev/null
+    source "$VENV_DIR/Scripts/activate"
+    return 0
+  fi
+  return 1
+}
+
 process_running() {
   local pid="$1"
   local state
@@ -163,7 +177,7 @@ Wrapper Options:
   -p, --port PORT          Port for the Flask app (default: 8501)
   --host HOST              Host for the Flask app (default: 0.0.0.0)
   -t, --threads THREADS    Number of threads for llama.cpp server
-  -ngl, --ngl LAYERS       Number of GPU layers to offload to GPU (llama.cpp)
+  -ngl, --ngl LAYERS       GPU layers to offload (default: CPU; set >0 for GPU)
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
@@ -252,26 +266,6 @@ apply_kvfix_mode() {
   fi
 }
 
-detect_cuda() {
-  if command_exists nvcc; then
-    return 0
-  fi
-  local p
-  for p in /usr/local/cuda/bin /usr/local/cuda-*/bin; do
-    if [[ -x "$p/nvcc" ]]; then
-      export PATH="$p:$PATH"
-      if [[ -d "${p%/bin}/lib64" ]]; then
-        export LD_LIBRARY_PATH="${p%/bin}/lib64:${LD_LIBRARY_PATH:-}"
-      fi
-      return 0
-    fi
-  done
-  if command_exists nvidia-smi; then
-    return 0
-  fi
-  return 1
-}
-
 setup_python_env() {
   local env_type="${PYTHON_ENV:-auto}"
 
@@ -316,17 +310,13 @@ setup_python_env() {
 
   # 3. UV virtualenv
   if [[ "$env_type" == "uv" || "$env_type" == "auto" ]] && command_exists uv; then
-    if [[ -f "$VENV_DIR/bin/activate" ]]; then
-      # shellcheck source=/dev/null
-      source "$VENV_DIR/bin/activate"
+    if activate_repo_venv; then
       return 0
     fi
   fi
 
   # 4. Fallback to standard venv
-  if [[ -f "$VENV_DIR/bin/activate" ]]; then
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
+  if activate_repo_venv; then
     return 0
   fi
 
@@ -428,9 +418,11 @@ find_llama_server() {
     command -v "$ORACLE_LLAMA_SERVER_BIN"
   elif command_exists llama-server; then
     command -v llama-server
+  elif command_exists llama-server.exe; then
+    command -v llama-server.exe
   elif [[ -d "$ORACLE_LLAMA_CPP_DIR" ]]; then
     local found_bin
-    found_bin="$(find "$ORACLE_LLAMA_CPP_DIR" -type f -name 'llama-server' -executable | head -n 1)"
+    found_bin="$(find "$ORACLE_LLAMA_CPP_DIR" -type f \( -name 'llama-server' -o -name 'llama-server.exe' \) -executable | head -n 1)"
     if [[ -n "$found_bin" ]]; then
       printf '%s\n' "$found_bin"
     else
@@ -668,17 +660,10 @@ start_llama_server() {
     server_args+=(--parallel "$LLAMA_PARALLEL")
   fi
 
-  # Check GPU/CUDA and automatically set GPU layers if NGL is not explicitly set
-  local use_cuda=0
-  if detect_cuda; then
-    use_cuda=1
-  fi
-
   if [[ -n "$LLAMA_NGL" ]]; then
     server_args+=(-ngl "$LLAMA_NGL")
-  elif [[ "$use_cuda" -eq 1 ]]; then
-    log "CUDA detected, automatically setting --n-gpu-layers 99 to offload all layers to GPU"
-    server_args+=(-ngl 99)
+  else
+    log "running llama.cpp on CPU by default; pass -ngl/--ngl to enable GPU offload"
   fi
 
   if [[ -n "$LLAMA_THREADS" ]]; then
