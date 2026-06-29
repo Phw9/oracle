@@ -815,11 +815,13 @@ def _parse_face_markdown_to_payload(face_analysis: str, prefix: str = "face") ->
             if part_clean:
                 sentences.append(part_clean + ".")
 
-    categories = ["기본 구조와 첫인상", "강점으로 읽히는 복과 기세", "관계와 대인운", "앞으로 살릴 운의 방향", "조심할 점과 생활 조언"]
+    categories = ["타고난 인상과 기본 상", "강점으로 읽히는 복과 기세", "관계와 대인운", "앞으로 살릴 운의 방향", "조심할 점과 생활 조언"]
+    titles = ["기본 구조와 첫인상", "강점", "관계 인상", "활용 방향", "조심할 점과 생활 팁"]
     face_blocks = []
     
     for i, cat in enumerate(categories):
         default_block = _DEFAULT_FACE_BLOCKS[i]
+        title = titles[i]
         
         if i < len(sentences):
             summary = sentences[i]
@@ -830,7 +832,7 @@ def _parse_face_markdown_to_payload(face_analysis: str, prefix: str = "face") ->
             
         face_blocks.append({
             "category": cat,
-            "title": default_block["title"],
+            "title": title,
             "summary": summary,
             "body": body
         })
