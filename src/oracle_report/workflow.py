@@ -185,7 +185,6 @@ def run_personal_workflow(
     face_client: TextGenerator | None = None,
     report_client: TextGenerator | None = None,
     capture_runner=run_capture,
-    status_callback: Callable[[str, str, str], None] | None = None,
 ) -> PersonalWorkflowResult:
     del manse_db_path
     face_llm_config_was_provided = face_llm_config is not None
@@ -276,37 +275,6 @@ def run_personal_workflow(
         manse_lookup,
     )
     saju_analysis_text = saju_analysis.text
-
-    if status_callback is not None:
-        mid_recommendations: tuple[FaceRecommendation, ...] = ()
-        if not workflow_input.skip_face:
-            mid_recommendations = recommend_faces(
-                recommendation_db_path,
-                workflow_input.target_gender,
-                manse_lookup.reading,
-            )
-        mid_markdown = _build_personal_report_json(
-            manse_lookup,
-            face_analysis_text,
-            saju_analysis_text,
-            mid_recommendations,
-            workflow_input.skip_face,
-        )
-        mid_html = render_personal_report_html(
-            profile,
-            manse_lookup,
-            face_analysis_text,
-            mid_recommendations,
-            mid_markdown,
-            True,
-            workflow_input.skip_face,
-        )
-        status_callback(
-            "generating",
-            "사주 풀이 완료! 관상 및 얼굴 추천 리포트를 추가로 분석하고 있습니다...",
-            mid_html,
-        )
-
     recommendations: tuple[FaceRecommendation, ...] = ()
     if not workflow_input.skip_face:
         recommendations = timing_recorder.run(
@@ -381,7 +349,6 @@ def run_compatibility_workflow(
     report_client: TextGenerator | None = None,
     capture_runner=run_capture,
     inter_capture_delay_seconds: float = 3.0,
-    status_callback: Callable[[str, str, str], None] | None = None,
 ) -> CompatibilityWorkflowResult:
     del manse_db_path
     face_llm_config_was_provided = face_llm_config is not None
@@ -470,34 +437,11 @@ def run_compatibility_workflow(
         left_manse,
         right_manse,
     )
-    saju_analysis_text = saju_analysis.text
-
-    if status_callback is not None:
-        mid_markdown = _build_compatibility_report_json(
-            face_analysis.text,
-            saju_analysis_text,
-        )
-        mid_html = render_compatibility_report_html(
-            left_profile,
-            right_profile,
-            mode,
-            left_manse,
-            right_manse,
-            face_analysis.text,
-            mid_markdown,
-            True,
-        )
-        status_callback(
-            "generating",
-            "사주 궁합 풀이 완료! 관상 궁합을 추가로 분석하고 있습니다...",
-            mid_html,
-        )
-
     markdown = timing_recorder.run(
         "final_report",
         _build_compatibility_report_json,
         face_analysis.text,
-        saju_analysis_text,
+        saju_analysis.text,
     )
     report_html = timing_recorder.run(
         "render_report_html",
@@ -954,28 +898,19 @@ def _build_saju_analysis(
     profile: BirthProfile,
     manse_lookup: ManseLookupResult,
 ) -> _GeneratedText:
-    distributed_app_config = _load_active_distributed_app_config()
-    if distributed_app_config is not None:
-        result = _build_distributed_saju_analysis(
-            client,
-            profile,
-            manse_lookup,
-            distributed_app_config,
-        )
-    else:
-        prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
-        result = _safe_generate(
-            client,
-            prompt,
-            None,
-            "사주정보를 생성하지 못했습니다.",
-            debug_label="saju_analysis",
-        )
-        result = _repair_short_report_block_bodies(
-            client,
-            result,
-            "saju_analysis",
-        )
+    prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
+    result = _safe_generate(
+        client,
+        prompt,
+        None,
+        "사주정보를 생성하지 못했습니다.",
+        debug_label="saju_analysis",
+    )
+    result = _repair_short_report_block_bodies(
+        client,
+        result,
+        "saju_analysis",
+    )
     return result
 
 
@@ -987,37 +922,25 @@ def _build_compatibility_saju_analysis(
     left_manse: ManseLookupResult,
     right_manse: ManseLookupResult,
 ) -> _GeneratedText:
-    distributed_app_config = _load_active_distributed_app_config()
-    if distributed_app_config is not None:
-        result = _build_distributed_compatibility_saju_analysis(
-            client,
-            left_profile,
-            right_profile,
-            mode,
-            left_manse,
-            right_manse,
-            distributed_app_config,
-        )
-    else:
-        prompt = build_couple_saju_reading_prompt(
-            left_profile,
-            right_profile,
-            mode,
-            left_manse.formatted_text,
-            right_manse.formatted_text,
-        )
-        result = _safe_generate(
-            client,
-            prompt,
-            None,
-            "궁합 사주정보를 생성하지 못했습니다.",
-            debug_label="saju_analysis_couple",
-        )
-        result = _repair_short_report_block_bodies(
-            client,
-            result,
-            "saju_analysis_couple",
-        )
+    prompt = build_couple_saju_reading_prompt(
+        left_profile,
+        right_profile,
+        mode,
+        left_manse.formatted_text,
+        right_manse.formatted_text,
+    )
+    result = _safe_generate(
+        client,
+        prompt,
+        None,
+        "궁합 사주정보를 생성하지 못했습니다.",
+        debug_label="saju_analysis_couple",
+    )
+    result = _repair_short_report_block_bodies(
+        client,
+        result,
+        "saju_analysis_couple",
+    )
     return result
 
 
@@ -1033,22 +956,6 @@ _PAIR_FACE_CATEGORIES = (
     "소통 리듬",
     "관계 강점",
     "주의할 점",
-)
-_PERSONAL_SAJU_CATEGORIES = (
-    "종합 형국",
-    "타고난 성향과 심리 패턴",
-    "재물운과 적성",
-    "연애운과 인간관계",
-    "올해의 운세",
-    "총평 및 인생의 조언",
-)
-_COMPATIBILITY_SAJU_CATEGORIES = (
-    "관계 구조",
-    "상호 보완",
-    "갈등 관리",
-    "현재 관계 흐름",
-    "실천 제안",
-    "총평 및 조언",
 )
 
 
@@ -1092,55 +999,6 @@ def _build_distributed_pair_face_analysis(
         client,
         "궁합 관상정보를 생성하지 못했습니다.",
         "face_analysis_copule",
-    )
-    return result
-
-
-def _build_distributed_saju_analysis(
-    client: TextGenerator,
-    profile: BirthProfile,
-    manse_lookup: ManseLookupResult,
-    app_config,
-) -> _GeneratedText:
-    values = _saju_prompt_values(profile, manse_lookup)
-    result = _safe_generate_distributed(
-        "saju_reading",
-        values,
-        _PERSONAL_SAJU_CATEGORIES,
-        None,
-        app_config,
-        client,
-        "사주정보를 생성하지 못했습니다.",
-        "saju_analysis",
-    )
-    return result
-
-
-def _build_distributed_compatibility_saju_analysis(
-    client: TextGenerator,
-    left_profile: BirthProfile,
-    right_profile: BirthProfile,
-    mode: str,
-    left_manse: ManseLookupResult,
-    right_manse: ManseLookupResult,
-    app_config,
-) -> _GeneratedText:
-    values = _compatibility_saju_prompt_values(
-        left_profile,
-        right_profile,
-        mode,
-        left_manse,
-        right_manse,
-    )
-    result = _safe_generate_distributed(
-        "saju_reading_couple",
-        values,
-        _COMPATIBILITY_SAJU_CATEGORIES,
-        None,
-        app_config,
-        client,
-        "궁합 사주정보를 생성하지 못했습니다.",
-        "saju_analysis_couple",
     )
     return result
 
@@ -1249,54 +1107,6 @@ def _prefixed_face_prompt_values(
         f"{prefix}_birth_datetime": base_values["birth_datetime"],
         f"{prefix}_birth_time_text": base_values["birth_time_text"],
         f"{prefix}_quality_text": base_values["quality_text"],
-    }
-    return result
-
-
-def _saju_prompt_values(
-    profile: BirthProfile,
-    manse_lookup: ManseLookupResult,
-) -> dict[str, object]:
-    from oracle_report.saju.repository import (
-        birth_datetime_display_from_profile,
-        birth_time_display_from_profile,
-    )
-
-    result = {
-        "name": profile.name,
-        "gender": profile.gender,
-        "birth_datetime": birth_datetime_display_from_profile(profile),
-        "birth_time_text": birth_time_display_from_profile(profile),
-        "timezone": profile.timezone,
-        "saju_text": manse_lookup.formatted_text,
-    }
-    return result
-
-
-def _compatibility_saju_prompt_values(
-    left_profile: BirthProfile,
-    right_profile: BirthProfile,
-    mode: str,
-    left_manse: ManseLookupResult,
-    right_manse: ManseLookupResult,
-) -> dict[str, object]:
-    from oracle_report.saju.repository import (
-        birth_datetime_display_from_profile,
-        birth_time_display_from_profile,
-    )
-
-    result = {
-        "left_name": left_profile.name,
-        "left_gender": left_profile.gender,
-        "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
-        "left_birth_time_text": birth_time_display_from_profile(left_profile),
-        "right_name": right_profile.name,
-        "right_gender": right_profile.gender,
-        "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
-        "right_birth_time_text": birth_time_display_from_profile(right_profile),
-        "mode": mode,
-        "left_saju_text": left_manse.formatted_text,
-        "right_saju_text": right_manse.formatted_text,
     }
     return result
 
@@ -1483,9 +1293,12 @@ def _parse_distributed_json(text: str) -> dict[str, object]:
 
 
 def _distributed_block_key(prompt_name: str) -> str:
-    result = "saju_blocks"
-    if "face" in prompt_name:
-        result = "pair_blocks" if "copule" in prompt_name else "face_blocks"
+    if prompt_name == "personal_face_analysis":
+        result = "face_blocks"
+    elif prompt_name == "face_analysis_copule":
+        result = "pair_blocks"
+    else:
+        raise ValueError(f"unsupported distributed prompt: {prompt_name}")
     return result
 
 
