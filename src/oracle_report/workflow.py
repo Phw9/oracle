@@ -539,9 +539,40 @@ def _build_single_face_analysis(
     artifact: CaptureArtifact,
     client: TextGenerator | None = None,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+
+    if app_config.distributed_split and app_config.distributed_role in ("master", "hybrid"):
+        categories = ["타고난 인상과 기본 상", "강점으로 읽히는 복과 기세", "관계와 대인운", "앞으로 살릴 운의 방향", "조심할 점과 생활 조언"]
+        from oracle_report.physiognomy import FaceReadingInput
+        from oracle_report.report import _format_quality_text, _format_landmark_metrics, _format_landmark_context
+        
+        face_input = FaceReadingInput(image_path=None, quality=artifact.quality)
+        values = {
+            "name": profile.name,
+            "gender": profile.gender,
+            "birth_datetime": profile.birth_datetime.isoformat(),
+            "birth_time_text": profile.birth_time_text,
+            "quality_text": _format_quality_text(face_input.quality),
+            "landmark_metrics_text": _format_landmark_metrics(artifact.data),
+            "landmark_context_text": _format_landmark_context(artifact.data),
+        }
+        try:
+            text = _generate_distributed(
+                "personal_face_analysis",
+                values,
+                categories,
+                artifact.cropped_image_path,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     if client is None:
         from oracle_report.llm import LlamaCppChatClient
-        from oracle_report.config import load_face_llm_config
         client = LlamaCppChatClient(load_face_llm_config())
 
     from oracle_report.physiognomy import FaceReadingInput
@@ -569,9 +600,46 @@ def _build_pair_face_analysis(
     mode: str,
     client: TextGenerator | None = None,
 ) -> _GeneratedText:
+    from oracle_report.config import load_app_config, load_face_llm_config, load_report_llm_config
+    app_config = load_app_config()
+
+    if app_config.distributed_split and app_config.distributed_role in ("master", "hybrid"):
+        categories = ["첫인상과 분위기", "소통 리듬", "관계 강점", "주의할 점"]
+        from oracle_report.physiognomy import FaceReadingInput
+        from oracle_report.report import _format_quality_text
+        
+        left_face_input = FaceReadingInput(image_path=None, quality=artifact.left.quality)
+        right_face_input = FaceReadingInput(image_path=None, quality=artifact.right.quality)
+        
+        values = {
+            "mode": mode,
+            "left_name": left_profile.name,
+            "left_gender": left_profile.gender,
+            "left_birth_datetime": left_profile.birth_datetime.isoformat(),
+            "left_birth_time_text": left_profile.birth_time_text,
+            "left_quality_text": _format_quality_text(left_face_input.quality),
+            "right_name": right_profile.name,
+            "right_gender": right_profile.gender,
+            "right_birth_datetime": right_profile.birth_datetime.isoformat(),
+            "right_birth_time_text": right_profile.birth_time_text,
+            "right_quality_text": _format_quality_text(right_face_input.quality),
+        }
+        try:
+            text = _generate_distributed(
+                "face_analysis_copule",
+                values,
+                categories,
+                artifact.pair_image_path,
+                app_config,
+                load_face_llm_config(),
+                load_report_llm_config(),
+            )
+            return _GeneratedText(text=text, error="")
+        except Exception as exc:
+            return _GeneratedText(text="", error=str(exc))
+
     if client is None:
         from oracle_report.llm import LlamaCppChatClient
-        from oracle_report.config import load_face_llm_config
         client = LlamaCppChatClient(load_face_llm_config())
 
     from oracle_report.physiognomy import FaceReadingInput
@@ -1677,7 +1745,7 @@ def _generate_distributed(
     final_dict = meta_output
     block_key = "saju_blocks"
     if "face" in prompt_name:
-        block_key = "face_blocks" if "couple" not in prompt_name else "pair_blocks"
+        block_key = "pair_blocks" if ("couple" in prompt_name or "copule" in prompt_name) else "face_blocks"
 
     ordered_blocks = []
     for cat in categories:
