@@ -809,11 +809,22 @@ def _parse_face_markdown_to_payload(face_analysis: str, prefix: str = "face") ->
         payload[subtitle_key] = "얼굴 비율 · 인상 관찰"
 
     sentences = []
+    instruction_keywords = (
+        "설명 문장으로 정리합니다",
+        "키워드로 정리합니다",
+        "표현으로 정리합니다",
+        "설명 소재로 사용합니다",
+        "설명 소재로 정리합니다",
+        "함께 설명합니다",
+        "참고 자료"
+    )
     if interpretation_text:
         parts = interpretation_text.split(".")
         for part in parts:
             part_clean = part.strip()
             if part_clean:
+                if any(kw in part_clean for kw in instruction_keywords):
+                    continue
                 sentences.append(part_clean + ".")
 
     categories = ["타고난 인상과 기본 상", "강점으로 읽히는 복과 기세", "관계와 대인운", "앞으로 살릴 운의 방향", "조심할 점과 생활 조언"]
