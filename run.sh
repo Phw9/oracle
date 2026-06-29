@@ -199,6 +199,11 @@ Wrapper Options:
   --distributed-warmup     Warmup LLM KV cache on start
   --reasoning              Enable reasoning mode (think tags) for LLM
   --mock-capture           Enable mock camera capture mode using mock_face.jpg
+  --mock-pair-preset       Enable built-in mock landmark metrics for compatibility
+  --mock-pair-left-metrics JSON
+                           Override first compatibility mock landmark metrics
+  --mock-pair-right-metrics JSON
+                           Override second compatibility mock landmark metrics
   --face-rulebase          Generate face report text with landmark rules instead of LLM
   --face-llm               Generate face report text with LLM (default)
   --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
@@ -269,6 +274,21 @@ parse_args() {
       --mock-capture)
         RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
         shift 1
+        ;;
+      --mock-pair-preset)
+        RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        RUN_ORACLE_MOCK_PAIR_LANDMARK_PRESET=1
+        shift 1
+        ;;
+      --mock-pair-left-metrics)
+        RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        RUN_ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON="$2"
+        shift 2
+        ;;
+      --mock-pair-right-metrics)
+        RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        RUN_ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON="$2"
+        shift 2
         ;;
       --face-rulebase)
         RUN_ORACLE_FACE_ANALYSIS_MODE=2
@@ -468,6 +488,9 @@ apply_run_config() {
   export ORACLE_SHOW_PREVIEW="$RUN_ORACLE_SHOW_PREVIEW"
   export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
   export ORACLE_MOCK_CAPTURE_ENABLED="${RUN_ORACLE_MOCK_CAPTURE_ENABLED:-${ORACLE_MOCK_CAPTURE_ENABLED:-0}}"
+  export ORACLE_MOCK_PAIR_LANDMARK_PRESET="${RUN_ORACLE_MOCK_PAIR_LANDMARK_PRESET:-${ORACLE_MOCK_PAIR_LANDMARK_PRESET:-0}}"
+  export ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON="${RUN_ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON:-${ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON:-}}"
+  export ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON="${RUN_ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON:-${ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON:-}}"
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"

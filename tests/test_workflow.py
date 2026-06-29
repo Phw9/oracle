@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from oracle_report.config import CaptureConfig, LlmConfig
+from oracle_report.config import CaptureConfig, LlmConfig, load_capture_config
 from oracle_report.models import (
     CaptureArtifact,
     FaceBox,
@@ -17,9 +17,12 @@ from oracle_report.models import (
 from oracle_report.workflow import (
     CompatibilityWorkflowInput,
     PersonalWorkflowInput,
+    _run_sequential_pair_capture,
     run_compatibility_workflow,
     run_personal_workflow,
 )
+from oracle_report.vision.physiognomy_rule_repository import PhysiognomyRuleMatch
+from oracle_report.vision.physiognomy_text_variations import build_pair_face_payload
 from oracle_report.vision.runtime import run_capture
 
 
@@ -409,7 +412,84 @@ def test_compatibility_workflow_rulebase_mode_skips_face_llm(
 
     assert payload["pair_subtitle"]
     assert len(payload["pair_blocks"]) == 4
+    assert "연인 관계에서는" in payload["pair_blocks"][0]["summary"]
     assert "두 사람의 관계 분위기" in result.report_html
+
+
+def test_pair_rulebase_payload_reflects_compatibility_mode() -> None:
+    matches = (
+        PhysiognomyRuleMatch(
+            rule_id="balance",
+            metric="third_balance_error",
+            title="삼정 균형",
+            basis="test",
+            tag="삼정 균형형",
+            observation="삼정 비율이 안정적으로 관찰됩니다.",
+            interpretation="균형 잡힌 인상으로 읽힙니다.",
+            value=0.01,
+        ),
+        PhysiognomyRuleMatch(
+            rule_id="mouth",
+            metric="mouth_width_ratio",
+            title="입매",
+            basis="test",
+            tag="입매 균형형",
+            observation="입매가 자연스럽게 균형을 이룹니다.",
+            interpretation="편안한 표현으로 읽힙니다.",
+            value=0.35,
+        ),
+    )
+
+    lover = build_pair_face_payload(matches, matches, "갑", "을", "same-seed", mode="연인")
+    friend = build_pair_face_payload(matches, matches, "갑", "을", "same-seed", mode="친구")
+    coworker = build_pair_face_payload(
+        matches,
+        matches,
+        "갑",
+        "을",
+        "same-seed",
+        mode="직장동료",
+    )
+
+    assert "감정" in lover["face_summary"]
+    assert "친구 관계에서는" in friend["pair_blocks"][0]["summary"]
+    assert "직장동료 관계에서는" in coworker["pair_blocks"][0]["summary"]
+    assert lover["pair_blocks"][0]["body"] != coworker["pair_blocks"][0]["body"]
+
+
+def test_pair_mock_capture_can_use_different_landmark_metrics(
+    tmp_path: Path,
+) -> None:
+    capture_config = replace(
+        _capture_config(tmp_path),
+        mock_capture_enabled=True,
+        mock_pair_left_landmark_metrics_json='{"eye_width_ratio": 0.19}',
+        mock_pair_right_landmark_metrics_json='{"mouth_width_ratio": 0.43}',
+    )
+
+    result = _run_sequential_pair_capture(
+        run_capture,
+        capture_config,
+        tmp_path / "pair-runs",
+        0.0,
+    )
+
+    assert "눈 가로폭/얼굴 폭: 0.190" in result.left.quality.landmark_metrics_text
+    assert "입 폭/얼굴 폭: 0.430" in result.right.quality.landmark_metrics_text
+    assert result.left.image_path.parent.name == "person_1"
+    assert result.right.image_path.parent.name == "person_2"
+
+
+def test_pair_mock_preset_env_enables_default_landmark_metrics(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_MOCK_PAIR_LANDMARK_PRESET", "1")
+
+    result = load_capture_config()
+
+    assert result.mock_capture_enabled is True
+    assert "eye_width_ratio" in result.mock_pair_left_landmark_metrics_json
+    assert "mouth_width_ratio" in result.mock_pair_right_landmark_metrics_json
 
 
 def _build_test_manse_db(tmp_path: Path) -> Path:

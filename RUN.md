@@ -235,6 +235,37 @@ configs/prompts_debug.json
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
+실제 촬영 대신 임의 랜드마크 값을 사용하려면 mock capture를 켭니다.
+
+- `ORACLE_MOCK_CAPTURE_ENABLED=1`: 카메라 촬영 대신 mock capture 사용
+- `ORACLE_MOCK_LANDMARK_METRICS_JSON`: 개인 리포트나 공통 mock capture에 적용할 랜드마크 metric JSON
+- `ORACLE_MOCK_PAIR_LANDMARK_PRESET=1`: 궁합 리포트에서 두 사람의 preset mock 랜드마크 값을 자동 적용
+- `ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON`: 궁합 첫 번째 사람에게 적용할 랜드마크 metric JSON
+- `ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON`: 궁합 두 번째 사람에게 적용할 랜드마크 metric JSON
+
+개인 리포트를 카메라 없이 특정 랜드마크 값으로 테스트하려면 아래처럼 실행합니다.
+
+```bash
+export ORACLE_MOCK_CAPTURE_ENABLED=1
+export ORACLE_MOCK_LANDMARK_METRICS_JSON='{"eye_width_ratio":0.19,"eye_spacing_ratio":0.28}'
+./run.sh --face-rulebase
+```
+
+궁합 룰베이스를 카메라 없이 테스트하려면 preset mock 랜드마크를 켤 수 있습니다. 한 번만 export하면 두 사람의 임의 랜드마크 값이 자동으로 적용됩니다.
+
+```bash
+export ORACLE_MOCK_PAIR_LANDMARK_PRESET=1
+./run.sh --face-rulebase
+```
+
+직접 좌우 값을 바꿔 테스트하고 싶을 때는 아래처럼 실행할 수 있습니다.
+
+```bash
+./run.sh --mock-capture --face-rulebase \
+  --mock-pair-left-metrics '{"eye_width_ratio":0.19,"eye_spacing_ratio":0.28}' \
+  --mock-pair-right-metrics '{"mouth_width_ratio":0.43,"jaw_width_ratio":0.72}'
+```
+
 ## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB

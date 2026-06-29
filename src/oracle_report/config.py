@@ -19,6 +19,21 @@ _LLM_BASE_URL_ENV_NAMES = (
     "ORACLE_REPORT_LLM_BASE_URL",
 )
 
+_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON = (
+    '{"third_balance_error":0.018,"face_aspect_ratio":1.38,'
+    '"eye_width_ratio":0.19,"eye_spacing_ratio":0.28,"eye_tail_tilt":0.018,'
+    '"brow_eye_gap_ratio":0.078,"nose_length_ratio":0.25,"nose_width_ratio":0.19,'
+    '"mouth_width_ratio":0.34,"mouth_balance_delta":0.004,'
+    '"chin_length_ratio":0.21,"jaw_width_ratio":0.64}'
+)
+_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON = (
+    '{"third_balance_error":0.035,"face_aspect_ratio":1.24,'
+    '"eye_width_ratio":0.17,"eye_spacing_ratio":0.31,"eye_tail_tilt":-0.012,'
+    '"brow_eye_gap_ratio":0.092,"nose_length_ratio":0.22,"nose_width_ratio":0.17,'
+    '"mouth_width_ratio":0.43,"mouth_balance_delta":0.012,'
+    '"chin_length_ratio":0.18,"jaw_width_ratio":0.72}'
+)
+
 
 @dataclass(frozen=True)
 class CaptureConfig:
@@ -37,6 +52,8 @@ class CaptureConfig:
     camera_auto_detect: bool = True
     mock_capture_enabled: bool = False
     mock_landmark_metrics_json: str = ""
+    mock_pair_left_landmark_metrics_json: str = ""
+    mock_pair_right_landmark_metrics_json: str = ""
 
 
 @dataclass(frozen=True)
@@ -65,6 +82,16 @@ class AppConfig:
 
 def load_capture_config() -> CaptureConfig:
     _load_dotenv()
+    mock_pair_preset_enabled = _read_bool("ORACLE_MOCK_PAIR_LANDMARK_PRESET", False)
+    mock_capture_enabled = _read_bool("ORACLE_MOCK_CAPTURE_ENABLED", False)
+    pair_left_metrics_json = os.getenv("ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON", "")
+    pair_right_metrics_json = os.getenv("ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON", "")
+    if mock_pair_preset_enabled:
+        mock_capture_enabled = True
+        if pair_left_metrics_json.strip() == "":
+            pair_left_metrics_json = _MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON
+        if pair_right_metrics_json.strip() == "":
+            pair_right_metrics_json = _MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON
     result = CaptureConfig(
         camera_index=_read_int("ORACLE_CAMERA_INDEX", 0),
         frame_width=_read_int("ORACLE_FRAME_WIDTH", 640),
@@ -85,8 +112,10 @@ def load_capture_config() -> CaptureConfig:
             0.018,
         ),
         camera_auto_detect=_read_bool("ORACLE_CAMERA_AUTO_DETECT", True),
-        mock_capture_enabled=_read_bool("ORACLE_MOCK_CAPTURE_ENABLED", False),
+        mock_capture_enabled=mock_capture_enabled,
         mock_landmark_metrics_json=os.getenv("ORACLE_MOCK_LANDMARK_METRICS_JSON", ""),
+        mock_pair_left_landmark_metrics_json=pair_left_metrics_json,
+        mock_pair_right_landmark_metrics_json=pair_right_metrics_json,
     )
     return result
 

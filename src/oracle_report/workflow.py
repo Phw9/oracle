@@ -402,7 +402,7 @@ def run_compatibility_workflow(
     )
     if face_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
         pair_face_builder = _build_pair_rule_based_face_analysis
-        pair_face_args = (left_profile, right_profile, capture_artifact)
+        pair_face_args = (left_profile, right_profile, capture_artifact, mode)
     face_analysis = timing_recorder.run(
         "face_analysis_pair",
         pair_face_builder,
@@ -634,6 +634,7 @@ def _build_pair_rule_based_face_analysis(
     left_profile: BirthProfile,
     right_profile: BirthProfile,
     artifact: SequentialPairCaptureArtifact,
+    mode: str,
 ) -> _GeneratedText:
     from oracle_report.vision.physiognomy_text_variations import build_pair_face_payload
 
@@ -651,6 +652,7 @@ def _build_pair_rule_based_face_analysis(
             left_matches,
             right_matches,
         ),
+        mode=mode,
     )
     text = json.dumps(payload, ensure_ascii=False)
     result = _GeneratedText(text=text, error="")
@@ -1226,14 +1228,29 @@ def _run_sequential_pair_capture(
 ) -> SequentialPairCaptureArtifact:
     left_dir = output_dir / "person_1"
     right_dir = output_dir / "person_2"
-    left_artifact = capture_runner(capture_config, left_dir)
+    left_config = _pair_capture_config(capture_config, "left")
+    right_config = _pair_capture_config(capture_config, "right")
+    left_artifact = capture_runner(left_config, left_dir)
     if inter_capture_delay_seconds > 0.0:
         time.sleep(inter_capture_delay_seconds)
-    right_artifact = capture_runner(capture_config, right_dir)
+    right_artifact = capture_runner(right_config, right_dir)
     result = SequentialPairCaptureArtifact(
         left=left_artifact,
         right=right_artifact,
     )
+    return result
+
+
+def _pair_capture_config(capture_config: CaptureConfig, side: str) -> CaptureConfig:
+    result = capture_config
+    if capture_config.mock_capture_enabled:
+        metrics_json = ""
+        if side == "left":
+            metrics_json = capture_config.mock_pair_left_landmark_metrics_json
+        elif side == "right":
+            metrics_json = capture_config.mock_pair_right_landmark_metrics_json
+        if metrics_json.strip():
+            result = replace(capture_config, mock_landmark_metrics_json=metrics_json)
     return result
 
 
