@@ -199,6 +199,7 @@ Wrapper Options:
   --distributed-warmup     Warmup LLM KV cache on start
   --reasoning              Enable reasoning mode (think tags) for LLM
   --mock-capture           Enable mock camera capture mode using mock_face.jpg
+  --mock-landmark-preset   Enable built-in mock landmark metrics for face rulebase
   --mock-pair-preset       Enable built-in mock landmark metrics for compatibility
   --mock-pair-left-metrics JSON
                            Override first compatibility mock landmark metrics
@@ -273,6 +274,11 @@ parse_args() {
         ;;
       --mock-capture)
         RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        shift 1
+        ;;
+      --mock-landmark-preset)
+        RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        RUN_ORACLE_MOCK_LANDMARK_PRESET=1
         shift 1
         ;;
       --mock-pair-preset)
@@ -488,6 +494,7 @@ apply_run_config() {
   export ORACLE_SHOW_PREVIEW="$RUN_ORACLE_SHOW_PREVIEW"
   export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
   export ORACLE_MOCK_CAPTURE_ENABLED="${RUN_ORACLE_MOCK_CAPTURE_ENABLED:-${ORACLE_MOCK_CAPTURE_ENABLED:-0}}"
+  export ORACLE_MOCK_LANDMARK_PRESET="${RUN_ORACLE_MOCK_LANDMARK_PRESET:-${ORACLE_MOCK_LANDMARK_PRESET:-0}}"
   export ORACLE_MOCK_PAIR_LANDMARK_PRESET="${RUN_ORACLE_MOCK_PAIR_LANDMARK_PRESET:-${ORACLE_MOCK_PAIR_LANDMARK_PRESET:-0}}"
   export ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON="${RUN_ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON:-${ORACLE_MOCK_PAIR_LEFT_LANDMARK_METRICS_JSON:-}}"
   export ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON="${RUN_ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON:-${ORACLE_MOCK_PAIR_RIGHT_LANDMARK_METRICS_JSON:-}}"

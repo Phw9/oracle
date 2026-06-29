@@ -492,6 +492,15 @@ def test_pair_mock_preset_env_enables_default_landmark_metrics(
     assert "mouth_width_ratio" in result.mock_pair_right_landmark_metrics_json
 
 
+def test_mock_landmark_preset_env_enables_default_metrics(monkeypatch) -> None:
+    monkeypatch.setenv("ORACLE_MOCK_LANDMARK_PRESET", "1")
+
+    result = load_capture_config()
+
+    assert result.mock_capture_enabled is True
+    assert "eye_width_ratio" in result.mock_landmark_metrics_json
+
+
 def _build_test_manse_db(tmp_path: Path) -> Path:
     result = tmp_path / "unused-manse.sqlite"
     return result
