@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
@@ -12,6 +13,7 @@ from oracle_report.vision.physiognomy_rule_repository import (
     PhysiognomyRuleMatch,
     PhysiognomyRuleRepository,
 )
+from oracle_report.vision.physiognomy_text_variations import build_personal_face_payload
 
 
 _LANDMARK_MODE_NAME = "랜드마크 룰 기반"
@@ -270,6 +272,8 @@ class MediaPipeLandmarkQualityAnalyzer:
         landmark_context_text = "- 구조화된 관찰 컨텍스트 없음"
         landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
         face_analysis = ""
+        face_payload_json = ""
+        landmark_matches_json = ""
         if detection.face is None or not detection.landmarks:
             warnings.append("얼굴 랜드마크를 안정적으로 찾지 못했습니다.")
         else:
@@ -284,6 +288,11 @@ class MediaPipeLandmarkQualityAnalyzer:
             landmark_context_text = _format_prompt_observation_context(matches)
             landmark_rules_text = _format_prompt_rule_hints(matches)
             face_analysis = build_rule_based_face_analysis(metrics, matches)
+            face_payload_json = json.dumps(
+                build_personal_face_payload(matches, _face_payload_seed(metrics)),
+                ensure_ascii=False,
+            )
+            landmark_matches_json = _matches_to_json(matches)
 
         result = FaceQuality(
             ready=len(warnings) == 0,
@@ -297,6 +306,8 @@ class MediaPipeLandmarkQualityAnalyzer:
             landmark_context_text=landmark_context_text,
             landmark_rules_text=landmark_rules_text,
             face_analysis=face_analysis,
+            face_payload_json=face_payload_json,
+            landmark_matches_json=landmark_matches_json,
         )
         return result
 
@@ -327,6 +338,61 @@ def build_rule_based_face_analysis(
 - 캡처 신뢰도: 정면 점수 {metrics.frontality_score:.2f}, 랜드마크 배치 점수 {metrics.occlusion_score:.2f}
 - 참고 고지: {safety_note}
 """.strip()
+    return result
+
+
+def build_rule_based_face_payload_json(
+    metrics: LandmarkMetrics,
+    matches: tuple[PhysiognomyRuleMatch, ...] | None = None,
+) -> str:
+    repository = _physiognomy_rule_repository()
+    resolved_matches = matches
+    if resolved_matches is None:
+        resolved_matches = _evaluate_physio_rules(metrics, repository)
+    payload = build_personal_face_payload(
+        resolved_matches,
+        _face_payload_seed(metrics),
+    )
+    result = json.dumps(payload, ensure_ascii=False)
+    return result
+
+
+def rule_matches_to_json(matches: tuple[PhysiognomyRuleMatch, ...]) -> str:
+    result = _matches_to_json(matches)
+    return result
+
+
+def _matches_to_json(matches: tuple[PhysiognomyRuleMatch, ...]) -> str:
+    result = json.dumps(
+        [
+            {
+                "rule_id": match.rule_id,
+                "metric": match.metric,
+                "title": match.title,
+                "basis": match.basis,
+                "tag": match.tag,
+                "observation": match.observation,
+                "interpretation": match.interpretation,
+                "value": match.value,
+            }
+            for match in matches
+        ],
+        ensure_ascii=False,
+    )
+    return result
+
+
+def _face_payload_seed(metrics: LandmarkMetrics) -> str:
+    result = "|".join(
+        (
+            f"balance:{metrics.third_balance_error:.3f}",
+            f"face:{metrics.face_aspect_ratio:.3f}",
+            f"eye:{metrics.eye_width_ratio:.3f}:{metrics.eye_spacing_ratio:.3f}",
+            f"nose:{metrics.nose_length_ratio:.3f}:{metrics.nose_width_ratio:.3f}",
+            f"mouth:{metrics.mouth_width_ratio:.3f}:{metrics.mouth_balance_delta:.3f}",
+            f"jaw:{metrics.chin_length_ratio:.3f}:{metrics.jaw_width_ratio:.3f}",
+        ),
+    )
     return result
 
 

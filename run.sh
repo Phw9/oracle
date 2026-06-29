@@ -213,6 +213,8 @@ Wrapper Options:
   --distributed-warmup     Warmup LLM KV cache on start
   --reasoning              Enable reasoning mode (think tags) for LLM
   --mock-capture           Enable mock camera capture mode using mock_face.jpg
+  --face-rulebase          Generate face report text with landmark rules instead of LLM
+  --face-llm               Generate face report text with LLM (default)
   --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
   --slave-addrs ADDRS      Comma-separated list of slave addresses
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
@@ -280,6 +282,14 @@ parse_args() {
         ;;
       --mock-capture)
         RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        shift 1
+        ;;
+      --face-rulebase)
+        RUN_ORACLE_FACE_ANALYSIS_MODE=2
+        shift 1
+        ;;
+      --face-llm)
+        RUN_ORACLE_FACE_ANALYSIS_MODE=1
         shift 1
         ;;
       --debug)
@@ -446,6 +456,7 @@ apply_run_config() {
   export ORACLE_FACE_DETECTION_SCALE="$RUN_ORACLE_FACE_DETECTION_SCALE"
   export ORACLE_FACE_DETECTION_INTERVAL="$RUN_ORACLE_FACE_DETECTION_INTERVAL"
   export ORACLE_SHOW_PREVIEW="$RUN_ORACLE_SHOW_PREVIEW"
+  export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
   export ORACLE_MOCK_CAPTURE_ENABLED="${RUN_ORACLE_MOCK_CAPTURE_ENABLED:-${ORACLE_MOCK_CAPTURE_ENABLED:-0}}"
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"

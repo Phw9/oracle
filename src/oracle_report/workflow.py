@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable, Generic, Protocol, TypeVar
@@ -177,17 +178,28 @@ class _WorkflowTimingRecorder:
 def run_personal_workflow(
     workflow_input: PersonalWorkflowInput,
     capture_config: CaptureConfig,
-    face_llm_config: LlmConfig,
-    report_llm_config: LlmConfig,
-    manse_db_path: Path,
-    recommendation_db_path: Path,
+    face_llm_config: LlmConfig | None = None,
+    report_llm_config: LlmConfig | None = None,
+    manse_db_path: Path | None = None,
+    recommendation_db_path: Path | None = None,
     face_client: TextGenerator | None = None,
     report_client: TextGenerator | None = None,
     capture_runner=run_capture,
+    status_callback: Callable[[str, str, str], None] | None = None,
 ) -> PersonalWorkflowResult:
     del manse_db_path
-    face_analysis_mode = _validate_face_analysis_mode(
+    face_llm_config_was_provided = face_llm_config is not None
+    if report_llm_config is None:
+        if face_llm_config is None:
+            raise ValueError("report_llm_config is required.")
+        report_llm_config = face_llm_config
+    if face_llm_config is None:
+        face_llm_config = report_llm_config
+    if recommendation_db_path is None:
+        recommendation_db_path = Path("data/face_recommendations.sqlite")
+    face_analysis_mode = _resolve_face_analysis_mode(
         workflow_input.face_analysis_mode,
+        capture_config,
     )
     active_capture_config = replace(
         capture_config,
@@ -204,7 +216,12 @@ def run_personal_workflow(
     repository = ManseRepository()
     active_face_client = face_client
     if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE:
-        active_face_client = face_client or LlamaCppChatClient(face_llm_config)
+        if face_client is not None:
+            active_face_client = face_client
+        elif not face_llm_config_was_provided and report_client is not None:
+            active_face_client = report_client
+        else:
+            active_face_client = LlamaCppChatClient(face_llm_config)
     active_report_client = report_client or LlamaCppChatClient(report_llm_config)
 
     capture_artifact = None
@@ -259,6 +276,37 @@ def run_personal_workflow(
         manse_lookup,
     )
     saju_analysis_text = saju_analysis.text
+
+    if status_callback is not None:
+        mid_recommendations: tuple[FaceRecommendation, ...] = ()
+        if not workflow_input.skip_face:
+            mid_recommendations = recommend_faces(
+                recommendation_db_path,
+                workflow_input.target_gender,
+                manse_lookup.reading,
+            )
+        mid_markdown = _build_personal_report_json(
+            manse_lookup,
+            face_analysis_text,
+            saju_analysis_text,
+            mid_recommendations,
+            workflow_input.skip_face,
+        )
+        mid_html = render_personal_report_html(
+            profile,
+            manse_lookup,
+            face_analysis_text,
+            mid_recommendations,
+            mid_markdown,
+            True,
+            workflow_input.skip_face,
+        )
+        status_callback(
+            "generating",
+            "사주 풀이 완료! 관상 및 얼굴 추천 리포트를 추가로 분석하고 있습니다...",
+            mid_html,
+        )
+
     recommendations: tuple[FaceRecommendation, ...] = ()
     if not workflow_input.skip_face:
         recommendations = timing_recorder.run(
@@ -326,18 +374,27 @@ def run_personal_workflow(
 def run_compatibility_workflow(
     workflow_input: CompatibilityWorkflowInput,
     capture_config: CaptureConfig,
-    face_llm_config: LlmConfig,
-    report_llm_config: LlmConfig,
-    manse_db_path: Path,
+    face_llm_config: LlmConfig | None = None,
+    report_llm_config: LlmConfig | None = None,
+    manse_db_path: Path | None = None,
     face_client: TextGenerator | None = None,
     report_client: TextGenerator | None = None,
     capture_runner=run_capture,
     inter_capture_delay_seconds: float = 3.0,
+    status_callback: Callable[[str, str, str], None] | None = None,
 ) -> CompatibilityWorkflowResult:
     del manse_db_path
+    face_llm_config_was_provided = face_llm_config is not None
+    if report_llm_config is None:
+        if face_llm_config is None:
+            raise ValueError("report_llm_config is required.")
+        report_llm_config = face_llm_config
+    if face_llm_config is None:
+        face_llm_config = report_llm_config
     mode = _validate_mode(workflow_input.mode)
-    face_analysis_mode = _validate_face_analysis_mode(
+    face_analysis_mode = _resolve_face_analysis_mode(
         workflow_input.face_analysis_mode,
+        capture_config,
     )
     active_capture_config = replace(
         capture_config,
@@ -360,7 +417,12 @@ def run_compatibility_workflow(
     repository = ManseRepository()
     active_face_client = face_client
     if face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE:
-        active_face_client = face_client or LlamaCppChatClient(face_llm_config)
+        if face_client is not None:
+            active_face_client = face_client
+        elif not face_llm_config_was_provided and report_client is not None:
+            active_face_client = report_client
+        else:
+            active_face_client = LlamaCppChatClient(face_llm_config)
     active_report_client = report_client or LlamaCppChatClient(report_llm_config)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -408,11 +470,34 @@ def run_compatibility_workflow(
         left_manse,
         right_manse,
     )
+    saju_analysis_text = saju_analysis.text
+
+    if status_callback is not None:
+        mid_markdown = _build_compatibility_report_json(
+            face_analysis.text,
+            saju_analysis_text,
+        )
+        mid_html = render_compatibility_report_html(
+            left_profile,
+            right_profile,
+            mode,
+            left_manse,
+            right_manse,
+            face_analysis.text,
+            mid_markdown,
+            True,
+        )
+        status_callback(
+            "generating",
+            "사주 궁합 풀이 완료! 관상 궁합을 추가로 분석하고 있습니다...",
+            mid_html,
+        )
+
     markdown = timing_recorder.run(
         "final_report",
         _build_compatibility_report_json,
         face_analysis.text,
-        saju_analysis.text,
+        saju_analysis_text,
     )
     report_html = timing_recorder.run(
         "render_report_html",
@@ -541,10 +626,7 @@ def _build_single_face_analysis(
             distributed_app_config,
         )
     elif face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
-        text = artifact.face_analysis or artifact.quality.face_analysis
-        if text == "":
-            text = "## 관상정보\n- 랜드마크 룰 기반 관상정보를 생성하지 못했습니다."
-        result = _GeneratedText(text=text, error="")
+        result = _build_single_rule_based_face_analysis(profile, artifact)
     else:
         if client is None:
             raise ValueError("face analysis client is required for mode 1.")
@@ -566,6 +648,30 @@ def _build_single_face_analysis(
             result,
             "personal_face_analysis",
         )
+    return result
+
+
+def _build_single_rule_based_face_analysis(
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+) -> _GeneratedText:
+    from oracle_report.vision.physiognomy_text_variations import build_personal_face_payload
+
+    matches = _quality_rule_matches(artifact.quality)
+    text = ""
+    error = ""
+    if matches:
+        payload = build_personal_face_payload(
+            matches,
+            _single_face_seed(profile, artifact, matches),
+        )
+        text = json.dumps(payload, ensure_ascii=False)
+    else:
+        text = artifact.quality.face_payload_json.strip()
+    if text == "":
+        text = artifact.face_analysis.strip()
+        error = "rule-based face payload is unavailable; using capture face analysis memo"
+    result = _GeneratedText(text=text, error=error)
     return result
 
 
@@ -591,30 +697,11 @@ def _build_pair_face_analysis(
             distributed_app_config,
         )
     elif face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
-        left_analysis = _build_single_face_analysis(
-            client,
+        result = _build_pair_rule_based_face_analysis(
             left_profile,
-            artifact.left,
-            face_analysis_mode,
-        )
-        right_analysis = _build_single_face_analysis(
-            client,
             right_profile,
-            artifact.right,
-            face_analysis_mode,
+            artifact,
         )
-        error = ""
-        if left_analysis.error or right_analysis.error:
-            error = " / ".join(
-                item for item in (left_analysis.error, right_analysis.error) if item
-            )
-        text = "\n\n".join(
-            (
-                f"## 첫 번째 사람 관상정보\n{left_analysis.text}",
-                f"## 두 번째 사람 관상정보\n{right_analysis.text}",
-            ),
-        )
-        result = _GeneratedText(text=text, error=error)
     else:
         result = _build_couple_face_analysis(
             client,
@@ -665,6 +752,87 @@ def _build_couple_face_analysis(
     )
     return result
 
+def _build_pair_rule_based_face_analysis(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+) -> _GeneratedText:
+    from oracle_report.vision.physiognomy_text_variations import build_pair_face_payload
+
+    left_matches = _quality_rule_matches(artifact.left.quality)
+    right_matches = _quality_rule_matches(artifact.right.quality)
+    payload = build_pair_face_payload(
+        left_matches,
+        right_matches,
+        left_profile.name,
+        right_profile.name,
+        _pair_face_seed(
+            left_profile,
+            right_profile,
+            artifact,
+            left_matches,
+            right_matches,
+        ),
+    )
+    text = json.dumps(payload, ensure_ascii=False)
+    result = _GeneratedText(text=text, error="")
+    return result
+
+
+def _quality_rule_matches(quality) -> tuple[Any, ...]:
+    from oracle_report.vision.physiognomy_rule_repository import PhysiognomyRuleMatch
+
+    raw_text = getattr(quality, "landmark_matches_json", "").strip()
+    rows: list[Any] = []
+    if raw_text != "":
+        try:
+            loaded = json.loads(raw_text)
+        except json.JSONDecodeError:
+            loaded = []
+        if isinstance(loaded, list):
+            rows = loaded
+    result = tuple(
+        PhysiognomyRuleMatch(
+            rule_id=str(row.get("rule_id", "")),
+            metric=str(row.get("metric", "")),
+            title=str(row.get("title", "")),
+            basis=str(row.get("basis", "")),
+            tag=str(row.get("tag", "")),
+            observation=str(row.get("observation", "")),
+            interpretation=str(row.get("interpretation", "")),
+            value=float(row.get("value", 0.0)),
+        )
+        for row in rows
+        if isinstance(row, dict)
+    )
+    return result
+
+
+def _pair_face_seed(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+    left_matches: tuple[Any, ...],
+    right_matches: tuple[Any, ...],
+) -> str:
+    left_tags = ",".join(getattr(match, "tag", "") for match in left_matches[:6])
+    right_tags = ",".join(getattr(match, "tag", "") for match in right_matches[:6])
+    result = (
+        f"{left_profile.name}:{right_profile.name}:"
+        f"{artifact.left.captured_at.isoformat()}:{artifact.right.captured_at.isoformat()}:"
+        f"{left_tags}:{right_tags}"
+    )
+    return result
+
+
+def _single_face_seed(
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+    matches: tuple[Any, ...],
+) -> str:
+    tags = ",".join(getattr(match, "tag", "") for match in matches[:8])
+    result = f"{profile.name}:{artifact.captured_at.isoformat()}:{tags}"
+    return result
 
 def _face_llm_image_path(artifact: CaptureArtifact) -> Path:
     result = artifact.image_path
@@ -1899,6 +2067,28 @@ def _validate_face_analysis_mode(mode: int | str) -> int:
     result = int(mode)
     if result not in FACE_ANALYSIS_MODES:
         raise ValueError("관상 분석 모드는 1 또는 2여야 합니다.")
+    return result
+
+
+def _resolve_face_analysis_mode(
+    workflow_mode: int | str,
+    capture_config: CaptureConfig,
+) -> int:
+    configured_mode = os.getenv("ORACLE_FACE_ANALYSIS_MODE", "").strip()
+    mode: int | str = workflow_mode
+    if configured_mode != "":
+        mode = configured_mode
+    elif (
+        int(workflow_mode) == FACE_ANALYSIS_MODE_LLM_IMAGE
+        and getattr(
+            capture_config,
+            "face_analysis_mode",
+            FACE_ANALYSIS_MODE_LLM_IMAGE,
+        )
+        != FACE_ANALYSIS_MODE_LLM_IMAGE
+    ):
+        mode = capture_config.face_analysis_mode
+    result = _validate_face_analysis_mode(mode)
     return result
 
 

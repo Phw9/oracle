@@ -165,6 +165,7 @@ def test_camera_candidate_indices_can_disable_auto_detect() -> None:
 def test_open_camera_falls_back_to_next_device(monkeypatch) -> None:
     fake_cv2 = FakeCv2Open({1})
 
+    monkeypatch.setattr(camera.os, "name", "posix")
     monkeypatch.setattr(camera, "_import_cv2", lambda: fake_cv2)
 
     cv2, capture = camera.open_camera(_capture_config())
@@ -178,6 +179,7 @@ def test_open_camera_falls_back_to_next_device(monkeypatch) -> None:
 def test_open_camera_reports_permission_hint_for_inaccessible_video_devices(monkeypatch) -> None:
     fake_cv2 = FakeCv2Open(set())
 
+    monkeypatch.setattr(camera.os, "name", "posix")
     monkeypatch.setattr(camera, "_import_cv2", lambda: fake_cv2)
     monkeypatch.setattr(camera, "_discover_video_device_paths", lambda: ["/dev/video0"])
     monkeypatch.setattr(camera.os, "access", lambda path, mode: False)

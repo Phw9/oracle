@@ -30,7 +30,7 @@ def test_distributed_prompt_split_metadata() -> None:
         values=values,
         is_metadata=True
     )
-    assert "face_subtitle" in rendered_face.prefix
+    assert "face_subtitle" in rendered_face.body
     assert '"face_blocks":' not in rendered_face.prefix
 
 
@@ -51,9 +51,9 @@ def test_distributed_prompt_split_category() -> None:
         target_category="재물운과 적성"
     )
     
-    assert "재물운과 적성" in rendered.prefix
-    assert "category" in rendered.prefix
-    assert "body" in rendered.prefix
+    assert "재물운과 적성" in rendered.body
+    assert "category" in rendered.body
+    assert "body" in rendered.body
     assert '"saju_blocks":' not in rendered.prefix
     assert '"essence":' not in rendered.prefix
     assert "[분석 대상 카테고리]" in rendered.body
