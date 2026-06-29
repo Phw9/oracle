@@ -72,6 +72,13 @@ def render_prompt_template(name: str, values: Mapping[str, object]) -> RenderedP
     templates = _load_prompt_templates(_prompt_templates_path())
     template_parts = _template_parts(templates, name)
     string_values = {key: str(value) for key, value in values.items()}
+    for key, default_value in (
+        ("landmark_metrics_text", "- 랜드마크 측정값 없음"),
+        ("landmark_context_text", "- 구조화된 관찰 컨텍스트 없음"),
+        ("landmark_rules_text", "- 랜드마크 규칙 해석 힌트 없음"),
+    ):
+        if key not in string_values:
+            string_values[key] = default_value
     prefix = Template(template_parts.prefix).substitute(string_values).strip()
     body = Template(template_parts.body_template).substitute(string_values).strip()
     result = RenderedPrompt(
@@ -218,3 +225,91 @@ def _template_slot_id(name: str, configured_value: object) -> int | None:
     if configured_value is not None:
         result = int(configured_value)
     return result
+
+
+def render_distributed_prompt_template(
+    name: str,
+    values: Mapping[str, object],
+    target_category: str | None = None,
+    is_metadata: bool = False,
+) -> RenderedPrompt:
+    rendered = render_prompt_template(name, values)
+    if not (target_category or is_metadata):
+        return rendered
+
+    prefix = rendered.prefix
+    schema_start = prefix.find("[출력 JSON 스키마]")
+    
+    # 1. Isolate the static system rules before the schema block
+    prefix_before_schema = prefix[:schema_start] if schema_start != -1 else prefix
+    
+    # 2. Extract static common body (saju birth profile / data)
+    common_body = rendered.body
+    
+    # 3. Unify static parts as the new prefix so that they are 100% identical in token sequence
+    unified_common_prefix = f"{prefix_before_schema.strip()}\n\n{common_body.strip()}"
+    
+    # 4. Construct category-specific suffix instructions to go into the body segment
+    suffix_instructions = ""
+    if is_metadata:
+        if name == "saju_reading":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. saju_blocks 필드는 절대 포함하지 마라.
+{
+  "essence": "이 사주의 전체적인 흐름과 삶의 방향성을 3~4문장의 풍부한 해설 단락(약 150~200자)으로 요약한 내용",
+  "element_note": "[오행 분포]의 강한 기운과 보완이 필요한 기운이 생활 리듬에 어떻게 드러나는지 1-2문장으로 설명",
+  "saju_subtitle": "사주 섹션 핵심을 8-16자 안팎의 짧은 문구",
+  "tags": ["태그1", "태그2", "태그3", "태그4"],
+  "disclaimer": "참고용 엔터테인먼트 리포트라는 짧은 고지"
+}"""
+        elif name == "personal_face_analysis":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. face_blocks 필드는 절대 포함하지 마라.
+{
+  "face_subtitle": "얼굴 관찰 섹션 오른쪽 짧은 키워드",
+  "face_summary": "관상 관찰을 1문장으로 요약"
+}"""
+        elif name == "saju_reading_couple":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. saju_blocks 필드는 절대 포함하지 마라.
+{
+  "essence": "두 사람의 사주 궁합 핵심 요약",
+  "saju_subtitle": "사주 섹션 짧은 부제",
+  "synthesis_title": "사주 궁합 종합 제목",
+  "synthesis_body": "두 사람의 사주 흐름을 종합한 설명",
+  "action_title": "관계를 좋게 만드는 행동 제안 제목",
+  "action_body": "실천 가능한 행동 제안",
+  "tags": ["태그1", "태그2", "태그3", "태그4"],
+  "disclaimer": "참고용 엔터테인먼트 리포트라는 짧은 고지"
+}"""
+        elif name == "face_analysis_copule":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. pair_blocks 필드는 절대 포함하지 마라.
+{
+  "pair_subtitle": "관상 기반 관계 분위기 부제",
+  "face_summary": "두 사람의 관상 관찰을 1문장으로 요약"
+}"""
+        else:
+            suffix_instructions = "[출력 JSON 스키마]\n오직 요약 정보와 메타데이터 필드들만 JSON으로 채워서 출력하고, 개별 상세 블록 필드는 포함하지 마십시오."
+    else:
+        suffix_instructions = f"""[출력 JSON 스키마]
+당신은 오직 '{target_category}' 카테고리에 대한 분석만 수행합니다.
+다른 메타데이터 필드나 다른 카테고리 블록은 절대 포함하지 말고, 오직 아래 포맷의 단일 JSON 객체 하나만 출력해야 합니다.
+{{
+  "category": "{target_category}",
+  "title": "이 분석을 대표하는 호기심을 자극하면서도 핵심을 찌르는 제목",
+  "summary": "쉬운 한국어 해요체의 짧은 요약 문장",
+  "body": "이 분석에 대한 구체적이고 현실적인 설명 본문"
+}}
+
+[분석 대상 카테고리]
+- 카테고리: {target_category}"""
+
+    # We return the unified static content as the prefix, and the variable parts as the suffix body.
+    # When concatenated by the LlamaCppChatClient, the prefix sequence remains 100% identical.
+    return RenderedPrompt(
+        name=f"{rendered.name}_split",
+        prefix=unified_common_prefix.strip(),
+        body=suffix_instructions.strip(),
+        slot_id=None,
+    )

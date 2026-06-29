@@ -13,17 +13,13 @@ from oracle_report.config import (
 )
 from oracle_report.llm import LlamaCppChatClient
 from oracle_report.models import BirthProfile
-from oracle_report.physiognomy import FaceReadingInput
 from oracle_report.prompt_templates import (
     list_prompt_template_info,
     render_debug_prompt_template,
 )
 from oracle_report.recommender import format_recommendations, recommend_faces
 from oracle_report.report import (
-    build_couple_face_analysis_prompt,
     build_couple_saju_reading_prompt,
-    build_compatibility_face_analysis_prompt,
-    build_personal_face_analysis_prompt,
     build_saju_reading_prompt,
 )
 from oracle_report.saju.engine import SajuReading
@@ -50,9 +46,16 @@ _TOKEN_TABLE_HEADERS = (
 )
 
 
+def _apply_temperature_override(args: argparse.Namespace) -> None:
+    if getattr(args, "temperature", None) is not None:
+        os.environ["ORACLE_LLM_TEMPERATURE"] = str(args.temperature)
+        os.environ["ORACLE_REPORT_LLM_TEMPERATURE"] = str(args.temperature)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    _apply_temperature_override(args)
     result = 0
     try:
         if args.command == "capture":
@@ -90,6 +93,8 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="0.0.0.0")
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--debug", action="store_true")
+    serve.add_argument("--distributed-warmup", action="store_true")
+    serve.add_argument("--temperature", type=float, help="LLM generation temperature")
 
     prompt = subparsers.add_parser("prompt", help="print workflow prompt inputs")
     _add_prompt_args(prompt)
@@ -121,7 +126,6 @@ def _add_capture_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--camera-index", type=int)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--no-preview", action="store_true")
-    parser.add_argument("--face-analysis-mode", type=int, choices=(1, 2))
 
 
 def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
@@ -155,6 +159,7 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--face-analysis-file", type=Path)
     parser.add_argument("--recommendation-text", default="")
     parser.add_argument("--recommendation-file", type=Path)
+    parser.add_argument("--temperature", type=float, help="LLM generation temperature")
 
 
 def _run_capture_command(args: argparse.Namespace) -> int:
@@ -167,6 +172,9 @@ def _run_capture_command(args: argparse.Namespace) -> int:
 
 def _run_serve_command(args: argparse.Namespace) -> int:
     from oracle_report.web import create_app
+
+    if args.distributed_warmup:
+        os.environ["ORACLE_DISTRIBUTED_WARMUP"] = "1"
 
     app = create_app()
     app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
@@ -189,10 +197,8 @@ def _run_prompt_result_command(args: argparse.Namespace) -> int:
         "compatibility-face-analysis",
         "face-analysis-copule",
     ):
-        output_text = LlamaCppChatClient(load_face_llm_config()).generate(
-            prompt_text,
-            image_path=args.image,
-        )
+        # Landmark rules face analysis does not require LLM generation.
+        output_text = prompt_text
     elif args.target in (
         "saju-reading",
         "saju-reading-couple",
@@ -353,37 +359,47 @@ def _override_capture_config(args: argparse.Namespace):
     camera_index = config.camera_index if args.camera_index is None else args.camera_index
     output_dir = config.output_dir if args.output_dir is None else args.output_dir
     show_preview = config.show_preview and not args.no_preview
-    face_analysis_mode = (
-        config.face_analysis_mode
-        if args.face_analysis_mode is None
-        else args.face_analysis_mode
-    )
     result = replace(
         config,
         camera_index=camera_index,
         output_dir=output_dir,
         show_preview=show_preview,
-        face_analysis_mode=face_analysis_mode,
     )
     return result
+
+
+def _run_landmark_analysis_on_image(image_path: Path | None) -> str:
+    if image_path is None or not image_path.exists():
+        return "## 관상정보\n- 오류: 이미지 경로가 지정되지 않았거나 파일이 존재하지 않습니다."
+    
+    import cv2
+    frame = cv2.imread(str(image_path))
+    if frame is None:
+        return "## 관상정보\n- 오류: 이미지를 로드할 수 없습니다."
+        
+    from oracle_report.config import load_capture_config
+    from oracle_report.vision.camera import build_capture_processors
+    
+    config = load_capture_config()
+    detector, analyzer = build_capture_processors(config)
+    
+    faces = detector.detect(frame)
+    if not faces:
+        return "## 관상정보\n- 오류: 얼굴을 감지하지 못했습니다."
+        
+    face = faces[0]
+    quality = analyzer.analyze(frame, face)
+    if not quality.ready:
+        return "## 관상정보\n- 오류: 랜드마크 분석을 위한 이미지 품질이 충분하지 않습니다."
+        
+    return quality.face_analysis
 
 
 def _build_prompt_text(args: argparse.Namespace) -> str:
     profile = _build_prompt_birth_profile(args)
     result = ""
-    if args.target == "personal-face-analysis":
-        face_input = FaceReadingInput(image_path=args.image, quality=None)
-        result = build_personal_face_analysis_prompt(profile, face_input)
-    elif args.target == "compatibility-face-analysis":
-        face_input = FaceReadingInput(image_path=args.image, quality=None)
-        result = build_compatibility_face_analysis_prompt(
-            profile,
-            face_input,
-            args.person_label,
-            args.mode,
-        )
-    elif args.target == "face-analysis-copule":
-        result = _build_couple_face_analysis_prompt_text(args, profile)
+    if args.target in ("personal-face-analysis", "compatibility-face-analysis", "face-analysis-copule"):
+        result = _run_landmark_analysis_on_image(args.image)
     elif args.target == "saju-reading":
         result = _lookup_manse(args, profile).formatted_text
     elif args.target == "saju-reading-couple":
@@ -467,21 +483,6 @@ def _build_personal_final_debug_prompt_text(
     return result
 
 
-def _build_couple_face_analysis_prompt_text(
-    args: argparse.Namespace,
-    left_profile: BirthProfile,
-) -> str:
-    right_profile = _build_right_prompt_birth_profile(args)
-    left_input = FaceReadingInput(image_path=args.image, quality=None)
-    right_input = FaceReadingInput(image_path=args.image, quality=None)
-    result = build_couple_face_analysis_prompt(
-        left_profile,
-        right_profile,
-        args.mode,
-        left_input,
-        right_input,
-    )
-    return result
 
 
 def _build_couple_saju_reading_prompt_text(args: argparse.Namespace) -> str:
@@ -608,3 +609,8 @@ def _normalize_birth_time(birth_time: str) -> tuple[str, bool]:
 def _parse_birth_datetime(birth_date: str, birth_time: str) -> datetime:
     result = datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
     return result
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())

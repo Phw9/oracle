@@ -364,20 +364,32 @@ install_deps() {
   if [[ "$python_env_mode" == "uv" ]]; then
     uv pip install --upgrade pip setuptools wheel
     if python -c 'import cv2' >/dev/null 2>&1; then
-      log "OpenCV already importable; installing quality/test deps with uv"
-      uv pip install -e ".[quality,test]"
+      log "OpenCV already importable; trying to install quality/test deps with uv"
+      if ! uv pip install -e ".[quality,test]"; then
+        log "Warning: mediapipe (quality extra) installation failed. Trying fallback to test-only deps..."
+        uv pip install -e ".[test]"
+      fi
     else
-      log "OpenCV not importable; installing camera/quality/test deps with uv"
-      uv pip install -e ".[camera,quality,test]"
+      log "OpenCV not importable; trying to install camera/quality/test deps with uv"
+      if ! uv pip install -e ".[camera,quality,test]"; then
+        log "Warning: mediapipe (quality extra) installation failed. Trying fallback to camera/test deps..."
+        uv pip install -e ".[camera,test]"
+      fi
     fi
   else
     python -m pip install --upgrade pip setuptools wheel
     if python -c 'import cv2' >/dev/null 2>&1; then
-      log "OpenCV already importable; installing quality/test deps with pip"
-      python -m pip install -e ".[quality,test]"
+      log "OpenCV already importable; trying to install quality/test deps with pip"
+      if ! python -m pip install -e ".[quality,test]"; then
+        log "Warning: mediapipe (quality extra) installation failed. Trying fallback to test-only deps..."
+        python -m pip install -e ".[test]"
+      fi
     else
-      log "OpenCV not importable; installing camera/quality/test deps with pip"
-      python -m pip install -e ".[camera,quality,test]"
+      log "OpenCV not importable; trying to install camera/quality/test deps with pip"
+      if ! python -m pip install -e ".[camera,quality,test]"; then
+        log "Warning: mediapipe (quality extra) installation failed. Trying fallback to camera/test deps..."
+        python -m pip install -e ".[camera,test]"
+      fi
     fi
   fi
 }
@@ -423,7 +435,24 @@ ensure_llama_cpp() {
   fi
 
   command_exists git || fail "git is required to clone llama.cpp"
-  command_exists cmake || fail "cmake is required to build llama.cpp"
+
+  if ! command_exists cmake; then
+    log "cmake is missing. Trying to install cmake via pip inside the virtual environment..."
+    if [[ "$python_env_mode" == "uv" ]]; then
+      uv pip install cmake || true
+    else
+      python -m pip install cmake || true
+    fi
+    if [[ -f "$VENV_DIR/bin/cmake" ]]; then
+      export PATH="$VENV_DIR/bin:$PATH"
+    elif [[ -f "$VIRTUAL_ENV/bin/cmake" ]]; then
+      export PATH="$VIRTUAL_ENV/bin:$PATH"
+    elif [[ -n "${CONDA_PREFIX:-}" && -f "$CONDA_PREFIX/bin/cmake" ]]; then
+      export PATH="$CONDA_PREFIX/bin:$PATH"
+    fi
+  fi
+
+  command_exists cmake || fail "cmake is required to build llama.cpp. Please install cmake (e.g., sudo apt-get install cmake) and try again."
 
   mkdir -p "$(dirname "$LLAMA_CPP_DIR")"
   if [[ ! -d "$LLAMA_CPP_DIR/.git" ]]; then
@@ -732,6 +761,7 @@ main() {
     python3-pip \
     python3-opencv \
     opencv-data \
+    acl \
     libatlas-base-dev \
     git \
     cmake \

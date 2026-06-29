@@ -17,8 +17,6 @@ from oracle_report.vision.quality import OpenCvFaceQualityAnalyzer
 
 _GSTREAMER_BACKEND_NAME = "GSTREAMER"
 _VIDEO_CAPTURE_BUFFER_SIZE = 1
-_FACE_ANALYSIS_MODE_LLM_IMAGE = 1
-_FACE_ANALYSIS_MODE_LANDMARK_RULE = 2
 _OVERLAY_HEIGHT_PX = 54
 _OVERLAY_TEXT_POSITION = (24, 14)
 _OVERLAY_TEXT_BASELINE_POSITION = (24, 36)
@@ -36,11 +34,65 @@ _KOREAN_FONT_PATHS = (
 
 def open_camera(config: CaptureConfig) -> tuple[Any, Any]:
     cv2 = _import_cv2()
-    capture = _open_video_capture(cv2, config.camera_index)
-    if not capture.isOpened():
-        raise RuntimeError(f"failed to open camera index {config.camera_index}")
+    selected_index = None
+    capture = None
+    attempted_indices = []
+    for camera_index in _camera_candidate_indices(config):
+        attempted_indices.append(camera_index)
+        candidate = _open_video_capture(cv2, camera_index)
+        if candidate.isOpened():
+            capture = candidate
+            selected_index = camera_index
+            break
+        _release_capture(candidate)
+    if capture is None or selected_index is None:
+        access_hint = _build_camera_access_hint()
+        raise RuntimeError(
+            "failed to open camera device; "
+            f"attempted indices: {', '.join(str(index) for index in attempted_indices)}"
+            f"{access_hint}"
+        )
     _configure_capture(cv2, capture, config)
     result = (cv2, capture)
+    return result
+
+
+def _camera_candidate_indices(config: CaptureConfig, max_auto_index: int = 5) -> tuple[int, ...]:
+    preferred = config.camera_index
+    if not config.camera_auto_detect:
+        return (preferred,)
+    candidates = []
+    if preferred >= 0:
+        candidates.append(preferred)
+    for camera_index in range(0, max_auto_index + 1):
+        if camera_index not in candidates:
+            candidates.append(camera_index)
+    if preferred < 0:
+        candidates.insert(0, preferred)
+    return tuple(candidates)
+
+
+def _release_capture(capture: Any) -> None:
+    if hasattr(capture, "release"):
+        capture.release()
+
+
+def _build_camera_access_hint() -> str:
+    if os.name != "posix":
+        return ""
+    inaccessible_devices = [
+        path for path in _discover_video_device_paths() if not os.access(path, os.R_OK | os.W_OK)
+    ]
+    if not inaccessible_devices:
+        return ""
+    return (
+        "; detected video devices but the current user cannot access them: "
+        f"{', '.join(inaccessible_devices)}; check video group membership or device permissions"
+    )
+
+
+def _discover_video_device_paths() -> list[str]:
+    result = sorted(str(path) for path in Path("/dev").glob("video*"))
     return result
 
 
@@ -93,23 +145,18 @@ def build_default_quality_analyzer(
 
 
 def build_capture_processors(config: CaptureConfig):
-    if config.face_analysis_mode == _FACE_ANALYSIS_MODE_LANDMARK_RULE:
-        from oracle_report.vision.landmarks import (
-            MediaPipeLandmarkFaceDetector,
-            MediaPipeLandmarkQualityAnalyzer,
-        )
+    from oracle_report.vision.landmarks import (
+        MediaPipeLandmarkFaceDetector,
+        MediaPipeLandmarkQualityAnalyzer,
+    )
 
-        detector = MediaPipeLandmarkFaceDetector(
-            min_size_px=config.face_min_size_px,
-            detection_scale=config.face_detection_scale,
-            detection_interval=config.face_detection_interval,
-        )
-        analyzer = MediaPipeLandmarkQualityAnalyzer(detector)
-        result = (detector, analyzer)
-    else:
-        detector = build_default_face_detector(config)
-        analyzer = build_default_quality_analyzer(config)
-        result = (detector, analyzer)
+    detector = MediaPipeLandmarkFaceDetector(
+        min_size_px=config.face_min_size_px,
+        detection_scale=config.face_detection_scale,
+        detection_interval=config.face_detection_interval,
+    )
+    analyzer = MediaPipeLandmarkQualityAnalyzer(detector)
+    result = (detector, analyzer)
     return result
 
 

@@ -8,6 +8,8 @@ cd "$ROOT_DIR"
 RUN_ORACLE_APP_HOST="${RUN_ORACLE_APP_HOST:-0.0.0.0}"
 RUN_ORACLE_APP_PORT="${RUN_ORACLE_APP_PORT:-8501}"
 RUN_ORACLE_APP_DEBUG="${RUN_ORACLE_APP_DEBUG:-0}"
+RUN_ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}"
+RUN_ORACLE_REASONING="${RUN_ORACLE_REASONING:-0}"
 
 RUN_ORACLE_LLM_BASE_URL="${RUN_ORACLE_LLM_BASE_URL:-http://127.0.0.1:8080/v1}"
 RUN_ORACLE_LLM_MODEL="${RUN_ORACLE_LLM_MODEL:-local-model}"
@@ -58,6 +60,7 @@ LLAMA_THREADS=""
 LLAMA_NGL=""
 LLAMA_BATCH_SIZE=""
 LLAMA_EXTRA_ARGS=""
+declare -a LLAMA_EXTRA_ARGS_ARR=()
 PYTHON_ENV="auto"
 POSITIONAL_ARGS=()
 RUN_LLAMA_CONTEXT_SIZE_EXPLICIT=0
@@ -87,6 +90,29 @@ activate_repo_venv() {
     # shellcheck source=/dev/null
     source "$VENV_DIR/Scripts/activate"
     return 0
+  fi
+  return 1
+}
+
+is_linux() {
+  [[ "$(uname -s)" == "Linux" ]]
+}
+
+run_with_elevation() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return
+  fi
+  if ! command_exists sudo; then
+    return 1
+  fi
+  if sudo -n true >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+  if [[ -t 0 ]]; then
+    sudo "$@"
+    return
   fi
   return 1
 }
@@ -176,12 +202,19 @@ Wrapper Options:
   -m, --model-path PATH    Path to the GGUF model file
   -p, --port PORT          Port for the Flask app (default: 8501)
   --host HOST              Host for the Flask app (default: 0.0.0.0)
+  --debug                  Enable debug mode for Flask app and logging
   -t, --threads THREADS    Number of threads for llama.cpp server
   -ngl, --ngl LAYERS       GPU layers to offload (default: CPU; set >0 for GPU)
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
-  --face-analysis-mode M   Face analysis mode (1 = LLM, 2 = landmarks)
+  --distributed-role ROLE  Distributed role: master, slave, or hybrid
+  --distributed-split      Split prompts for parallel execution
+  --distributed-warmup     Warmup LLM KV cache on start
+  --reasoning              Enable reasoning mode (think tags) for LLM
+  --mock-capture           Enable mock camera capture mode using mock_face.jpg
+  --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
+  --slave-addrs ADDRS      Comma-separated list of slave addresses
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
   --llama-dir DIR          Path to llama.cpp repository
   --extra-llama-args ARGS  Additional raw command-line arguments for llama-server
@@ -229,8 +262,41 @@ parse_args() {
         LLAMA_BATCH_SIZE="$2"
         shift 2
         ;;
-      --face-analysis-mode)
-        RUN_ORACLE_FACE_ANALYSIS_MODE="$2"
+      --distributed-role)
+        RUN_ORACLE_DISTRIBUTED_ROLE="$2"
+        shift 2
+        ;;
+      --distributed-split)
+        RUN_ORACLE_DISTRIBUTED_SPLIT=1
+        shift 1
+        ;;
+      --distributed-warmup)
+        RUN_ORACLE_DISTRIBUTED_WARMUP=1
+        shift 1
+        ;;
+      --reasoning)
+        RUN_ORACLE_REASONING=1
+        shift 1
+        ;;
+      --mock-capture)
+        RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
+        shift 1
+        ;;
+      --debug)
+        RUN_ORACLE_APP_DEBUG=1
+        shift 1
+        ;;
+      --master-addr)
+        RUN_ORACLE_MASTER_ADDR="$2"
+        shift 2
+        ;;
+      --slave-addrs)
+        RUN_ORACLE_SLAVE_ADDRS="$2"
+        shift 2
+        ;;
+      --temperature)
+        export ORACLE_LLM_TEMPERATURE="$2"
+        export ORACLE_REPORT_LLM_TEMPERATURE="$2"
         shift 2
         ;;
       --python-env)
@@ -242,7 +308,8 @@ parse_args() {
         shift 2
         ;;
       --extra-llama-args)
-        LLAMA_EXTRA_ARGS="$2"
+        # Parse into array to handle embedded spaces correctly
+        read -r -a LLAMA_EXTRA_ARGS_ARR <<< "$2"
         shift 2
         ;;
       *)
@@ -343,6 +410,11 @@ apply_run_config() {
   export ORACLE_LLM_MODEL="$RUN_ORACLE_LLM_MODEL"
   export ORACLE_LLM_TIMEOUT_SECONDS="$RUN_ORACLE_LLM_TIMEOUT_SECONDS"
 
+  local default_max_tokens=1800
+  if [[ "${RUN_ORACLE_REASONING:-${ORACLE_REASONING:-0}}" == "1" ]]; then
+    default_max_tokens=4096
+  fi
+
   export ORACLE_FACE_LLM_BASE_URL="$RUN_ORACLE_LLM_BASE_URL"
   export ORACLE_FACE_LLM_MODEL="$RUN_ORACLE_FACE_LLM_MODEL"
   export ORACLE_FACE_LLM_SEND_IMAGE="$RUN_ORACLE_FACE_LLM_SEND_IMAGE"
@@ -352,7 +424,7 @@ apply_run_config() {
   export ORACLE_REPORT_LLM_MODEL="$RUN_ORACLE_REPORT_LLM_MODEL"
   export ORACLE_REPORT_LLM_TIMEOUT_SECONDS="$RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS"
   export ORACLE_REPORT_LLM_SEND_IMAGE="$RUN_ORACLE_REPORT_LLM_SEND_IMAGE"
-  export ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="${ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS:-1800}"
+  export ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="${ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS:-$default_max_tokens}"
   export ORACLE_LLM_PROMPT_CACHE="${ORACLE_LLM_PROMPT_CACHE:-0}"
 
   export ORACLE_START_LLAMA_SERVER="$RUN_ORACLE_START_LLAMA_SERVER"
@@ -374,12 +446,89 @@ apply_run_config() {
   export ORACLE_FACE_DETECTION_SCALE="$RUN_ORACLE_FACE_DETECTION_SCALE"
   export ORACLE_FACE_DETECTION_INTERVAL="$RUN_ORACLE_FACE_DETECTION_INTERVAL"
   export ORACLE_SHOW_PREVIEW="$RUN_ORACLE_SHOW_PREVIEW"
-  export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
+  export ORACLE_MOCK_CAPTURE_ENABLED="${RUN_ORACLE_MOCK_CAPTURE_ENABLED:-${ORACLE_MOCK_CAPTURE_ENABLED:-0}}"
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
 
+  export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-${ORACLE_DISTRIBUTED_ROLE:-}}"
+  export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-${ORACLE_DISTRIBUTED_SPLIT:-0}}"
+  export ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}}"
+  export ORACLE_REASONING="${RUN_ORACLE_REASONING:-${ORACLE_REASONING:-0}}"
+  export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-${ORACLE_MASTER_ADDR:-}}"
+  export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-${ORACLE_SLAVE_ADDRS:-}}"
+
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
+}
+
+camera_device_paths() {
+  local device_path
+  for device_path in /dev/video*; do
+    if [[ -e "$device_path" ]]; then
+      printf '%s\n' "$device_path"
+    fi
+  done
+}
+
+camera_devices_need_access_fix() {
+  local device_path
+  for device_path in "$@"; do
+    if [[ ! -r "$device_path" || ! -w "$device_path" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+grant_camera_device_access() {
+  local devices=("$@")
+  local current_user
+  current_user="$(id -un)"
+  if command_exists setfacl; then
+    run_with_elevation setfacl -m "u:${current_user}:rw" "${devices[@]}"
+    return
+  fi
+  run_with_elevation chmod a+rw "${devices[@]}"
+}
+
+ensure_camera_device_access() {
+  if [[ "${RUN_ORACLE_AUTO_CAMERA_PERMISSIONS:-1}" != "1" ]]; then
+    return
+  fi
+  if ! is_linux; then
+    return
+  fi
+
+  local devices=()
+  local blocked_devices=()
+  local device_path
+  while IFS= read -r device_path; do
+    if [[ -n "$device_path" ]]; then
+      devices+=("$device_path")
+      if [[ ! -r "$device_path" || ! -w "$device_path" ]]; then
+        blocked_devices+=("$device_path")
+      fi
+    fi
+  done < <(camera_device_paths)
+
+  if [[ "${#devices[@]}" -eq 0 ]]; then
+    return
+  fi
+  if ! camera_devices_need_access_fix "${devices[@]}"; then
+    return
+  fi
+
+  log "camera devices detected without user access; attempting permission repair: ${blocked_devices[*]}"
+  if grant_camera_device_access "${blocked_devices[@]}"; then
+    if camera_devices_need_access_fix "${blocked_devices[@]}"; then
+      log "Warning: camera permission repair ran, but access is still unavailable. Re-login or add $(id -un) to the video group."
+    else
+      log "camera device permissions repaired for current user"
+    fi
+    return
+  fi
+
+  log "Warning: could not automatically grant camera permissions. Try: sudo usermod -aG video $(id -un)"
 }
 
 llm_host_port() {
@@ -652,9 +801,13 @@ start_llama_server() {
     -c "${LLAMA_CONTEXT_SIZE:-4096}"
     --cache-type-k q4_0
     --cache-type-v q4_0
-    --reasoning off
-    --reasoning-format none
   )
+
+  if [[ "${ORACLE_REASONING:-0}" == "1" ]]; then
+    server_args+=(--reasoning on --reasoning-format deepseek)
+  else
+    server_args+=(--reasoning off --reasoning-format none)
+  fi
 
   if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
     server_args+=(--parallel "$LLAMA_PARALLEL")
@@ -674,7 +827,9 @@ start_llama_server() {
     server_args+=(-b "$LLAMA_BATCH_SIZE")
   fi
 
-  if [[ -n "$LLAMA_EXTRA_ARGS" ]]; then
+  if [[ "${#LLAMA_EXTRA_ARGS_ARR[@]}" -gt 0 ]]; then
+    server_args+=("${LLAMA_EXTRA_ARGS_ARR[@]}")
+  elif [[ -n "$LLAMA_EXTRA_ARGS" ]]; then
     # split arguments safely
     # shellcheck disable=SC2206
     server_args+=($LLAMA_EXTRA_ARGS)
@@ -700,8 +855,16 @@ start_llama_server() {
 }
 
 run_oracle() {
-  if [[ "$#" -gt 0 ]]; then
-    oracle-report "$@"
+  local filtered_args=()
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" != -* ]]; then
+      filtered_args+=("$arg")
+    fi
+  done
+
+  if [[ "${#filtered_args[@]}" -gt 0 ]]; then
+    PYTHONPATH="$ROOT_DIR/src" python -m oracle_report.cli "${filtered_args[@]}"
     return
   fi
 
@@ -710,7 +873,7 @@ run_oracle() {
     debug_args=(--debug)
   fi
   log "starting Oracle Flask UI at http://${ORACLE_APP_HOST}:${ORACLE_APP_PORT}"
-  oracle-report serve \
+  PYTHONPATH="$ROOT_DIR/src" python -m oracle_report.cli serve \
     --host "$ORACLE_APP_HOST" \
     --port "$ORACLE_APP_PORT" \
     "${debug_args[@]}"
@@ -815,6 +978,25 @@ needs_llm_server() {
   return "$result"
 }
 
+needs_camera_device() {
+  if [[ "$#" -eq 0 ]]; then
+    return 0
+  fi
+  case "$1" in
+    capture | serve)
+      return 0
+      ;;
+    debug | release)
+      case "${2:-}" in
+        capture | serve)
+          return 0
+          ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
 main() {
   # Parse options
   parse_args "$@"
@@ -843,13 +1025,25 @@ main() {
 
   apply_run_config
 
+  if needs_camera_device "${POSITIONAL_ARGS[@]}"; then
+    ensure_camera_device_access
+  fi
+
   # Re-evaluate command from positional arguments
   case "$cmd" in
     debug)
-      run_debug_mode "${POSITIONAL_ARGS[@]:1}"
+      local debug_args=("${POSITIONAL_ARGS[@]:1}")
+      if [[ "${#debug_args[@]}" -eq 0 ]]; then
+        debug_args=("serve")
+      fi
+      run_debug_mode "${debug_args[@]}"
       ;;
     release)
-      run_release_mode "${POSITIONAL_ARGS[@]:1}"
+      local release_args=("${POSITIONAL_ARGS[@]:1}")
+      if [[ "${#release_args[@]}" -eq 0 ]]; then
+        release_args=("serve")
+      fi
+      run_release_mode "${release_args[@]}"
       ;;
     *)
       if needs_llm_server "${POSITIONAL_ARGS[@]}"; then

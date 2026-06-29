@@ -9,12 +9,102 @@ from oracle_report.config import LlmConfig
 from oracle_report.prompt_templates import RenderedPrompt
 
 
+import threading
+
 _INCOMPLETE_FINISH_REASONS = frozenset(("length",))
+_ACTIVE_GENERATIONS_LOCK = threading.Lock()
+_ACTIVE_GENERATIONS_COUNT = 0
+
+
+def is_local_llm_running() -> bool:
+    global _ACTIVE_GENERATIONS_COUNT
+    with _ACTIVE_GENERATIONS_LOCK:
+        result = _ACTIVE_GENERATIONS_COUNT > 0
+    return result
 
 
 class LlamaCppChatClient:
+    _measured_tps: float | None = None
+    _tps_lock = threading.Lock()
+
     def __init__(self, config: LlmConfig) -> None:
         self._config = config
+
+    def get_or_measure_tps(self) -> float:
+        """
+        이 디바이스의 LLM 추론 속도(TPS)를 안전하게 실측하거나 캐싱된 값을 반환합니다.
+        벤치마크 시 시스템 프롬프트 캐시(KV cache) 슬롯을 Evict/오염시키지 않기 위해
+        'cache_prompt: False' 와 콤팩트한 더미 메시지 세트를 사용합니다.
+        """
+        with self._tps_lock:
+            if self._measured_tps is not None:
+                return self._measured_tps
+
+        import requests
+        import time
+
+        payload = {
+            "model": self._config.model,
+            "messages": [
+                {"role": "user", "content": "1"}
+            ],
+            "max_tokens": 5,
+            "temperature": 0.1,
+            "stream": False,
+            "cache_prompt": False  # 프롬프트 캐시 기능 절대 미사용 (캐시 오염 방지)
+        }
+
+        try:
+            t0 = time.perf_counter()
+            response = requests.post(
+                self._chat_completions_url(),
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=10.0
+            )
+            t1 = time.perf_counter()
+            if response.status_code == 200:
+                root = response.json()
+                usage = root.get("usage", {})
+                completion_tokens = usage.get("completion_tokens", 0)
+                elapsed = t1 - t0
+                if completion_tokens > 0 and elapsed > 0:
+                    tps = completion_tokens / elapsed
+                    with self._tps_lock:
+                        self._measured_tps = tps
+                    print(f"[LLM][Benchmark] Auto-profiling complete: {tps:.2f} tokens/sec (Cache bypass enabled)")
+                    return tps
+        except Exception as e:
+            print(f"[LLM][Benchmark] Auto-profiling failed: {e}. Defaulting to 1.0 TPS.")
+        
+        return 1.0
+
+    def get_model_parameter_size(self) -> float:
+        """
+        모델 파일명/이름을 기반으로 대략적인 파라미터 크기(Billion 단위)를 유추합니다.
+        """
+        model_name = self._config.model.lower()
+        if "1b" in model_name:
+            return 1.0
+        elif "2b" in model_name:
+            return 2.0
+        elif "7b" in model_name:
+            return 7.0
+        elif "8b" in model_name:
+            return 8.0
+        elif "9b" in model_name:
+            return 9.0
+        elif "27b" in model_name:
+            return 27.0
+        elif "e2b" in model_name or "gemma-4" in model_name:
+            return 9.0
+        return 2.0
+
+    def get_compute_score(self) -> float:
+        tps = self.get_or_measure_tps()
+        param_size = self.get_model_parameter_size()
+        score = tps * param_size
+        return score
 
     def generate(
         self,
@@ -24,48 +114,86 @@ class LlamaCppChatClient:
         import requests
         import time
 
-        payload = self._build_payload(prompt, image_path)
-        t0 = time.perf_counter()
-        response = requests.post(
-            self._chat_completions_url(),
-            headers={"Content-Type": "application/json"},
-            data=json.dumps(payload),
-            timeout=self._config.timeout_seconds,
-        )
-        t1 = time.perf_counter()
-        if response.status_code < 200 or response.status_code >= 300:
-            raise RuntimeError(
-                f"local llama.cpp request failed: HTTP {response.status_code}",
+        global _ACTIVE_GENERATIONS_COUNT
+        with _ACTIVE_GENERATIONS_LOCK:
+            _ACTIVE_GENERATIONS_COUNT += 1
+
+        try:
+            payload = self._build_payload(prompt, image_path)
+            t0 = time.perf_counter()
+            response = requests.post(
+                self._chat_completions_url(),
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=self._config.timeout_seconds,
             )
-        elapsed = t1 - t0
-        root = response.json()
-        usage = root.get("usage", {}) if isinstance(root.get("usage"), dict) else {}
-        completion_tokens = usage.get("completion_tokens", 0)
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        cached_tokens = _extract_cached_tokens(root)
-        finish_reason = _extract_finish_reason(root)
-        result = _extract_output_text(root)
+            t1 = time.perf_counter()
+            if response.status_code < 200 or response.status_code >= 300:
+                error_preview = response.text.strip()
+                if len(error_preview) > 300:
+                    error_preview = error_preview[:300] + "..."
+                prompt_chars = 0
+                prefix_chars = 0
+                user_chars = 0
+                messages = payload.get("messages")
+                if isinstance(messages, list):
+                    for message in messages:
+                        if not isinstance(message, dict):
+                            continue
+                        role = message.get("role")
+                        content = message.get("content")
+                        if isinstance(content, str):
+                            prompt_chars += len(content)
+                            if role == "system":
+                                prefix_chars += len(content)
+                        elif isinstance(content, list):
+                            for item in content:
+                                if not isinstance(item, dict):
+                                    continue
+                                text = item.get("text")
+                                if isinstance(text, str):
+                                    prompt_chars += len(text)
+                                    user_chars += len(text)
+                raise RuntimeError(
+                    "local llama.cpp request failed: "
+                    f"HTTP {response.status_code}; "
+                    f"prefix_chars={prefix_chars}; "
+                    f"user_chars={user_chars}; "
+                    f"prompt_chars={prompt_chars}; "
+                    f"response={error_preview or '<empty>'}",
+                )
+            elapsed = t1 - t0
+            root = response.json()
+            usage = root.get("usage", {}) if isinstance(root.get("usage"), dict) else {}
+            completion_tokens = usage.get("completion_tokens", 0)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            cached_tokens = _extract_cached_tokens(root)
+            finish_reason = _extract_finish_reason(root)
+            result = _extract_output_text(root)
 
-        speed_str = ""
-        if completion_tokens > 0 and elapsed > 0:
-            speed = completion_tokens / elapsed
-            speed_str = f" ({speed:.2f} tokens/sec)"
+            speed_str = ""
+            if completion_tokens > 0 and elapsed > 0:
+                speed = completion_tokens / elapsed
+                speed_str = f" ({speed:.2f} tokens/sec)"
 
-        print(
-            f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
-            f"cached_tokens={cached_tokens}, "
-            f"completion_tokens={completion_tokens}, "
-            f"finish_reason={finish_reason or 'unknown'}, "
-            f"elapsed={elapsed:.2f}s{speed_str}"
-        )
-        if finish_reason in _INCOMPLETE_FINISH_REASONS:
-            raise RuntimeError(
-                "incomplete LLM response: "
-                f"finish_reason={finish_reason}, "
+            print(
+                f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
+                f"cached_tokens={cached_tokens}, "
                 f"completion_tokens={completion_tokens}, "
-                f"max_output_tokens={self._config.max_output_tokens}",
+                f"finish_reason={finish_reason or 'unknown'}, "
+                f"elapsed={elapsed:.2f}s{speed_str}"
             )
-        return result
+            if finish_reason in _INCOMPLETE_FINISH_REASONS:
+                raise RuntimeError(
+                    "incomplete LLM response: "
+                    f"finish_reason={finish_reason}, "
+                    f"completion_tokens={completion_tokens}, "
+                    f"max_output_tokens={self._config.max_output_tokens}",
+                )
+            return result
+        finally:
+            with _ACTIVE_GENERATIONS_LOCK:
+                _ACTIVE_GENERATIONS_COUNT -= 1
 
     def _build_payload(
         self,
@@ -95,15 +223,20 @@ class LlamaCppChatClient:
         if rendered_prompt.prefix.strip() != "":
             messages.append({"role": "system", "content": rendered_prompt.prefix})
         messages.append({"role": "user", "content": content})
+        max_tokens = self._config.max_output_tokens
+        if self._config.reasoning:
+            max_tokens = max(max_tokens, 8192)
+
         result = {
             "model": self._config.model,
             "messages": messages,
-            "max_tokens": self._config.max_output_tokens,
+            "max_tokens": max_tokens,
             "temperature": self._config.temperature,
             "stream": False,
         }
         if rendered_prompt.slot_id is not None:
             result["id_slot"] = rendered_prompt.slot_id
+        if self._config.prompt_cache:
             result["cache_prompt"] = True
         return result
 

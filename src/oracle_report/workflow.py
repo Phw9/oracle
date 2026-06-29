@@ -510,13 +510,37 @@ def _format_timing_log(
     return result
 
 
+def _load_active_distributed_app_config():
+    from oracle_report.config import load_app_config
+
+    app_config = load_app_config()
+    result = None
+    if app_config.distributed_split and app_config.distributed_role in (
+        "master",
+        "hybrid",
+    ):
+        result = app_config
+    return result
+
+
 def _build_single_face_analysis(
     client: TextGenerator | None,
     profile: BirthProfile,
     artifact: CaptureArtifact,
     face_analysis_mode: int = FACE_ANALYSIS_MODE_LLM_IMAGE,
 ) -> _GeneratedText:
-    if face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+    distributed_app_config = _load_active_distributed_app_config()
+    if (
+        face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE
+        and distributed_app_config is not None
+    ):
+        result = _build_distributed_single_face_analysis(
+            client,
+            profile,
+            artifact,
+            distributed_app_config,
+        )
+    elif face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
         text = artifact.face_analysis or artifact.quality.face_analysis
         if text == "":
             text = "## 관상정보\n- 랜드마크 룰 기반 관상정보를 생성하지 못했습니다."
@@ -553,7 +577,20 @@ def _build_pair_face_analysis(
     mode: str,
     face_analysis_mode: int = FACE_ANALYSIS_MODE_LLM_IMAGE,
 ) -> _GeneratedText:
-    if face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+    distributed_app_config = _load_active_distributed_app_config()
+    if (
+        face_analysis_mode == FACE_ANALYSIS_MODE_LLM_IMAGE
+        and distributed_app_config is not None
+    ):
+        result = _build_distributed_pair_face_analysis(
+            client,
+            left_profile,
+            right_profile,
+            artifact,
+            mode,
+            distributed_app_config,
+        )
+    elif face_analysis_mode == FACE_ANALYSIS_MODE_LANDMARK_RULE:
         left_analysis = _build_single_face_analysis(
             client,
             left_profile,
@@ -749,19 +786,28 @@ def _build_saju_analysis(
     profile: BirthProfile,
     manse_lookup: ManseLookupResult,
 ) -> _GeneratedText:
-    prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
-    result = _safe_generate(
-        client,
-        prompt,
-        None,
-        "사주정보를 생성하지 못했습니다.",
-        debug_label="saju_analysis",
-    )
-    result = _repair_short_report_block_bodies(
-        client,
-        result,
-        "saju_analysis",
-    )
+    distributed_app_config = _load_active_distributed_app_config()
+    if distributed_app_config is not None:
+        result = _build_distributed_saju_analysis(
+            client,
+            profile,
+            manse_lookup,
+            distributed_app_config,
+        )
+    else:
+        prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
+        result = _safe_generate(
+            client,
+            prompt,
+            None,
+            "사주정보를 생성하지 못했습니다.",
+            debug_label="saju_analysis",
+        )
+        result = _repair_short_report_block_bodies(
+            client,
+            result,
+            "saju_analysis",
+        )
     return result
 
 
@@ -773,25 +819,538 @@ def _build_compatibility_saju_analysis(
     left_manse: ManseLookupResult,
     right_manse: ManseLookupResult,
 ) -> _GeneratedText:
-    prompt = build_couple_saju_reading_prompt(
+    distributed_app_config = _load_active_distributed_app_config()
+    if distributed_app_config is not None:
+        result = _build_distributed_compatibility_saju_analysis(
+            client,
+            left_profile,
+            right_profile,
+            mode,
+            left_manse,
+            right_manse,
+            distributed_app_config,
+        )
+    else:
+        prompt = build_couple_saju_reading_prompt(
+            left_profile,
+            right_profile,
+            mode,
+            left_manse.formatted_text,
+            right_manse.formatted_text,
+        )
+        result = _safe_generate(
+            client,
+            prompt,
+            None,
+            "궁합 사주정보를 생성하지 못했습니다.",
+            debug_label="saju_analysis_couple",
+        )
+        result = _repair_short_report_block_bodies(
+            client,
+            result,
+            "saju_analysis_couple",
+        )
+    return result
+
+
+_PERSONAL_FACE_CATEGORIES = (
+    "눈과 눈썹",
+    "얼굴 비율과 중심감",
+    "표정과 소통 분위기",
+    "첫인상 리듬",
+    "관상 기반 생활 팁",
+)
+_PAIR_FACE_CATEGORIES = (
+    "첫인상과 분위기",
+    "소통 리듬",
+    "관계 강점",
+    "주의할 점",
+)
+_PERSONAL_SAJU_CATEGORIES = (
+    "종합 형국",
+    "타고난 성향과 심리 패턴",
+    "재물운과 적성",
+    "연애운과 인간관계",
+    "올해의 운세",
+    "총평 및 인생의 조언",
+)
+_COMPATIBILITY_SAJU_CATEGORIES = (
+    "관계 구조",
+    "상호 보완",
+    "갈등 관리",
+    "현재 관계 흐름",
+    "실천 제안",
+    "총평 및 조언",
+)
+
+
+def _build_distributed_single_face_analysis(
+    client: TextGenerator | None,
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+    app_config,
+) -> _GeneratedText:
+    image_path = _face_llm_image_path(artifact)
+    values = _personal_face_prompt_values(profile, artifact)
+    result = _safe_generate_distributed(
+        "personal_face_analysis",
+        values,
+        _PERSONAL_FACE_CATEGORIES,
+        image_path,
+        app_config,
+        client,
+        "관상정보를 생성하지 못했습니다.",
+        "personal_face_analysis",
+    )
+    return result
+
+
+def _build_distributed_pair_face_analysis(
+    client: TextGenerator | None,
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+    mode: str,
+    app_config,
+) -> _GeneratedText:
+    image_path = _pair_face_llm_image_path(artifact)
+    values = _pair_face_prompt_values(left_profile, right_profile, artifact, mode)
+    result = _safe_generate_distributed(
+        "face_analysis_copule",
+        values,
+        _PAIR_FACE_CATEGORIES,
+        image_path,
+        app_config,
+        client,
+        "궁합 관상정보를 생성하지 못했습니다.",
+        "face_analysis_copule",
+    )
+    return result
+
+
+def _build_distributed_saju_analysis(
+    client: TextGenerator,
+    profile: BirthProfile,
+    manse_lookup: ManseLookupResult,
+    app_config,
+) -> _GeneratedText:
+    values = _saju_prompt_values(profile, manse_lookup)
+    result = _safe_generate_distributed(
+        "saju_reading",
+        values,
+        _PERSONAL_SAJU_CATEGORIES,
+        None,
+        app_config,
+        client,
+        "사주정보를 생성하지 못했습니다.",
+        "saju_analysis",
+    )
+    return result
+
+
+def _build_distributed_compatibility_saju_analysis(
+    client: TextGenerator,
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    mode: str,
+    left_manse: ManseLookupResult,
+    right_manse: ManseLookupResult,
+    app_config,
+) -> _GeneratedText:
+    values = _compatibility_saju_prompt_values(
         left_profile,
         right_profile,
         mode,
-        left_manse.formatted_text,
-        right_manse.formatted_text,
+        left_manse,
+        right_manse,
     )
-    result = _safe_generate(
-        client,
-        prompt,
+    result = _safe_generate_distributed(
+        "saju_reading_couple",
+        values,
+        _COMPATIBILITY_SAJU_CATEGORIES,
         None,
-        "궁합 사주정보를 생성하지 못했습니다.",
-        debug_label="saju_analysis_couple",
-    )
-    result = _repair_short_report_block_bodies(
+        app_config,
         client,
-        result,
+        "궁합 사주정보를 생성하지 못했습니다.",
         "saju_analysis_couple",
     )
+    return result
+
+
+def _safe_generate_distributed(
+    prompt_name: str,
+    values: dict[str, object],
+    categories: tuple[str, ...],
+    image_path: Path | None,
+    app_config,
+    client: TextGenerator | None,
+    fallback: str,
+    debug_label: str,
+) -> _GeneratedText:
+    text = fallback
+    error = ""
+    try:
+        text = _generate_distributed(
+            prompt_name,
+            values,
+            categories,
+            image_path,
+            app_config,
+        )
+        print(
+            f"\n[LLM RAW:{debug_label}:BEGIN]\n"
+            f"{text}\n"
+            f"[LLM RAW:{debug_label}:END]\n",
+        )
+    except Exception as exc:
+        error = str(exc)
+        text = f"{fallback}\n\n오류: {error}"
+        print(f"\n[LLM RAW:{debug_label}:ERROR] {error}\n")
+    result = _GeneratedText(text=text, error=error)
+    if error == "" and client is not None:
+        result = _repair_short_report_block_bodies(client, result, debug_label)
+    return result
+
+
+def _personal_face_prompt_values(
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+) -> dict[str, object]:
+    result = _base_face_prompt_values(profile, artifact)
+    result["person_label"] = "개인 리포트 대상"
+    result["mode"] = "개인"
+    return result
+
+
+def _pair_face_prompt_values(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+    mode: str,
+) -> dict[str, object]:
+    result = {}
+    result.update(_prefixed_face_prompt_values("left", left_profile, artifact.left))
+    result.update(_prefixed_face_prompt_values("right", right_profile, artifact.right))
+    result["mode"] = mode
+    return result
+
+
+def _base_face_prompt_values(
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+) -> dict[str, object]:
+    from oracle_report.physiognomy import format_face_quality
+    from oracle_report.saju.repository import (
+        birth_datetime_display_from_profile,
+        birth_time_display_from_profile,
+    )
+
+    quality = artifact.quality
+    landmark_metrics_text = "- 랜드마크 측정값 없음"
+    landmark_context_text = "- 구조화된 관찰 컨텍스트 없음"
+    landmark_rules_text = "- 랜드마크 규칙 해석 힌트 없음"
+    if quality is not None:
+        if quality.landmark_metrics_text.strip() != "":
+            landmark_metrics_text = quality.landmark_metrics_text
+        if quality.landmark_context_text.strip() != "":
+            landmark_context_text = quality.landmark_context_text
+        if quality.landmark_rules_text.strip() != "":
+            landmark_rules_text = quality.landmark_rules_text
+    result = {
+        "name": profile.name,
+        "gender": profile.gender,
+        "birth_datetime": birth_datetime_display_from_profile(profile),
+        "birth_time_text": birth_time_display_from_profile(profile),
+        "quality_text": format_face_quality(quality),
+        "landmark_metrics_text": landmark_metrics_text,
+        "landmark_context_text": landmark_context_text,
+        "landmark_rules_text": landmark_rules_text,
+    }
+    return result
+
+
+def _prefixed_face_prompt_values(
+    prefix: str,
+    profile: BirthProfile,
+    artifact: CaptureArtifact,
+) -> dict[str, object]:
+    base_values = _base_face_prompt_values(profile, artifact)
+    result = {
+        f"{prefix}_name": base_values["name"],
+        f"{prefix}_gender": base_values["gender"],
+        f"{prefix}_birth_datetime": base_values["birth_datetime"],
+        f"{prefix}_birth_time_text": base_values["birth_time_text"],
+        f"{prefix}_quality_text": base_values["quality_text"],
+    }
+    return result
+
+
+def _saju_prompt_values(
+    profile: BirthProfile,
+    manse_lookup: ManseLookupResult,
+) -> dict[str, object]:
+    from oracle_report.saju.repository import (
+        birth_datetime_display_from_profile,
+        birth_time_display_from_profile,
+    )
+
+    result = {
+        "name": profile.name,
+        "gender": profile.gender,
+        "birth_datetime": birth_datetime_display_from_profile(profile),
+        "birth_time_text": birth_time_display_from_profile(profile),
+        "timezone": profile.timezone,
+        "saju_text": manse_lookup.formatted_text,
+    }
+    return result
+
+
+def _compatibility_saju_prompt_values(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    mode: str,
+    left_manse: ManseLookupResult,
+    right_manse: ManseLookupResult,
+) -> dict[str, object]:
+    from oracle_report.saju.repository import (
+        birth_datetime_display_from_profile,
+        birth_time_display_from_profile,
+    )
+
+    result = {
+        "left_name": left_profile.name,
+        "left_gender": left_profile.gender,
+        "left_birth_datetime": birth_datetime_display_from_profile(left_profile),
+        "left_birth_time_text": birth_time_display_from_profile(left_profile),
+        "right_name": right_profile.name,
+        "right_gender": right_profile.gender,
+        "right_birth_datetime": birth_datetime_display_from_profile(right_profile),
+        "right_birth_time_text": birth_time_display_from_profile(right_profile),
+        "mode": mode,
+        "left_saju_text": left_manse.formatted_text,
+        "right_saju_text": right_manse.formatted_text,
+    }
+    return result
+
+
+class DistributedTaskScheduler:
+    def __init__(self, slave_addrs: list[str]) -> None:
+        self.slave_addrs = slave_addrs
+        self.slave_metadata = {
+            addr: {"cuda": False, "weight": 1.0, "compute_score": 5.0}
+            for addr in slave_addrs
+        }
+        self._next_index = 0
+
+    def select_slave(self, task_name: str) -> str:
+        del task_name
+        if not self.slave_addrs:
+            raise RuntimeError(
+                "No slave addresses available for distributed task execution.",
+            )
+        result = self.slave_addrs[self._next_index % len(self.slave_addrs)]
+        self._next_index += 1
+        return result
+
+
+def _generate_distributed(
+    prompt_name: str,
+    values: dict[str, object],
+    categories: tuple[str, ...],
+    image_path: Path | None,
+    app_config,
+) -> str:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    worker_urls = tuple(app_config.slave_addrs) or ("local",)
+    tasks = [{"is_metadata": True, "target_category": None}]
+    tasks.extend({"is_metadata": False, "target_category": item} for item in categories)
+    image_base64 = _encode_distributed_image(image_path)
+    results = []
+    with ThreadPoolExecutor(max_workers=len(worker_urls)) as executor:
+        futures = []
+        scheduler = DistributedTaskScheduler(list(worker_urls))
+        for task in tasks:
+            worker_url = scheduler.select_slave("distributed-task")
+            futures.append(
+                executor.submit(
+                    _run_distributed_task,
+                    worker_url,
+                    prompt_name,
+                    values,
+                    task,
+                    image_path,
+                    image_base64,
+                    app_config,
+                ),
+            )
+        for future in as_completed(futures):
+            results.append(future.result())
+    payload = _combine_distributed_outputs(prompt_name, categories, results)
+    result = json.dumps(payload, ensure_ascii=False)
+    return result
+
+
+def _run_distributed_task(
+    worker_url: str,
+    prompt_name: str,
+    values: dict[str, object],
+    task: dict[str, object],
+    image_path: Path | None,
+    image_base64: str | None,
+    app_config,
+) -> dict[str, object]:
+    if _is_local_distributed_worker(worker_url, app_config):
+        output = _run_local_distributed_task(prompt_name, values, task, image_path)
+    else:
+        output = _run_remote_distributed_task(
+            worker_url,
+            prompt_name,
+            values,
+            task,
+            image_base64,
+        )
+    result = {"task": task, "output": output}
+    return result
+
+
+def _run_local_distributed_task(
+    prompt_name: str,
+    values: dict[str, object],
+    task: dict[str, object],
+    image_path: Path | None,
+) -> str:
+    from oracle_report.config import load_face_llm_config, load_report_llm_config
+    from oracle_report.prompt_templates import render_distributed_prompt_template
+
+    is_face_prompt = "face" in prompt_name
+    llm_config = load_face_llm_config() if is_face_prompt else load_report_llm_config()
+    client = LlamaCppChatClient(llm_config)
+    rendered = render_distributed_prompt_template(
+        name=prompt_name,
+        values=values,
+        target_category=task["target_category"],
+        is_metadata=bool(task["is_metadata"]),
+    )
+    result = client.generate(rendered, image_path=image_path)
+    return result
+
+
+def _run_remote_distributed_task(
+    worker_url: str,
+    prompt_name: str,
+    values: dict[str, object],
+    task: dict[str, object],
+    image_base64: str | None,
+) -> str:
+    import requests
+
+    payload = {
+        "prompt_name": prompt_name,
+        "target_category": task["target_category"],
+        "is_metadata": task["is_metadata"],
+        "values": values,
+        "image_base64": image_base64,
+    }
+    response = requests.post(
+        f"{worker_url.rstrip('/')}/api/distributed/generate",
+        json=payload,
+        timeout=300.0,
+    )
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(
+            f"distributed worker failed: {worker_url} HTTP {response.status_code}",
+        )
+    data = response.json()
+    if data.get("status") != "success":
+        raise RuntimeError(
+            f"distributed worker failed: {worker_url} {data.get('error', '')}",
+        )
+    result = str(data.get("output", ""))
+    return result
+
+
+def _combine_distributed_outputs(
+    prompt_name: str,
+    categories: tuple[str, ...],
+    results: list[dict[str, object]],
+) -> dict[str, object]:
+    metadata: dict[str, object] = {}
+    blocks_by_category: dict[str, dict[str, object]] = {}
+    for item in results:
+        task = item["task"]
+        output = str(item["output"])
+        payload = _parse_distributed_json(output)
+        if bool(task["is_metadata"]):
+            metadata.update(payload)
+        else:
+            category = str(task["target_category"])
+            if payload:
+                blocks_by_category[category] = payload
+    block_key = _distributed_block_key(prompt_name)
+    metadata[block_key] = [
+        blocks_by_category.get(category, _default_distributed_block(category))
+        for category in categories
+    ]
+    result = metadata
+    return result
+
+
+def _parse_distributed_json(text: str) -> dict[str, object]:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = _strip_markdown_fence_text(cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    payload: dict[str, object] = {}
+    if start >= 0 and end >= start:
+        try:
+            loaded = json.loads(cleaned[start : end + 1])
+            if isinstance(loaded, dict):
+                payload = loaded
+        except json.JSONDecodeError:
+            payload = {}
+    result = payload
+    return result
+
+
+def _distributed_block_key(prompt_name: str) -> str:
+    result = "saju_blocks"
+    if "face" in prompt_name:
+        result = "pair_blocks" if "copule" in prompt_name else "face_blocks"
+    return result
+
+
+def _default_distributed_block(category: str) -> dict[str, object]:
+    result = {
+        "category": category,
+        "title": "분석 오류",
+        "summary": "분산 작업 결과를 만들지 못했어요.",
+        "body": "해당 카테고리의 분석을 생성하지 못했습니다.",
+    }
+    return result
+
+
+def _encode_distributed_image(image_path: Path | None) -> str | None:
+    import base64
+
+    result = None
+    if image_path is not None and image_path.exists():
+        result = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return result
+
+
+def _is_local_distributed_worker(worker_url: str, app_config) -> bool:
+    from urllib.parse import urlparse
+
+    result = worker_url == "local"
+    if not result:
+        parsed = urlparse(worker_url)
+        host = parsed.hostname or ""
+        port = parsed.port
+        result = host in ("localhost", "127.0.0.1", "0.0.0.0")
+        if not result and port == app_config.port:
+            result = host == ""
     return result
 
 

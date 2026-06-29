@@ -279,6 +279,79 @@ def create_app() -> Flask:
         result = "ok"
         return result
 
+    @app.post("/api/distributed/generate")
+    def distributed_generate():
+        payload = request.json or {}
+        prompt_name = payload.get("prompt_name")
+        target_category = payload.get("target_category")
+        is_metadata = payload.get("is_metadata", False)
+        values = payload.get("values", {})
+        image_base64 = payload.get("image_base64")
+
+        from oracle_report.prompt_templates import render_distributed_prompt_template
+        rendered = render_distributed_prompt_template(
+            name=prompt_name,
+            values=values,
+            target_category=target_category,
+            is_metadata=is_metadata,
+        )
+
+        temp_img_path = None
+        if image_base64:
+            import base64
+            img_data = base64.b64decode(image_base64)
+            temp_dir = Path("runs/temp")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_img_path = temp_dir / f"distributed_temp_{uuid.uuid4().hex}.jpg"
+            temp_img_path.write_bytes(img_data)
+
+        from oracle_report.llm import LlamaCppChatClient
+        from oracle_report.config import load_face_llm_config, load_report_llm_config
+
+        is_face = "face" in prompt_name
+        llm_config = load_face_llm_config() if is_face else load_report_llm_config()
+        client = LlamaCppChatClient(llm_config)
+
+        try:
+            output = client.generate(rendered, image_path=temp_img_path)
+            result = jsonify({"status": "success", "output": output})
+        except Exception as exc:
+            result = jsonify({"status": "error", "error": str(exc)}), 500
+        finally:
+            if temp_img_path and temp_img_path.exists():
+                try:
+                    temp_img_path.unlink()
+                except Exception:
+                    pass
+        return result
+
+    @app.get("/api/distributed/status")
+    def distributed_status():
+        from oracle_report.llm import is_local_llm_running, LlamaCppChatClient
+        from oracle_report.config import load_llm_config
+        is_busy = _CAPTURE_LOCK.locked() or is_local_llm_running()
+        
+        llm_config = load_llm_config()
+        client = LlamaCppChatClient(llm_config)
+        
+        tps = 1.0
+        score = 2.0
+        model_name = llm_config.model
+        if not is_busy:
+            try:
+                tps = client.get_or_measure_tps()
+                score = client.get_compute_score()
+            except Exception:
+                pass
+                
+        result = jsonify({
+            "status": "busy" if is_busy else "idle",
+            "tps": tps,
+            "compute_score": score,
+            "model": model_name
+        })
+        return result
+
     @app.get("/favicon.ico")
     def favicon():
         result = ("", 204)
@@ -290,6 +363,41 @@ def create_app() -> Flask:
 
 def serve() -> None:
     config = load_app_config()
+
+    # Run distributed warmup in the background if enabled
+    if config.distributed_role in ("master", "hybrid") and config.distributed_warmup:
+        import threading
+        def run_warmup_background():
+            import time
+            time.sleep(5.0)  # Wait for slave servers to start fully
+            print("[Distributed] Starting LLM warmup for distributed nodes...", flush=True)
+            try:
+                from oracle_report.workflow import _generate_distributed
+                dummy_values = {
+                    "name": "더미",
+                    "gender": "남성",
+                    "timezone": "KST",
+                    "saju_text": "태어난 날짜: 1990년 1월 1일\n사주 오행: 木 2, 火 1, 土 2, 金 2, 水 1\n일간: 甲木"
+                }
+                dummy_categories = ["종합 형국", "타고난 성향과 심리 패턴"]
+
+                # Trigger distributed run with dummy values to pre-populate KV Cache
+                from oracle_report.config import load_face_llm_config, load_report_llm_config
+                _generate_distributed(
+                    prompt_name="saju_reading",
+                    values=dummy_values,
+                    categories=dummy_categories,
+                    image_path=None,
+                    app_config=config,
+                    face_llm_config=load_face_llm_config(),
+                    report_llm_config=load_report_llm_config(),
+                )
+                print("[Distributed] LLM warmup complete. Prefix KV caches are now initialized.", flush=True)
+            except Exception as e:
+                print(f"[Distributed][Warn] Warmup failed: {e}", flush=True)
+
+        threading.Thread(target=run_warmup_background, daemon=True).start()
+
     app = create_app()
     app.run(host=config.host, port=config.port, debug=config.debug, threaded=True)
 
@@ -330,7 +438,6 @@ def _personal_workflow_input_from_form() -> PersonalWorkflowInput:
         birth_time=_form_value("birth_time"),
         gender=_form_value("gender"),
         target_gender=_form_value("target_gender"),
-        face_analysis_mode=_form_int("face_analysis_mode", 1),
         skip_face=_form_bool("skip_face", False),
     )
     return result
@@ -374,14 +481,25 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
         return capture_artifact
 
     def run_job() -> _WorkflowJob:
+        def status_callback(phase: str, message: str, html: str = "") -> None:
+            _set_job(
+                job_id,
+                _WorkflowJob(
+                    status="running",
+                    phase=phase,
+                    message=message,
+                    html=html,
+                ),
+            )
+
         workflow_result = run_personal_workflow(
             workflow_input=workflow_input,
             capture_config=load_capture_config(),
-            face_llm_config=load_face_llm_config(),
             report_llm_config=load_report_llm_config(),
             manse_db_path=_manse_db_path(),
             recommendation_db_path=_face_db_path(),
             capture_runner=capture_runner,
+            status_callback=status_callback,
         )
         result = _WorkflowJob(
             status="complete",
@@ -477,12 +595,18 @@ def _compatibility_result_url(job_id: str) -> str:
 
 
 def _preview_capture_runner(config, output_dir: Path | None = None):
-    result = run_capture(
-        config,
-        output_dir=output_dir,
-        frame_callback=_PREVIEW_STREAM.publish,
-    )
-    return result
+    acquired = _CAPTURE_LOCK.acquire(blocking=False)
+    if not acquired:
+        raise RuntimeError("다른 촬영 작업이 진행 중입니다.")
+    try:
+        result = run_capture(
+            config,
+            output_dir=output_dir,
+            frame_callback=_PREVIEW_STREAM.publish,
+        )
+        return result
+    finally:
+        _CAPTURE_LOCK.release()
 
 
 def _start_workflow_job(
@@ -504,35 +628,22 @@ def _start_workflow_job(
 
 
 def _run_workflow_job(job_id: str, run_job) -> None:
-    acquired = _CAPTURE_LOCK.acquire(blocking=False)
-    if not acquired:
+    try:
+        job_result = run_job()
+        if isinstance(job_result, _WorkflowJob):
+            completed_job = job_result
+        else:
+            completed_job = _WorkflowJob(status="complete", html=job_result)
+        _set_job(job_id, completed_job)
+    except Exception as exc:
         _set_job(
             job_id,
             _WorkflowJob(
                 status="error",
-                html=_error_panel(RuntimeError("다른 촬영 작업이 진행 중입니다.")),
-                error="다른 촬영 작업이 진행 중입니다.",
+                html=_error_panel(exc),
+                error=str(exc),
             ),
         )
-    else:
-        try:
-            job_result = run_job()
-            if isinstance(job_result, _WorkflowJob):
-                completed_job = job_result
-            else:
-                completed_job = _WorkflowJob(status="complete", html=job_result)
-            _set_job(job_id, completed_job)
-        except Exception as exc:
-            _set_job(
-                job_id,
-                _WorkflowJob(
-                    status="error",
-                    html=_error_panel(exc),
-                    error=str(exc),
-                ),
-            )
-        finally:
-            _CAPTURE_LOCK.release()
 
 
 def _set_job(job_id: str, job: _WorkflowJob) -> None:
@@ -559,39 +670,37 @@ def _face_db_path() -> Path:
 
 
 def _personal_form() -> str:
-    mode_options = _face_analysis_mode_options()
     gender_options = _gender_options(required=True)
     target_gender_options = _gender_options(required=False)
     birth_time_options = _birth_time_options()
     result = f"""
     <div class="oracle-input-shell">
       <div class="brand">
-        <div class="logo">ORACLE</div>
-        <div class="tag">관상 &amp; 사주 리포트</div>
-        <div class="ornament"></div>
+        <a class="logo" href="/">Oracle</a>
+        <h1>개인 리포트 생성</h1>
+        <p>얼굴과 사주로 당신의 인생 운세를 조율해 보세요.</p>
       </div>
 
-      <div class="input-card">
-        <div class="card-head">
-          <h1>개인 리포트</h1>
-          <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
-        </div>
-
-        <form method="post" class="workflow-form input-form" data-workflow-api="/api/personal">
+      <div class="card">
+        <form action="/personal" method="post" autocomplete="off">
           <input type="hidden" name="skip_face" value="0">
-          <div class="field lead">
+          <div class="field">
             <label>이름</label>
-            <input name="name" placeholder="이름을 입력하세요" required>
+            <input type="text" name="name" required placeholder="홍길동" maxlength="10">
           </div>
-          <div class="field-stack">
+
+          <div class="grid">
             <div class="field">
               <label>생년월일</label>
-              <input name="birth_date" type="date" required>
+              <input type="date" name="birth_date" required min="1900-01-01" max="2099-12-31">
             </div>
             <div class="field">
-              <label>태어난 시간<span class="hint">모르면 '모름'을 선택하세요</span></label>
+              <label>태어난 시간</label>
               <select name="birth_time">{birth_time_options}</select>
             </div>
+          </div>
+
+          <div class="grid">
             <div class="field">
               <label>성별</label>
               <select name="gender" required>{gender_options}</select>
@@ -599,10 +708,6 @@ def _personal_form() -> str:
             <div class="field">
               <label>추천받고 싶은 얼굴 성별</label>
               <select name="target_gender">{target_gender_options}</select>
-            </div>
-            <div class="field">
-              <label>관상 분석 모드</label>
-              <select name="face_analysis_mode">{mode_options}</select>
             </div>
           </div>
           <div class="actions">
@@ -625,7 +730,6 @@ def _compatibility_form() -> str:
     )
     gender_options = _gender_options(required=True)
     birth_time_options = _birth_time_options()
-    face_mode_options = _face_analysis_mode_options()
     result = f"""
     <form method="post" class="panel workflow-form" data-workflow-api="/api/compatibility">
       <h2>두 사람 궁합</h2>
@@ -646,7 +750,6 @@ def _compatibility_form() -> str:
         </fieldset>
       </div>
       <label>궁합 모드<select name="mode">{mode_options}</select></label>
-      <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
       <p class="hint">두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
       <button type="submit">두 사람 궁합 촬영 시작</button>
     </form>
@@ -679,17 +782,6 @@ def _birth_time_options() -> str:
         f'<option value="{escape(value)}">{escape(label)}</option>'
         for value, label in options
     )
-    return result
-
-
-def _face_analysis_mode_options() -> str:
-    selected_mode = os.getenv("ORACLE_FACE_ANALYSIS_MODE", "1")
-    mode_one_selected = " selected" if selected_mode == "1" else ""
-    mode_two_selected = " selected" if selected_mode == "2" else ""
-    result = f"""
-      <option value="1"{mode_one_selected}>1 - 이미지 LLM 분석</option>
-      <option value="2"{mode_two_selected}>2 - 랜드마크 룰 기반 분석</option>
-    """
     return result
 
 
@@ -1616,12 +1708,19 @@ def _render_page(
             const preview = document.querySelector(".capture-preview");
             let done = false;
             while (!done) {{
-              await new Promise((resolve) => setTimeout(resolve, 5000));
+              await new Promise((resolve) => setTimeout(resolve, 30000));
               const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
               const payload = await response.json();
               if (payload.phase === "generating") {{
                 activatePrivacyVeil(preview);
                 status.textContent = payload.message || "얼굴 인식 완료, 리포트를 생성하고 있습니다";
+                if (payload.html) {{
+                  const tempDiv = document.createElement("div");
+                  tempDiv.innerHTML = payload.html;
+                  if (result.textContent.trim() !== tempDiv.textContent.trim()) {{
+                    result.innerHTML = payload.html;
+                  }}
+                }}
               }}
               if (payload.status === "complete") {{
                 result.innerHTML = payload.html;
