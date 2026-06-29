@@ -789,19 +789,12 @@ def _build_personal_report_json(
     recommendations: tuple[FaceRecommendation, ...],
     skip_face: bool = False,
 ) -> str:
-    face_payload, face_error = ({}, "")
+    face_payload = {}
     saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
-    if not skip_face:
-        face_payload, face_error = _load_json_payload_or_error(face_analysis)
     if saju_error:
         print(
             "[UI FALLBACK:saju_analysis] invalid LLM output; "
             f"renderer will fill missing saju fields. reason={saju_error}",
-        )
-    if face_error:
-        print(
-            "[UI FALLBACK:face_analysis] invalid LLM output; "
-            f"renderer will fill missing face fields. reason={face_error}",
         )
     payload = _merge_personal_payloads(
         manse_lookup,
@@ -818,13 +811,8 @@ def _build_compatibility_report_json(
     face_analysis: str,
     saju_analysis: str,
 ) -> str:
-    face_payload, face_error = _load_json_payload_or_error(face_analysis)
+    face_payload = {}
     saju_payload, saju_error = _load_json_payload_or_error(saju_analysis)
-    if face_error:
-        print(
-            "[UI FALLBACK:face_analysis_copule] invalid LLM output; "
-            f"renderer will fill missing pair fields. reason={face_error}",
-        )
     if saju_error:
         print(
             "[UI FALLBACK:saju_analysis_couple] invalid LLM output; "
