@@ -13,6 +13,8 @@ _DEFAULT_PROMPTS_PATH = Path("configs/prompts.json")
 _DEFAULT_DEBUG_PROMPTS_PATH = Path("configs/prompts_debug.json")
 _PROMPTS_PATH_ENV_NAME = "ORACLE_PROMPTS_PATH"
 _DEBUG_PROMPTS_PATH_ENV_NAME = "ORACLE_DEBUG_PROMPTS_PATH"
+REPORT_BLOCK_SENTENCE_COUNT = 6
+_REPORT_BLOCK_SENTENCE_COUNT_TOKEN = "{{report_block_sentence_count}}"
 _DEFAULT_PROMPT_SLOTS = {
     "personal_face_analysis": 0,
     "saju_reading": 1,
@@ -190,6 +192,15 @@ def _template_fragment_text(raw_value: object) -> str:
         result = "\n".join(raw_value)
     else:
         raise ValueError("prompt template fragment must be a string or list of strings.")
+    result = _apply_template_constants(result)
+    return result
+
+
+def _apply_template_constants(template_text: str) -> str:
+    result = template_text.replace(
+        _REPORT_BLOCK_SENTENCE_COUNT_TOKEN,
+        str(REPORT_BLOCK_SENTENCE_COUNT),
+    )
     return result
 
 
