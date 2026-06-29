@@ -235,8 +235,6 @@ configs/prompts_debug.json
 - `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 - `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석
 
-`./run.sh --face-rulebase`로 실행하면 UI에는 룰 기반 결과를 사용하되, 비교를 위해 터미널에 룰 기반 출력과 기존 LLM 출력을 함께 남깁니다. 환경변수로 직접 모드를 지정할 때 같은 비교 로그가 필요하면 `ORACLE_FACE_RULEBASE_COMPARE_LLM=1`을 함께 설정합니다.
-
 ## 8. 데이터 파일
 
 - `data/physiognomy_rules.sqlite`: 랜드마크 규칙 기반 관상 보조 DB
