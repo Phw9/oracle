@@ -800,7 +800,8 @@ def _parse_face_markdown_to_payload(face_analysis: str, prefix: str = "face") ->
         "캡처 신뢰도",
         "참고 고지",
         "리포트에 넣을 설명 문장",
-        "주요 태그"
+        "주요 태그",
+        "세부 관찰"
     )
 
     for line in lines:
@@ -814,7 +815,7 @@ def _parse_face_markdown_to_payload(face_analysis: str, prefix: str = "face") ->
                 title = parts[0].strip()
                 desc = parts[1].strip()
                 
-                if title in system_keywords:
+                if title in system_keywords or not desc:
                     continue
                     
                 if "(" in desc:
