@@ -15,7 +15,3 @@ llama.cpp/
 data/*.sqlite
 systemd/llama-server.service
 systemd/oracle-report.service
-venv/
-.python-version
-!samples/reports/
-!samples/reports/**
