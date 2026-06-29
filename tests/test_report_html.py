@@ -294,7 +294,7 @@ def test_report_graphic_hanja_glyphs_use_black_text() -> None:
     assert ".person-mark.c-su .person-ko{color:#fff}" in html
 
 
-def test_summary_and_body_share_line_wrapping_width() -> None:
+def test_report_block_text_uses_full_block_width() -> None:
     profile = BirthProfile(
         name="tester",
         birth_datetime=datetime(1995, 3, 15, 12, 0),
@@ -310,5 +310,9 @@ def test_summary_and_body_share_line_wrapping_width() -> None:
         skip_face=True,
     )
 
-    assert ".b-sum{font-size:15.5px;line-height:1.78;color:var(--mok);font-weight:400;margin-bottom:12px;padding-left:14px;border-left:3px solid var(--mok);max-width:42ch}" in html
-    assert ".b-body{font-size:15.5px;line-height:1.78;color:var(--ink);max-width:42ch}" in html
+    assert ".b-sum{font-size:15.5px;line-height:1.78;color:var(--mok);font-weight:400;margin-bottom:12px;padding-left:14px;border-left:3px solid var(--mok)}" in html
+    assert ".b-body{font-size:15.5px;line-height:1.78;color:var(--ink)}" in html
+    assert ".b-sum{" in html
+    assert ".b-body{" in html
+    assert "max-width:42ch}.part.saju .b-sum" not in html
+    assert ".b-body{font-size:15.5px;line-height:1.78;color:var(--ink);max-width:" not in html
