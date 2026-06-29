@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable, Generic, Protocol, TypeVar
@@ -221,13 +222,12 @@ def run_personal_workflow(
         manse_lookup = manse_timed.value
 
     if not workflow_input.skip_face and capture_artifact is not None:
-        face_analysis = timing_recorder.run(
-            "face_analysis",
-            _build_single_face_analysis,
-            profile,
-            capture_artifact,
-            active_report_client,
-        )
+        face_builder = _build_single_face_analysis
+        face_args: tuple[object, ...] = (profile, capture_artifact, active_report_client)
+        if _configured_face_analysis_mode() == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+            face_builder = _build_single_rule_based_face_analysis
+            face_args = (capture_artifact,)
+        face_analysis = timing_recorder.run("face_analysis", face_builder, *face_args)
         face_analysis_text = face_analysis.text
     else:
         face_analysis_text = ""
@@ -390,14 +390,21 @@ def run_compatibility_workflow(
         timing_recorder.add(manse_timed.timing)
         left_manse, right_manse = manse_timed.value
 
-    face_analysis = timing_recorder.run(
-        "face_analysis_pair",
-        _build_pair_face_analysis,
+    pair_face_builder = _build_pair_face_analysis
+    pair_face_args: tuple[object, ...] = (
         left_profile,
         right_profile,
         capture_artifact,
         mode,
         active_report_client,
+    )
+    if _configured_face_analysis_mode() == FACE_ANALYSIS_MODE_LANDMARK_RULE:
+        pair_face_builder = _build_pair_rule_based_face_analysis
+        pair_face_args = (left_profile, right_profile, capture_artifact)
+    face_analysis = timing_recorder.run(
+        "face_analysis_pair",
+        pair_face_builder,
+        *pair_face_args,
     )
     saju_analysis = timing_recorder.run(
         "saju_analysis_pair",
@@ -562,6 +569,18 @@ def _build_single_face_analysis(
     return result
 
 
+def _build_single_rule_based_face_analysis(
+    artifact: CaptureArtifact,
+) -> _GeneratedText:
+    text = artifact.quality.face_payload_json.strip()
+    error = ""
+    if text == "":
+        text = artifact.face_analysis.strip()
+        error = "rule-based face payload is unavailable; using capture face analysis memo"
+    result = _GeneratedText(text=text, error=error)
+    return result
+
+
 def _build_pair_face_analysis(
     left_profile: BirthProfile,
     right_profile: BirthProfile,
@@ -594,6 +613,68 @@ def _build_pair_face_analysis(
         "궁합 관상정보를 생성하지 못했습니다.",
         debug_label="face_analysis",
     )
+    return result
+
+
+def _build_pair_rule_based_face_analysis(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    artifact: SequentialPairCaptureArtifact,
+) -> _GeneratedText:
+    from oracle_report.vision.physiognomy_text_variations import build_pair_face_payload
+
+    left_matches = _quality_rule_matches(artifact.left.quality)
+    right_matches = _quality_rule_matches(artifact.right.quality)
+    payload = build_pair_face_payload(
+        left_matches,
+        right_matches,
+        left_profile.name,
+        right_profile.name,
+        _pair_face_seed(left_profile, right_profile, left_matches, right_matches),
+    )
+    text = json.dumps(payload, ensure_ascii=False)
+    result = _GeneratedText(text=text, error="")
+    return result
+
+
+def _quality_rule_matches(quality) -> tuple[Any, ...]:
+    from oracle_report.vision.physiognomy_rule_repository import PhysiognomyRuleMatch
+
+    raw_text = getattr(quality, "landmark_matches_json", "").strip()
+    rows: list[Any] = []
+    if raw_text != "":
+        try:
+            loaded = json.loads(raw_text)
+        except json.JSONDecodeError:
+            loaded = []
+        if isinstance(loaded, list):
+            rows = loaded
+    result = tuple(
+        PhysiognomyRuleMatch(
+            rule_id=str(row.get("rule_id", "")),
+            metric=str(row.get("metric", "")),
+            title=str(row.get("title", "")),
+            basis=str(row.get("basis", "")),
+            tag=str(row.get("tag", "")),
+            observation=str(row.get("observation", "")),
+            interpretation=str(row.get("interpretation", "")),
+            value=float(row.get("value", 0.0)),
+        )
+        for row in rows
+        if isinstance(row, dict)
+    )
+    return result
+
+
+def _pair_face_seed(
+    left_profile: BirthProfile,
+    right_profile: BirthProfile,
+    left_matches: tuple[Any, ...],
+    right_matches: tuple[Any, ...],
+) -> str:
+    left_tags = ",".join(getattr(match, "tag", "") for match in left_matches[:6])
+    right_tags = ",".join(getattr(match, "tag", "") for match in right_matches[:6])
+    result = f"{left_profile.name}:{right_profile.name}:{left_tags}:{right_tags}"
     return result
 
 
@@ -1225,6 +1306,12 @@ def _validate_face_analysis_mode(mode: int | str) -> int:
     result = int(mode)
     if result not in FACE_ANALYSIS_MODES:
         raise ValueError("관상 분석 모드는 1 또는 2여야 합니다.")
+    return result
+
+
+def _configured_face_analysis_mode() -> int:
+    raw_mode = os.getenv("ORACLE_FACE_ANALYSIS_MODE", str(FACE_ANALYSIS_MODE_LLM_IMAGE))
+    result = _validate_face_analysis_mode(raw_mode)
     return result
 
 

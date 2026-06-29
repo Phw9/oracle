@@ -23,7 +23,9 @@ from oracle_report.vision.landmarks import (
     _format_prompt_metric_snapshot,
     _format_prompt_rule_hints,
     _physiognomy_rule_repository,
+    build_rule_based_face_payload_json,
     build_rule_based_face_analysis,
+    rule_matches_to_json,
 )
 
 
@@ -119,6 +121,8 @@ def _build_mock_capture_artifact(
         landmark_context_text=_format_prompt_observation_context(matches),
         landmark_rules_text=_format_prompt_rule_hints(matches),
         face_analysis=build_rule_based_face_analysis(metrics, matches),
+        face_payload_json=build_rule_based_face_payload_json(metrics, matches),
+        landmark_matches_json=rule_matches_to_json(matches),
     )
     return CaptureArtifact(
         image_path=image_path,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from oracle_report.workflow import (
     run_compatibility_workflow,
     run_personal_workflow,
 )
+from oracle_report.vision.runtime import run_capture
 
 
 def _report_blocks(prefix: str, count: int) -> list[dict[str, str]]:
@@ -209,6 +211,15 @@ class FailingFaceClient:
         raise AssertionError("face LLM must not run in landmark rule mode")
 
 
+class FailsOnFacePromptClient(FakeLlmClient):
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        is_saju_prompt = "\"saju_blocks\"" in prompt
+        if ("face_blocks" in prompt or "pair_blocks" in prompt) and not is_saju_prompt:
+            raise AssertionError("face LLM must not run in landmark rule mode")
+        result = super().generate(prompt, image_path)
+        return result
+
+
 class PartialFinalReportClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         del prompt
@@ -294,6 +305,38 @@ def test_personal_workflow_uses_rule_based_face(tmp_path: Path) -> None:
     assert "시간 미상" in result.report_html
 
 
+def test_personal_workflow_rulebase_mode_skips_face_llm(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+    capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="모름",
+        gender="남성",
+        target_gender="여성",
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        report_client=FailsOnFacePromptClient(),
+        capture_runner=run_capture,
+    )
+    payload = json.loads(result.face_analysis)
+
+    assert payload["face_subtitle"]
+    assert len(payload["face_blocks"]) == 5
+    assert "타고난 인상과 기본 상" in result.report_html
+    assert "랜드마크 룰 기반" not in result.face_analysis
+
+
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:
     capture_config = _capture_config(tmp_path)
     manse_db_path = _build_test_manse_db(tmp_path)
@@ -332,6 +375,41 @@ def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) 
     assert "궁합 행동 제목" in result.report_html
     assert result.left_capture_path.parent.name == "person_1"
     assert result.right_capture_path.parent.name == "person_2"
+
+
+def test_compatibility_workflow_rulebase_mode_skips_face_llm(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+    capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = CompatibilityWorkflowInput(
+        left_name="갑",
+        left_birth_date="1995-03-15",
+        left_birth_time="14:30",
+        left_gender="남성",
+        right_name="을",
+        right_birth_date="1997-05-20",
+        right_birth_time="",
+        right_gender="여성",
+        mode="연인",
+    )
+
+    result = run_compatibility_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        report_client=FailsOnFacePromptClient(),
+        capture_runner=run_capture,
+        inter_capture_delay_seconds=0.0,
+    )
+    payload = json.loads(result.face_analysis)
+
+    assert payload["pair_subtitle"]
+    assert len(payload["pair_blocks"]) == 4
+    assert "두 사람의 관계 분위기" in result.report_html
 
 
 
@@ -536,4 +614,3 @@ def test_compatibility_workflow_status_callback_progressive(
     assert phase == "generating"
     assert "궁합" in message
     assert html != ""
-

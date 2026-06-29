@@ -27,6 +27,8 @@ class FaceQuality:
     landmark_context_text: str = ""
     landmark_rules_text: str = ""
     face_analysis: str = ""
+    face_payload_json: str = ""
+    landmark_matches_json: str = ""
 
 
 @dataclass(frozen=True)
