@@ -60,6 +60,7 @@ LLAMA_THREADS=""
 LLAMA_NGL=""
 LLAMA_BATCH_SIZE=""
 LLAMA_EXTRA_ARGS=""
+declare -a LLAMA_EXTRA_ARGS_ARR=()
 PYTHON_ENV="auto"
 POSITIONAL_ARGS=()
 RUN_LLAMA_CONTEXT_SIZE_EXPLICIT=0
@@ -293,7 +294,8 @@ parse_args() {
         shift 2
         ;;
       --extra-llama-args)
-        LLAMA_EXTRA_ARGS="$2"
+        # Parse into array to handle embedded spaces correctly
+        read -r -a LLAMA_EXTRA_ARGS_ARR <<< "$2"
         shift 2
         ;;
       *)
@@ -840,7 +842,9 @@ start_llama_server() {
     server_args+=(-b "$LLAMA_BATCH_SIZE")
   fi
 
-  if [[ -n "$LLAMA_EXTRA_ARGS" ]]; then
+  if [[ "${#LLAMA_EXTRA_ARGS_ARR[@]}" -gt 0 ]]; then
+    server_args+=("${LLAMA_EXTRA_ARGS_ARR[@]}")
+  elif [[ -n "$LLAMA_EXTRA_ARGS" ]]; then
     # split arguments safely
     # shellcheck disable=SC2206
     server_args+=($LLAMA_EXTRA_ARGS)
