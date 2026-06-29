@@ -84,7 +84,8 @@ def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
     assert prompt.name == "saju_reading"
     assert prompt.slot_id == 1
     assert prompt.prefix.strip() != ""
-    assert "자동 줄바꿈했을 때 약 6줄 분량" in prompt.prefix
+    assert "자동 줄바꿈 기준 5~6줄" in prompt.prefix
+    assert "180~220자" in prompt.prefix
     assert "줄바꿈 이스케이프" in prompt.prefix
     assert "줄바꿈은 \\n으로 표현" not in prompt.prefix
     assert "입력받은 이름 필드만 사용" in prompt.prefix
@@ -130,7 +131,8 @@ def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:
     assert "RIGHT SAJU INPUT" in prompt
     assert "face_analysis_copule" not in prompt
     assert "saju_blocks는 6개를 작성합니다" in prompt.prefix
-    assert "자동 줄바꿈했을 때 약 6줄 분량" in prompt.prefix
+    assert "자동 줄바꿈 기준 5~6줄" in prompt.prefix
+    assert "180~220자" in prompt.prefix
     assert "줄바꿈 이스케이프" in prompt.prefix
     assert "줄바꿈은 \\n으로 표현" not in prompt.prefix
     assert "입력받은 left_name/right_name 필드만 사용" in prompt.prefix
@@ -160,7 +162,7 @@ def test_couple_face_analysis_prompt_uses_pair_face_only() -> None:
     assert "right" in prompt
 
 
-def test_face_analysis_prompts_use_six_line_body_guidance() -> None:
+def test_face_analysis_prompts_use_five_to_six_line_body_guidance() -> None:
     profile = BirthProfile(name="tester", birth_datetime=datetime(1995, 3, 15, 14, 30))
     left = BirthProfile(name="left", birth_datetime=datetime(1995, 3, 15, 14, 30))
     right = BirthProfile(name="right", birth_datetime=datetime(1997, 5, 20, 9, 0))
@@ -183,7 +185,9 @@ def test_face_analysis_prompts_use_six_line_body_guidance() -> None:
     )
 
     for prompt in prompts:
-        assert "약 6줄 분량" in prompt
+        assert "자동 줄바꿈 기준 5~6줄" in prompt
+        assert "180~220자" in prompt
+        assert "약 6줄 분량" not in prompt
         assert "수동 줄바꿈" in prompt
         assert "1-2문장" not in prompt
         assert "1~2문장" not in prompt

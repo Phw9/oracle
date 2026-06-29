@@ -289,3 +289,22 @@ def test_water_profile_marks_use_white_inner_text() -> None:
 
     assert ".person-mark.c-su,.person-day.c-su{color:#fff;background:var(--su);border-color:var(--su)}" in html
     assert ".person-mark.c-su .person-ko{color:#fff}" in html
+
+
+def test_report_body_width_keeps_generated_text_to_five_or_six_lines() -> None:
+    profile = BirthProfile(
+        name="tester",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+
+    html = render_personal_report_html(
+        profile,
+        ManseRepository().lookup(profile),
+        "",
+        (),
+        '{"essence":"사주 핵심"}',
+        skip_face=True,
+    )
+
+    assert ".b-body{font-size:15.5px;line-height:1.78;color:var(--ink);max-width:64ch}" in html
