@@ -236,6 +236,7 @@ class LlamaCppChatClient:
         }
         if rendered_prompt.slot_id is not None:
             result["id_slot"] = rendered_prompt.slot_id
+        if self._config.prompt_cache:
             result["cache_prompt"] = True
         return result
 
