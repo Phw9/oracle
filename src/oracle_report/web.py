@@ -284,7 +284,7 @@ def create_app() -> Flask:
         result = _render_page(
             "두 사람 궁합",
             body,
-            page_class="input-page",
+            page_class="input-page compatibility-page",
             show_heading=False,
         )
         return result
@@ -768,29 +768,73 @@ def _compatibility_form() -> str:
     birth_time_options = _birth_time_options()
     face_mode_options = _face_analysis_mode_options()
     result = f"""
-    <form method="post" class="panel workflow-form" data-workflow-api="/api/compatibility">
-      <h2>두 사람 궁합</h2>
-      <div class="grid">
-        <fieldset>
-          <legend>첫 번째 사람</legend>
-          <label>이름<input name="left_name" required></label>
-          <label>생년월일<input name="left_birth_date" type="date" required></label>
-          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
-          <label>성별<select name="left_gender" required>{gender_options}</select></label>
-        </fieldset>
-        <fieldset>
-          <legend>두 번째 사람</legend>
-          <label>이름<input name="right_name" required></label>
-          <label>생년월일<input name="right_birth_date" type="date" required></label>
-          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
-          <label>성별<select name="right_gender" required>{gender_options}</select></label>
-        </fieldset>
+    <div class="oracle-input-shell compatibility-oracle-shell">
+      <div class="input-topbar compatibility-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/" aria-label="홈으로 돌아가기">‹</a>
+        <span class="compatibility-heart-mark" aria-hidden="true">♡</span>
       </div>
-      <label>궁합 모드<select name="mode">{mode_options}</select></label>
-      <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
-      <p class="hint">두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
-      <button type="submit">두 사람 궁합 촬영 시작</button>
-    </form>
+
+      <div class="brand compatibility-brand">
+        <div class="logo"><span aria-hidden="true">✦</span>ORACLE<span aria-hidden="true">✦</span></div>
+        <div class="tag">우리 궁합 리포트</div>
+        <div class="ornament"></div>
+      </div>
+
+      <div class="input-card compatibility-card">
+        <div class="compat-cloud compat-cloud-left" aria-hidden="true"></div>
+        <span class="compat-spark compat-spark-left" aria-hidden="true">✦</span>
+        <span class="compat-spark compat-spark-right" aria-hidden="true">✦</span>
+        <img class="compat-hero-ora" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+
+        <div class="card-head compatibility-card-head">
+          <div class="title-block">
+            <h1><span aria-hidden="true">♥</span>우리 궁합 리포트<span aria-hidden="true">♥</span></h1>
+            <p>두 사람의 인연과 궁합을 분석해드려요!</p>
+          </div>
+          <div class="compat-speech">두 사람의 정보를<br>입력해보세요!</div>
+        </div>
+
+        <form method="post" class="workflow-form compatibility-form" data-workflow-api="/api/compatibility">
+          <div class="compat-people">
+            <fieldset class="compat-person">
+              <legend><span aria-hidden="true">♥</span>첫 번째 사람</legend>
+              <label>이름<input name="left_name" placeholder="이름을 입력해주세요" required></label>
+              <label>생년월일<input name="left_birth_date" type="date" required></label>
+              <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
+              <label>성별<select name="left_gender" required>{gender_options}</select></label>
+            </fieldset>
+
+            <div class="compat-heart-bridge" aria-hidden="true">
+              <span>♥</span>
+            </div>
+
+            <fieldset class="compat-person">
+              <legend><span aria-hidden="true">♥</span>두 번째 사람</legend>
+              <label>이름<input name="right_name" placeholder="이름을 입력해주세요" required></label>
+              <label>생년월일<input name="right_birth_date" type="date" required></label>
+              <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
+              <label>성별<select name="right_gender" required>{gender_options}</select></label>
+            </fieldset>
+          </div>
+
+          <div class="compat-options">
+            <label>궁합 모드<select name="mode">{mode_options}</select></label>
+            <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
+          </div>
+
+          <p class="compat-note"><span aria-hidden="true">💡</span>두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
+
+          <div class="compat-actions">
+            <button type="submit" class="btn btn-primary compat-submit">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              우리 궁합 촬영 시작
+            </button>
+          </div>
+        </form>
+
+        <img class="compat-bottom-ora" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+      </div>
+    </div>
     {_bottom_nav("compatibility")}
     """
     return result
@@ -2178,6 +2222,376 @@ def _render_page(
             width: 54px;
             height: 58px;
             object-fit: contain;
+          }}
+          main.compatibility-page {{
+            width: min(1120px, calc(100vw - 58px));
+            padding: 24px 0 104px;
+          }}
+          .compatibility-oracle-shell {{
+            position: relative;
+            width: 100%;
+          }}
+          .compatibility-topbar {{
+            top: 4px;
+          }}
+          .compatibility-heart-mark {{
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd7cc;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: #ffb6c2;
+            font-size: 31px;
+            box-shadow: 0 12px 28px -22px rgba(74, 47, 38, 0.45);
+            transform: rotate(-16deg);
+          }}
+          .compatibility-brand {{
+            margin-bottom: 42px;
+          }}
+          .compatibility-brand .logo {{
+            display: inline-flex;
+            align-items: center;
+            gap: 22px;
+            font-size: 36px;
+            line-height: 1;
+          }}
+          .compatibility-brand .logo span {{
+            color: #ffd36f;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 24px;
+          }}
+          .compatibility-brand .tag {{
+            margin-top: 14px;
+            color: #8f5d3e;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            text-transform: none;
+          }}
+          .compatibility-brand .ornament {{
+            margin-top: 13px;
+          }}
+          .compatibility-brand .ornament::before {{
+            content: "×";
+            top: -13px;
+            background: #fff8ef;
+          }}
+          .compatibility-card {{
+            position: relative;
+            min-height: 0;
+            padding: 40px 36px 30px;
+            border: 2px solid #ffd8ce;
+            border-radius: 24px;
+            background:
+              radial-gradient(circle at 82% 10%, rgba(255, 239, 242, 0.9), transparent 22%),
+              radial-gradient(circle at 18% 58%, rgba(255, 246, 235, 0.88), transparent 32%),
+              rgba(255, 255, 255, 0.86);
+            box-shadow:
+              0 22px 52px -36px rgba(74, 47, 38, 0.42),
+              inset 0 0 0 8px rgba(255, 249, 245, 0.92);
+          }}
+          .compatibility-card::before {{
+            inset: 9px;
+            border-color: #ffdcd4;
+            border-radius: 17px;
+          }}
+          .compat-cloud {{
+            position: absolute;
+            top: -58px;
+            width: 124px;
+            height: 48px;
+            border: 2px solid #ffd7b0;
+            border-top: 0;
+            border-radius: 0 0 38px 38px;
+            opacity: 0.9;
+          }}
+          .compat-cloud::before,
+          .compat-cloud::after {{
+            content: "";
+            position: absolute;
+            bottom: 17px;
+            border: 2px solid #ffd7b0;
+            border-bottom: 0;
+            background: #fff8ef;
+          }}
+          .compat-cloud::before {{
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .compat-cloud::after {{
+            right: 18px;
+            width: 58px;
+            height: 58px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .compat-cloud-left {{
+            left: 120px;
+          }}
+          .compat-spark {{
+            position: absolute;
+            color: #ffd36f;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
+          }}
+          .compat-spark-left {{
+            left: 52px;
+            top: -44px;
+          }}
+          .compat-spark-right {{
+            right: 44px;
+            top: 42px;
+          }}
+          .compat-hero-ora {{
+            position: absolute;
+            right: 90px;
+            top: -118px;
+            width: 190px;
+            height: 170px;
+            object-fit: contain;
+          }}
+          .compatibility-card-head {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 58px;
+            min-height: 112px;
+            margin-bottom: 22px;
+            text-align: center;
+          }}
+          .compatibility-card-head .title-block {{
+            min-width: 360px;
+          }}
+          .compatibility-card-head h1 {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 34px;
+            line-height: 1.15;
+          }}
+          .compatibility-card-head h1 span {{
+            color: #ff8fab;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
+          }}
+          .compatibility-card-head p {{
+            margin: 16px 0 0;
+            color: #9a6d75;
+            font-family: "Gowun Batang", serif;
+            font-size: 17px;
+          }}
+          .compat-speech {{
+            position: relative;
+            min-width: 172px;
+            margin-top: -2px;
+            padding: 22px 24px;
+            border: 2px solid #f6b8c5;
+            border-radius: 50%;
+            background: #fff3f6;
+            color: #7a5158;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.55;
+          }}
+          .compat-speech::after {{
+            content: "";
+            position: absolute;
+            left: 34px;
+            bottom: -8px;
+            width: 20px;
+            height: 20px;
+            border-left: 2px solid #f6b8c5;
+            border-bottom: 2px solid #f6b8c5;
+            background: #fff3f6;
+            transform: rotate(-26deg);
+          }}
+          .compatibility-form {{
+            position: relative;
+            z-index: 1;
+          }}
+          .compat-people {{
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr);
+            gap: 22px;
+            align-items: center;
+          }}
+          .compat-person {{
+            min-height: 406px;
+            margin: 0;
+            padding: 24px 22px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.74);
+          }}
+          .compat-person legend {{
+            padding: 0 8px;
+            color: #ff6f82;
+            font-family: "Gowun Batang", serif;
+            font-size: 19px;
+            font-weight: 700;
+          }}
+          .compat-person legend span {{
+            margin-right: 8px;
+            color: #ffb4c3;
+          }}
+          .compat-person label,
+          .compat-options label {{
+            margin: 16px 0 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+          }}
+          .compat-person label:first-of-type {{
+            margin-top: 10px;
+          }}
+          .compat-person label .hint {{
+            color: #a88a83;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 11px;
+          }}
+          .compat-person input,
+          .compat-person select,
+          .compat-options select {{
+            min-height: 52px;
+            margin-top: 8px;
+            border: 1px solid #ffd7ce;
+            border-radius: 11px;
+            background-color: rgba(255, 255, 255, 0.92);
+            color: #5b3b34;
+            font-size: 16px;
+            padding: 12px 18px;
+          }}
+          .compat-person input::placeholder {{
+            color: #bca8a2;
+          }}
+          .compat-person input:focus,
+          .compat-person select:focus,
+          .compat-options select:focus {{
+            border-color: #ff9fad;
+            box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.14);
+          }}
+          .compat-person select,
+          .compat-options select {{
+            background-position: right 20px center;
+            padding-right: 46px;
+          }}
+          .compat-heart-bridge {{
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 406px;
+            color: #ff9fb1;
+          }}
+          .compat-heart-bridge::before,
+          .compat-heart-bridge::after {{
+            content: "···";
+            position: absolute;
+            top: 50%;
+            color: #ffc2ce;
+            font-size: 28px;
+            letter-spacing: 5px;
+            transform: translateY(-50%);
+          }}
+          .compat-heart-bridge::before {{
+            left: 2px;
+          }}
+          .compat-heart-bridge::after {{
+            right: -3px;
+          }}
+          .compat-heart-bridge span {{
+            width: 72px;
+            height: 72px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 10px;
+            border: 2px solid #ffbfca;
+            border-radius: 24px;
+            background: radial-gradient(circle at 35% 30%, #ffe4eb, #ffb8c7);
+            color: #ffffff;
+            font-size: 38px;
+            box-shadow: 0 14px 30px -22px rgba(255, 111, 130, 0.74);
+          }}
+          .compat-options {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 22px;
+            margin-top: 18px;
+            padding: 20px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.7);
+          }}
+          .compat-options label {{
+            margin: 0;
+          }}
+          .compat-note {{
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0 0;
+            padding: 12px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 12px;
+            background: linear-gradient(90deg, rgba(255, 242, 247, 0.94), rgba(255, 255, 255, 0.78));
+            color: #7e5a53;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: center;
+          }}
+          .compat-note span {{
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 20px;
+          }}
+          .compat-actions {{
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+          }}
+          .compat-submit {{
+            flex: 0 1 420px;
+            min-height: 68px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            border: 2px solid #ff86a4;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #ff7898 0%, #ff5f93 100%);
+            color: #ffffff;
+            font-size: 20px;
+            box-shadow: 0 16px 30px -22px rgba(255, 111, 130, 0.78);
+          }}
+          .compat-submit:hover {{
+            background: linear-gradient(135deg, #ff6b91 0%, #f65186 100%);
+          }}
+          .compat-submit img {{
+            width: 58px;
+            height: 46px;
+            object-fit: contain;
+          }}
+          .compat-bottom-ora {{
+            position: absolute;
+            right: 34px;
+            bottom: 20px;
+            width: 128px;
+            height: 142px;
+            object-fit: contain;
+            pointer-events: none;
           }}
           pre {{
             overflow: auto;
