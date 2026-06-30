@@ -97,11 +97,6 @@ def create_app() -> Flask:
               <div class="logo">ORACLE<span class="stamp serif">運</span></div>
               <div class="tag">관상 &amp; 사주 · 운명 해설</div>
             </div>
-            <div class="nav-actions" aria-label="계정 메뉴">
-              <button class="nav-pill" type="button">로그인</button>
-              <button class="nav-pill" type="button">회원가입</button>
-              <button class="nav-menu" type="button" aria-label="메뉴">☰</button>
-            </div>
           </header>
 
           <section class="home-hero">
@@ -947,7 +942,7 @@ def _render_page(
           .home-nav {{
             display: flex;
             align-items: flex-start;
-            justify-content: space-between;
+            justify-content: flex-start;
             gap: 18px;
             margin-bottom: 6px;
           }}
@@ -980,32 +975,9 @@ def _render_page(
             color: var(--ink);
             margin-top: 6px;
           }}
-          .nav-actions {{
-            display: flex;
-            align-items: center;
-            gap: 14px;
-          }}
-          .nav-pill, .nav-menu {{
-            min-height: 52px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.78);
-            border: 1px solid #f5c8c4;
-            color: var(--ink);
-            box-shadow: 0 10px 24px -20px rgba(74, 47, 38, 0.5);
-          }}
-          .nav-pill {{
-            padding: 12px 24px;
-            font-size: 15px;
-          }}
-          .nav-menu {{
-            width: 56px;
-            padding: 0;
-            font-size: 27px;
-            line-height: 1;
-          }}
           .home-hero {{
             position: relative;
-            min-height: 720px;
+            min-height: 660px;
             text-align: center;
             padding-top: 28px;
           }}
@@ -1057,14 +1029,15 @@ def _render_page(
             position: relative;
             z-index: 2;
             display: block;
-            width: min(540px, 82vw);
-            aspect-ratio: 1 / 1;
-            object-fit: cover;
+            width: min(560px, 86vw);
+            height: auto;
+            object-fit: contain;
             object-position: center center;
-            margin: 24px auto 0;
+            margin: 0 auto;
             border: 0;
-            border-radius: 999px;
-            mix-blend-mode: multiply;
+            border-radius: 0;
+            mix-blend-mode: normal;
+            transform: translateY(-38px);
           }}
           .hero-orbit {{
             position: absolute;
@@ -1304,9 +1277,9 @@ def _render_page(
             z-index: 2;
             width: 162px;
             height: 162px;
-            object-fit: cover;
-            border-radius: 999px;
-            mix-blend-mode: multiply;
+            object-fit: contain;
+            border-radius: 0;
+            mix-blend-mode: normal;
             flex: 0 0 auto;
           }}
           .feature-row {{
@@ -1784,11 +1757,8 @@ def _render_page(
             .brand-lockup .tag {{
               font-size: 14px;
             }}
-            .nav-pill {{
-              display: none;
-            }}
             .home-hero {{
-              min-height: 560px;
+              min-height: 500px;
               padding-top: 18px;
             }}
             .home-hero .speech {{
@@ -1804,7 +1774,8 @@ def _render_page(
               font-size: 17px;
             }}
             .oracle-character {{
-              width: min(360px, 88vw);
+              width: min(380px, 92vw);
+              transform: translateY(-24px);
             }}
             .hero-orbit {{
               bottom: 44px;
@@ -1863,9 +1834,6 @@ def _render_page(
             }}
           }}
           @media (max-width: 680px) {{
-            .home-nav {{
-              align-items: center;
-            }}
             .cards {{
               grid-template-columns: 1fr;
               margin-top: -18px;

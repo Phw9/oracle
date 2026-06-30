@@ -26,6 +26,9 @@ def test_home_page_uses_oracle_home_layout_and_hover_effects() -> None:
     assert response.status_code == 200
     assert 'class="oracle-home-shell"' in html
     assert 'ORACLE<span class="stamp serif">運</span>' in html
+    assert "로그인" not in html
+    assert "회원가입" not in html
+    assert 'aria-label="메뉴"' not in html
     assert "오늘도 운명을 함께 찾아볼까요?" in html
     assert "오라와 함께 나의 운명과 인연을" in html
     assert 'class="hero-orbit"' in html
@@ -56,6 +59,7 @@ def test_home_page_serves_oracle_character_illustration() -> None:
     assert 'src="/static/assets/oracle-character.png"' in html
     assert image_response.status_code == 200
     assert image_response.content_type == "image/png"
+    assert image_response.data.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_personal_input_page_links_to_separate_result_page() -> None:
