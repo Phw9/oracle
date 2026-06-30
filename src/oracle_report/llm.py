@@ -170,32 +170,43 @@ class LlamaCppChatClient:
             finish_reason = _extract_finish_reason(root)
             result = _extract_output_text(root)
 
-            speed_str = ""
             timings = root.get("timings", {}) if isinstance(root.get("timings"), dict) else {}
             predicted_per_sec = timings.get("predicted_per_second")
             predicted_ms = timings.get("predicted_ms")
             prompt_ms = timings.get("prompt_ms")
 
+            prompt_eval_val = 0.0
+            prompt_eval_str = ""
+            if isinstance(prompt_ms, (int, float)) and prompt_ms > 0:
+                prompt_eval_val = prompt_ms / 1000.0
+                prompt_eval_str = f", prompt_eval={prompt_eval_val:.2f}s"
+
+            generation_val = 0.0
+            generation_str = ""
+            if isinstance(predicted_ms, (int, float)) and predicted_ms > 0:
+                generation_val = predicted_ms / 1000.0
+                generation_str = f", generation={generation_val:.2f}s"
+
+            speed_str = ""
             if isinstance(predicted_per_sec, (int, float)) and predicted_per_sec > 0:
                 speed = predicted_per_sec
-                speed_str = f" ({speed:.2f} tokens/sec)"
-            elif isinstance(predicted_ms, (int, float)) and predicted_ms > 0 and completion_tokens > 0:
-                speed = completion_tokens / (predicted_ms / 1000.0)
-                speed_str = f" ({speed:.2f} tokens/sec)"
+                speed_str = f", speed={speed:.2f} tokens/sec"
+            elif generation_val > 0 and completion_tokens > 0:
+                speed = completion_tokens / generation_val
+                speed_str = f", speed={speed:.2f} tokens/sec"
             elif completion_tokens > 0 and elapsed > 0:
                 speed = completion_tokens / elapsed
-                speed_str = f" ({speed:.2f} tokens/sec)"
-
-            eval_info = ""
-            if isinstance(prompt_ms, (int, float)) and prompt_ms > 0:
-                eval_info = f", prompt_eval={prompt_ms / 1000.0:.2f}s"
+                speed_str = f", speed={speed:.2f} tokens/sec"
 
             print(
                 f"[LLM] Inference complete: prompt_tokens={prompt_tokens}, "
                 f"cached_tokens={cached_tokens}, "
                 f"completion_tokens={completion_tokens}, "
                 f"finish_reason={finish_reason or 'unknown'}, "
-                f"elapsed={elapsed:.2f}s{speed_str}{eval_info}"
+                f"elapsed={elapsed:.2f}s"
+                f"{prompt_eval_str}"
+                f"{generation_str}"
+                f"{speed_str}"
             )
             if finish_reason in _INCOMPLETE_FINISH_REASONS:
                 raise RuntimeError(
