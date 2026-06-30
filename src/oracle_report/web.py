@@ -238,7 +238,7 @@ def create_app() -> Flask:
         result = _render_page(
             "개인 리포트",
             body,
-            page_class="input-page",
+            page_class="input-page personal-page",
             show_heading=False,
         )
         return result
@@ -683,54 +683,85 @@ def _personal_form() -> str:
     target_gender_options = _gender_options(required=False)
     birth_time_options = _birth_time_options()
     result = f"""
-    <div class="oracle-input-shell">
-      <div class="brand">
-        <div class="logo">ORACLE</div>
+    <div class="oracle-input-shell personal-oracle-shell">
+      <div class="input-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/" aria-label="홈으로 돌아가기">‹</a>
+        <span class="heart-mark" aria-hidden="true">♡</span>
+      </div>
+
+      <div class="brand personal-brand">
+        <div class="logo"><span aria-hidden="true">✧</span>ORACLE<span aria-hidden="true">✧</span></div>
         <div class="tag">관상 &amp; 사주 리포트</div>
         <div class="ornament"></div>
       </div>
 
-      <div class="input-card">
-        <div class="card-head">
-          <h1>개인 리포트</h1>
-          <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
+      <div class="input-card personal-card">
+        <div class="cloud cloud-left" aria-hidden="true"></div>
+        <div class="cloud cloud-right" aria-hidden="true"></div>
+
+        <div class="card-head personal-card-head">
+          <div class="title-block">
+            <h1><span aria-hidden="true">♡</span>개인 리포트<span aria-hidden="true">♡</span></h1>
+            <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
+          </div>
+          <div class="guide-ora">
+            <div class="speech-bubble">정확한 리포트를<br>위해 정보를 입력해줘!</div>
+            <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+          </div>
         </div>
 
-        <form method="post" class="workflow-form input-form" data-workflow-api="/api/personal">
+        <form method="post" class="workflow-form input-form personal-form" data-workflow-api="/api/personal">
           <input type="hidden" name="skip_face" value="0">
-          <div class="field lead">
-            <label>이름</label>
-            <input name="name" placeholder="이름을 입력하세요" required>
-          </div>
-          <div class="field-stack">
-            <div class="field">
+          <div class="personal-field-list">
+            <div class="field personal-field lead">
+              <span class="field-icon" aria-hidden="true">☻</span>
+              <label>이름</label>
+              <input name="name" placeholder="이름을 입력해주세요" required>
+            </div>
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">▣</span>
               <label>생년월일</label>
               <input name="birth_date" type="date" required>
             </div>
-            <div class="field">
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">◷</span>
               <label>태어난 시간<span class="hint">모르면 '모름'을 선택하세요</span></label>
               <select name="birth_time">{birth_time_options}</select>
             </div>
-            <div class="field">
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">♡</span>
               <label>성별</label>
               <select name="gender" required>{gender_options}</select>
             </div>
-            <div class="field">
-              <label>추천받고 싶은 얼굴 성별</label>
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">☆</span>
+              <label>추천받고 싶은<br>얼굴 성별</label>
               <select name="target_gender">{target_gender_options}</select>
             </div>
-            <div class="field">
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">✧</span>
               <label>관상 분석 모드</label>
               <select name="face_analysis_mode">{mode_options}</select>
             </div>
           </div>
           <div class="actions">
-            <button type="submit" class="btn btn-primary" onclick="this.form.skip_face.value='0';">개인 리포트 촬영 시작</button>
-            <button type="submit" class="btn btn-ghost" onclick="this.form.skip_face.value='1';">관상 없이 사주만 보기</button>
+            <button type="submit" class="btn btn-primary" onclick="this.form.skip_face.value='0';">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              개인 리포트 촬영 시작
+              <span aria-hidden="true">✦</span>
+            </button>
+            <button type="submit" class="btn btn-ghost" onclick="this.form.skip_face.value='1';">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              관상 없이 사주만 보기
+            </button>
           </div>
         </form>
 
-        <p class="footnote">입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.</p>
+        <p class="footnote personal-footnote">
+          <span aria-hidden="true">♡</span>
+          입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.
+          <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+        </p>
       </div>
     </div>
     {_bottom_nav("personal")}
@@ -1743,6 +1774,359 @@ def _render_page(
             color: var(--ink-soft);
             margin: 16px 0 0;
             line-height: 1.7;
+          }}
+          main.personal-page {{
+            width: min(1120px, calc(100vw - 58px));
+            padding: 40px 0 116px;
+          }}
+          .personal-oracle-shell {{
+            position: relative;
+            width: 100%;
+          }}
+          .input-topbar {{
+            position: absolute;
+            top: 8px;
+            left: 0;
+            right: 0;
+            z-index: 4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+          }}
+          .back-link, .heart-mark {{
+            width: 58px;
+            height: 58px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd7cc;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: var(--ink);
+            box-shadow: 0 12px 28px -22px rgba(74, 47, 38, 0.45);
+          }}
+          .back-link {{
+            pointer-events: auto;
+            color: #5a332a;
+            font-size: 48px;
+            line-height: 0.65;
+            text-decoration: none;
+            padding-bottom: 8px;
+          }}
+          .heart-mark {{
+            color: #ffb6c2;
+            font-size: 42px;
+            transform: rotate(-18deg);
+          }}
+          .personal-brand {{
+            margin-bottom: 44px;
+          }}
+          .personal-brand .logo {{
+            display: inline-flex;
+            align-items: center;
+            gap: 28px;
+            font-size: 43px;
+            line-height: 1;
+          }}
+          .personal-brand .logo span {{
+            color: #f8ad55;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 31px;
+            font-weight: 700;
+          }}
+          .personal-brand .tag {{
+            margin-top: 18px;
+            color: #a66a42;
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            text-transform: none;
+          }}
+          .personal-brand .ornament {{
+            margin-top: 18px;
+            width: 72px;
+          }}
+          .personal-brand .ornament::before {{
+            top: -13px;
+            background: #fff8ef;
+            font-size: 15px;
+          }}
+          .personal-card {{
+            min-height: 980px;
+            padding: 66px 54px 36px;
+            border: 2px solid #ffd8ce;
+            border-radius: 34px;
+            background:
+              radial-gradient(circle at 84% 17%, rgba(255, 239, 242, 0.9), transparent 24%),
+              radial-gradient(circle at 18% 48%, rgba(255, 246, 235, 0.9), transparent 32%),
+              rgba(255, 255, 255, 0.87);
+            box-shadow:
+              0 22px 52px -36px rgba(74, 47, 38, 0.42),
+              inset 0 0 0 8px rgba(255, 249, 245, 0.92);
+          }}
+          .personal-card::before {{
+            inset: 9px;
+            border: 1px solid #ffdcd4;
+            border-radius: 26px;
+          }}
+          .cloud {{
+            position: absolute;
+            top: -56px;
+            width: 104px;
+            height: 45px;
+            border: 3px solid #ffc77e;
+            border-top: 0;
+            border-radius: 0 0 34px 34px;
+            opacity: 0.86;
+          }}
+          .cloud::before, .cloud::after {{
+            content: "";
+            position: absolute;
+            bottom: 16px;
+            border: 3px solid #ffc77e;
+            border-bottom: 0;
+            background: #fff8ef;
+          }}
+          .cloud::before {{
+            left: 18px;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .cloud::after {{
+            right: 12px;
+            width: 52px;
+            height: 52px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .cloud-left {{
+            left: 112px;
+          }}
+          .cloud-right {{
+            right: 178px;
+            top: -50px;
+            transform: scale(0.74);
+          }}
+          .personal-card-head {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 46px;
+            min-height: 170px;
+            margin-bottom: 20px;
+            text-align: center;
+          }}
+          .personal-card-head .title-block {{
+            padding-top: 18px;
+            min-width: 370px;
+          }}
+          .personal-card-head h1 {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 42px;
+            line-height: 1.15;
+          }}
+          .personal-card-head h1 span {{
+            color: #ff8fab;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 24px;
+          }}
+          .personal-card-head p {{
+            margin-top: 22px;
+            color: #92746a;
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+          }}
+          .guide-ora {{
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: -10px;
+          }}
+          .guide-ora img {{
+            width: 196px;
+            height: 192px;
+            object-fit: contain;
+          }}
+          .speech-bubble {{
+            position: relative;
+            min-width: 178px;
+            margin-top: 20px;
+            padding: 23px 26px;
+            border: 2px solid #f6b8c5;
+            border-radius: 50%;
+            background: #fff3f6;
+            color: #5b3b34;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.55;
+          }}
+          .speech-bubble::after {{
+            content: "";
+            position: absolute;
+            right: -7px;
+            bottom: 23px;
+            width: 22px;
+            height: 22px;
+            border-right: 2px solid #f6b8c5;
+            border-bottom: 2px solid #f6b8c5;
+            background: #fff3f6;
+            transform: rotate(-22deg);
+          }}
+          .personal-form {{
+            z-index: 1;
+          }}
+          .personal-field-list {{
+            overflow: hidden;
+            border: 1px solid #ffe0d8;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.72);
+          }}
+          .personal-field {{
+            display: grid;
+            grid-template-columns: 80px 160px minmax(0, 1fr);
+            align-items: center;
+            gap: 18px;
+            min-height: 126px;
+            margin: 0;
+            padding: 28px 28px;
+            border-bottom: 1px solid #ffe0d8;
+          }}
+          .personal-field:last-child {{
+            border-bottom: 0;
+          }}
+          .personal-field .field-icon {{
+            width: 62px;
+            height: 62px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd9ce;
+            border-radius: 999px;
+            background: #fff9f5;
+            color: #ff7c91;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 34px;
+            box-shadow: 0 10px 24px -20px rgba(255, 111, 130, 0.55);
+          }}
+          .personal-field:nth-child(5) .field-icon,
+          .personal-field:nth-child(6) .field-icon {{
+            color: #f8a94e;
+          }}
+          .personal-field label {{
+            margin: 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 23px;
+            line-height: 1.35;
+            font-weight: 700;
+          }}
+          .personal-field label .hint {{
+            color: #ff7890;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+          }}
+          .personal-field input,
+          .personal-field select {{
+            min-height: 72px;
+            border: 1px solid #ffd7ce;
+            border-radius: 14px;
+            background-color: rgba(255, 255, 255, 0.92);
+            color: #5b3b34;
+            font-size: 20px;
+            padding: 18px 24px;
+          }}
+          .personal-field input::placeholder {{
+            color: #bca8a2;
+          }}
+          .personal-field input:focus,
+          .personal-field select:focus {{
+            border-color: #ff9fad;
+            box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.14);
+          }}
+          .personal-field select {{
+            background-position: right 26px center;
+            padding-right: 58px;
+          }}
+          .personal-field.lead input {{
+            background: rgba(255, 255, 255, 0.92);
+            border-color: #ffd7ce;
+          }}
+          .personal-form .actions {{
+            gap: 24px;
+            margin-top: 32px;
+          }}
+          .personal-form .btn {{
+            min-height: 92px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            border-radius: 24px;
+            font-size: 23px;
+            box-shadow: 0 18px 34px -24px rgba(255, 111, 130, 0.7);
+          }}
+          .personal-form .btn img {{
+            width: 62px;
+            height: 52px;
+            object-fit: contain;
+          }}
+          .personal-form .btn span {{
+            color: #ffd55a;
+          }}
+          .personal-form .btn-primary {{
+            border: 2px solid #ff86a4;
+            background: linear-gradient(135deg, #ff7898 0%, #ff5f93 100%);
+            color: #ffffff;
+          }}
+          .personal-form .btn-primary:hover {{
+            background: linear-gradient(135deg, #ff6b91 0%, #f65186 100%);
+          }}
+          .personal-form .btn-ghost {{
+            border: 1px solid #ffd8ce;
+            background: linear-gradient(135deg, rgba(255, 250, 246, 0.96), rgba(255, 255, 255, 0.8));
+            color: #4a2f26;
+          }}
+          .personal-form .btn-ghost:hover {{
+            background: #fff7f0;
+          }}
+          .personal-footnote {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            min-height: 96px;
+            margin-top: 36px;
+            padding: 18px 92px;
+            border: 1px solid #ffe0d8;
+            border-radius: 20px;
+            background: linear-gradient(90deg, rgba(255, 242, 247, 0.94), rgba(255, 255, 255, 0.78));
+            color: #6e4940;
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            line-height: 1.65;
+          }}
+          .personal-footnote > span {{
+            position: absolute;
+            left: 26px;
+            top: 24px;
+            color: #ffb1c0;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 31px;
+          }}
+          .personal-footnote img {{
+            position: absolute;
+            right: 28px;
+            bottom: 4px;
+            width: 72px;
+            height: 76px;
+            object-fit: contain;
           }}
           pre {{
             overflow: auto;
