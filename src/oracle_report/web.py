@@ -114,7 +114,7 @@ def create_app() -> Flask:
                 <p>사주 · 관상 · 운세를<br>종합적으로 분석해드려요!</p>
                 <span class="go">시작하기 <span class="arr">→</span></span>
               </div>
-              <img src="/static/assets/oracle-character.png" alt="" aria-hidden="true">
+              <img class="mode-art mode-art-solo" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
             </a>
 
             <a class="mode pair" href="/compatibility">
@@ -124,7 +124,7 @@ def create_app() -> Flask:
                 <p>두 사람의 인연과 궁합을<br>AI가 정밀하게 분석해드려요!</p>
                 <span class="go">시작하기 <span class="arr">→</span></span>
               </div>
-              <img src="/static/assets/oracle-character.png" alt="" aria-hidden="true">
+              <img class="mode-art mode-art-pair" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
             </a>
           </div>
 
@@ -151,14 +151,23 @@ def create_app() -> Flask:
             </div>
           </div>
 
-          <footer class="home-foot">
-            <span class="foot-mascot">
-              <img src="/static/assets/oracle-character.png" alt="" aria-hidden="true">
-            </span>
-            <div>
-              <strong>ORACLE</strong>
-              <p>운명은, 프라이버시 안에서 빛납니다. <span>♡</span></p>
-            </div>
+          <footer class="home-foot" aria-label="하단 메뉴">
+            <a class="foot-item foot-item-active" href="/">
+              <span class="foot-icon">⌂</span>
+              <span>홈</span>
+            </a>
+            <a class="foot-item" href="/personal">
+              <span class="foot-icon">▤</span>
+              <span>운세 리포트</span>
+            </a>
+            <a class="foot-item" href="/compatibility">
+              <span class="foot-icon">♡</span>
+              <span>궁합 리포트</span>
+            </a>
+            <a class="foot-item" href="/">
+              <span class="foot-icon">•••</span>
+              <span>더보기</span>
+            </a>
           </footer>
         </div>
         """
@@ -886,7 +895,7 @@ def _render_page(
           }}
           main.home-page {{
             width: min(1120px, calc(100vw - 40px));
-            padding: 28px 0 42px;
+            padding: 28px 0 132px;
           }}
           h1 {{
             margin: 0 0 24px;
@@ -1149,15 +1158,22 @@ def _render_page(
           .mode:hover .go .arr {{
             transform: translateX(4px);
           }}
-          .mode img {{
+          .mode .mode-art {{
             position: relative;
             z-index: 2;
-            width: 162px;
-            height: 162px;
+            width: 190px;
+            height: 204px;
             object-fit: contain;
             border-radius: 0;
             mix-blend-mode: normal;
             flex: 0 0 auto;
+            align-self: flex-end;
+            margin: 0 -18px -18px 0;
+          }}
+          .mode .mode-art-pair {{
+            width: 184px;
+            height: 208px;
+            margin-right: -14px;
           }}
           .feature-row {{
             display: grid;
@@ -1220,39 +1236,54 @@ def _render_page(
             line-height: 1.6;
           }}
           .home-foot {{
+            position: fixed;
+            left: 50%;
+            bottom: max(14px, env(safe-area-inset-bottom));
+            z-index: 30;
+            transform: translateX(-50%);
             display: flex;
-            justify-content: center;
+            justify-content: space-around;
             align-items: center;
-            gap: 20px;
-            margin-top: 28px;
+            width: min(1000px, calc(100vw - 32px));
+            min-height: 78px;
+            margin: 0;
+            padding: 8px 0;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.94);
+            box-shadow: 0 16px 42px -24px rgba(74, 47, 38, 0.42);
+            backdrop-filter: blur(14px);
             text-align: center;
             color: var(--ink);
           }}
-          .foot-mascot {{
-            display: inline-flex;
-            width: 88px;
-            height: 88px;
-            overflow: hidden;
-            border-radius: 999px;
-          }}
-          .foot-mascot img {{
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            mix-blend-mode: multiply;
-          }}
-          .home-foot strong {{
-            display: block;
-            font-family: "Song Myung", serif;
-            font-size: 32px;
+          .foot-item {{
+            flex: 1;
+            min-height: 62px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            border-right: 1px solid var(--line-soft);
+            color: var(--ink-soft);
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
             letter-spacing: 0;
           }}
-          .home-foot p {{
-            margin: 6px 0 0;
-            font-size: 15px;
+          .foot-item:last-child {{
+            border-right: 0;
           }}
-          .home-foot span {{
+          .foot-item-active {{
             color: var(--hwa);
+          }}
+          .foot-icon {{
+            display: block;
+            min-height: 24px;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 24px;
+            line-height: 1;
           }}
           .oracle-input-shell {{
             width: 100%;
@@ -1669,9 +1700,26 @@ def _render_page(
               min-height: 48px;
               font-size: 16px;
             }}
-            .mode img {{
-              width: 112px;
-              height: 112px;
+            .mode .mode-art {{
+              width: 132px;
+              height: 150px;
+              margin: 0 -12px -12px 0;
+            }}
+            .mode .mode-art-pair {{
+              width: 126px;
+              height: 152px;
+            }}
+            .home-foot {{
+              width: calc(100vw - 24px);
+              min-height: 70px;
+              bottom: max(10px, env(safe-area-inset-bottom));
+            }}
+            .foot-item {{
+              min-height: 56px;
+              font-size: 12px;
+            }}
+            .foot-icon {{
+              font-size: 21px;
             }}
             .feature-row {{
               grid-template-columns: 1fr;
