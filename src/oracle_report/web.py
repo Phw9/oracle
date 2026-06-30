@@ -1776,8 +1776,8 @@ def _render_page(
             line-height: 1.7;
           }}
           main.personal-page {{
-            width: min(1120px, calc(100vw - 58px));
-            padding: 40px 0 116px;
+            width: min(940px, calc(100vw - 58px));
+            padding: 24px 0 104px;
           }}
           .personal-oracle-shell {{
             position: relative;
@@ -1785,7 +1785,7 @@ def _render_page(
           }}
           .input-topbar {{
             position: absolute;
-            top: 8px;
+            top: 4px;
             left: 0;
             right: 0;
             z-index: 4;
@@ -1795,8 +1795,8 @@ def _render_page(
             pointer-events: none;
           }}
           .back-link, .heart-mark {{
-            width: 58px;
-            height: 58px;
+            width: 44px;
+            height: 44px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1809,53 +1809,53 @@ def _render_page(
           .back-link {{
             pointer-events: auto;
             color: #5a332a;
-            font-size: 48px;
+            font-size: 38px;
             line-height: 0.65;
             text-decoration: none;
-            padding-bottom: 8px;
+            padding-bottom: 6px;
           }}
           .heart-mark {{
             color: #ffb6c2;
-            font-size: 42px;
+            font-size: 31px;
             transform: rotate(-18deg);
           }}
           .personal-brand {{
-            margin-bottom: 44px;
+            margin-bottom: 30px;
           }}
           .personal-brand .logo {{
             display: inline-flex;
             align-items: center;
-            gap: 28px;
-            font-size: 43px;
+            gap: 18px;
+            font-size: 32px;
             line-height: 1;
           }}
           .personal-brand .logo span {{
             color: #f8ad55;
             font-family: "Gowun Dodum", sans-serif;
-            font-size: 31px;
+            font-size: 22px;
             font-weight: 700;
           }}
           .personal-brand .tag {{
-            margin-top: 18px;
+            margin-top: 11px;
             color: #a66a42;
             font-family: "Gowun Batang", serif;
-            font-size: 18px;
+            font-size: 14px;
             text-transform: none;
           }}
           .personal-brand .ornament {{
-            margin-top: 18px;
-            width: 72px;
+            margin-top: 12px;
+            width: 58px;
           }}
           .personal-brand .ornament::before {{
             top: -13px;
             background: #fff8ef;
-            font-size: 15px;
+            font-size: 13px;
           }}
           .personal-card {{
-            min-height: 980px;
-            padding: 66px 54px 36px;
+            min-height: 0;
+            padding: 42px 44px 28px;
             border: 2px solid #ffd8ce;
-            border-radius: 34px;
+            border-radius: 26px;
             background:
               radial-gradient(circle at 84% 17%, rgba(255, 239, 242, 0.9), transparent 24%),
               radial-gradient(circle at 18% 48%, rgba(255, 246, 235, 0.9), transparent 32%),
@@ -1867,112 +1867,112 @@ def _render_page(
           .personal-card::before {{
             inset: 9px;
             border: 1px solid #ffdcd4;
-            border-radius: 26px;
+            border-radius: 19px;
           }}
           .cloud {{
             position: absolute;
-            top: -56px;
-            width: 104px;
-            height: 45px;
-            border: 3px solid #ffc77e;
+            top: -38px;
+            width: 76px;
+            height: 33px;
+            border: 2px solid #ffc77e;
             border-top: 0;
-            border-radius: 0 0 34px 34px;
+            border-radius: 0 0 25px 25px;
             opacity: 0.86;
           }}
           .cloud::before, .cloud::after {{
             content: "";
             position: absolute;
-            bottom: 16px;
-            border: 3px solid #ffc77e;
+            bottom: 12px;
+            border: 2px solid #ffc77e;
             border-bottom: 0;
             background: #fff8ef;
           }}
           .cloud::before {{
-            left: 18px;
-            width: 40px;
-            height: 40px;
+            left: 13px;
+            width: 29px;
+            height: 29px;
             border-radius: 999px 999px 0 0;
           }}
           .cloud::after {{
-            right: 12px;
-            width: 52px;
-            height: 52px;
+            right: 9px;
+            width: 38px;
+            height: 38px;
             border-radius: 999px 999px 0 0;
           }}
           .cloud-left {{
-            left: 112px;
+            left: 92px;
           }}
           .cloud-right {{
-            right: 178px;
-            top: -50px;
+            right: 142px;
+            top: -35px;
             transform: scale(0.74);
           }}
           .personal-card-head {{
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            gap: 46px;
-            min-height: 170px;
-            margin-bottom: 20px;
+            gap: 32px;
+            min-height: 126px;
+            margin-bottom: 14px;
             text-align: center;
           }}
           .personal-card-head .title-block {{
-            padding-top: 18px;
-            min-width: 370px;
+            padding-top: 12px;
+            min-width: 310px;
           }}
           .personal-card-head h1 {{
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 18px;
+            gap: 12px;
             color: #3f211b;
             font-family: "Gowun Batang", serif;
-            font-size: 42px;
+            font-size: 32px;
             line-height: 1.15;
           }}
           .personal-card-head h1 span {{
             color: #ff8fab;
             font-family: "Gowun Dodum", sans-serif;
-            font-size: 24px;
+            font-size: 18px;
           }}
           .personal-card-head p {{
-            margin-top: 22px;
+            margin-top: 13px;
             color: #92746a;
             font-family: "Gowun Batang", serif;
-            font-size: 18px;
+            font-size: 15px;
           }}
           .guide-ora {{
             display: flex;
             align-items: flex-start;
-            gap: 10px;
-            margin-top: -10px;
+            gap: 8px;
+            margin-top: -8px;
           }}
           .guide-ora img {{
-            width: 196px;
-            height: 192px;
+            width: 142px;
+            height: 138px;
             object-fit: contain;
           }}
           .speech-bubble {{
             position: relative;
-            min-width: 178px;
-            margin-top: 20px;
-            padding: 23px 26px;
+            min-width: 145px;
+            margin-top: 16px;
+            padding: 16px 20px;
             border: 2px solid #f6b8c5;
             border-radius: 50%;
             background: #fff3f6;
             color: #5b3b34;
             font-family: "Gowun Batang", serif;
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
-            line-height: 1.55;
+            line-height: 1.45;
           }}
           .speech-bubble::after {{
             content: "";
             position: absolute;
-            right: -7px;
-            bottom: 23px;
-            width: 22px;
-            height: 22px;
+            right: -6px;
+            bottom: 19px;
+            width: 17px;
+            height: 17px;
             border-right: 2px solid #f6b8c5;
             border-bottom: 2px solid #f6b8c5;
             background: #fff3f6;
@@ -1984,25 +1984,25 @@ def _render_page(
           .personal-field-list {{
             overflow: hidden;
             border: 1px solid #ffe0d8;
-            border-radius: 20px;
+            border-radius: 16px;
             background: rgba(255, 255, 255, 0.72);
           }}
           .personal-field {{
             display: grid;
-            grid-template-columns: 80px 160px minmax(0, 1fr);
+            grid-template-columns: 58px 128px minmax(0, 1fr);
             align-items: center;
-            gap: 18px;
-            min-height: 126px;
+            gap: 14px;
+            min-height: 82px;
             margin: 0;
-            padding: 28px 28px;
+            padding: 14px 22px;
             border-bottom: 1px solid #ffe0d8;
           }}
           .personal-field:last-child {{
             border-bottom: 0;
           }}
           .personal-field .field-icon {{
-            width: 62px;
-            height: 62px;
+            width: 46px;
+            height: 46px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -2011,7 +2011,7 @@ def _render_page(
             background: #fff9f5;
             color: #ff7c91;
             font-family: "Gowun Dodum", sans-serif;
-            font-size: 34px;
+            font-size: 25px;
             box-shadow: 0 10px 24px -20px rgba(255, 111, 130, 0.55);
           }}
           .personal-field:nth-child(5) .field-icon,
@@ -2022,7 +2022,7 @@ def _render_page(
             margin: 0;
             color: #3f211b;
             font-family: "Gowun Batang", serif;
-            font-size: 23px;
+            font-size: 18px;
             line-height: 1.35;
             font-weight: 700;
           }}
@@ -2034,13 +2034,13 @@ def _render_page(
           }}
           .personal-field input,
           .personal-field select {{
-            min-height: 72px;
+            min-height: 52px;
             border: 1px solid #ffd7ce;
-            border-radius: 14px;
+            border-radius: 12px;
             background-color: rgba(255, 255, 255, 0.92);
             color: #5b3b34;
-            font-size: 20px;
-            padding: 18px 24px;
+            font-size: 16px;
+            padding: 12px 18px;
           }}
           .personal-field input::placeholder {{
             color: #bca8a2;
@@ -2051,30 +2051,30 @@ def _render_page(
             box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.14);
           }}
           .personal-field select {{
-            background-position: right 26px center;
-            padding-right: 58px;
+            background-position: right 20px center;
+            padding-right: 46px;
           }}
           .personal-field.lead input {{
             background: rgba(255, 255, 255, 0.92);
             border-color: #ffd7ce;
           }}
           .personal-form .actions {{
-            gap: 24px;
-            margin-top: 32px;
+            gap: 18px;
+            margin-top: 24px;
           }}
           .personal-form .btn {{
-            min-height: 92px;
+            min-height: 66px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 18px;
-            border-radius: 24px;
-            font-size: 23px;
+            gap: 12px;
+            border-radius: 18px;
+            font-size: 18px;
             box-shadow: 0 18px 34px -24px rgba(255, 111, 130, 0.7);
           }}
           .personal-form .btn img {{
-            width: 62px;
-            height: 52px;
+            width: 44px;
+            height: 38px;
             object-fit: contain;
           }}
           .personal-form .btn span {{
@@ -2100,32 +2100,32 @@ def _render_page(
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 20px;
-            min-height: 96px;
-            margin-top: 36px;
-            padding: 18px 92px;
+            gap: 16px;
+            min-height: 68px;
+            margin-top: 24px;
+            padding: 13px 78px;
             border: 1px solid #ffe0d8;
-            border-radius: 20px;
+            border-radius: 16px;
             background: linear-gradient(90deg, rgba(255, 242, 247, 0.94), rgba(255, 255, 255, 0.78));
             color: #6e4940;
             font-family: "Gowun Batang", serif;
-            font-size: 18px;
-            line-height: 1.65;
+            font-size: 14px;
+            line-height: 1.55;
           }}
           .personal-footnote > span {{
             position: absolute;
-            left: 26px;
-            top: 24px;
+            left: 22px;
+            top: 17px;
             color: #ffb1c0;
             font-family: "Gowun Dodum", sans-serif;
-            font-size: 31px;
+            font-size: 24px;
           }}
           .personal-footnote img {{
             position: absolute;
-            right: 28px;
-            bottom: 4px;
-            width: 72px;
-            height: 76px;
+            right: 24px;
+            bottom: 2px;
+            width: 54px;
+            height: 58px;
             object-fit: contain;
           }}
           pre {{
