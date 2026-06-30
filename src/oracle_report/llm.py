@@ -171,7 +171,17 @@ class LlamaCppChatClient:
             result = _extract_output_text(root)
 
             speed_str = ""
-            if completion_tokens > 0 and elapsed > 0:
+            timings = root.get("timings", {}) if isinstance(root.get("timings"), dict) else {}
+            predicted_per_sec = timings.get("predicted_per_second")
+            predicted_ms = timings.get("predicted_ms")
+
+            if isinstance(predicted_per_sec, (int, float)) and predicted_per_sec > 0:
+                speed = predicted_per_sec
+                speed_str = f" ({speed:.2f} tokens/sec)"
+            elif isinstance(predicted_ms, (int, float)) and predicted_ms > 0 and completion_tokens > 0:
+                speed = completion_tokens / (predicted_ms / 1000.0)
+                speed_str = f" ({speed:.2f} tokens/sec)"
+            elif completion_tokens > 0 and elapsed > 0:
                 speed = completion_tokens / elapsed
                 speed_str = f" ({speed:.2f} tokens/sec)"
 
