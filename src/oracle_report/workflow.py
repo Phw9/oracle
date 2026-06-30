@@ -1187,40 +1187,436 @@ def _generate_distributed(
     image_path: Path | None,
     app_config,
 ) -> str:
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import queue
+    import threading
+    import requests
+    import time
+    import base64
+    import copy
+    from urllib.parse import urlparse
+    import socket
+    from oracle_report.config import load_face_llm_config, load_report_llm_config
+    from oracle_report.llm import LlamaCppChatClient, is_local_llm_running
 
+    face_llm_config = load_face_llm_config()
+    report_llm_config = load_report_llm_config()
+
+    # Build the task list
+    tasks = [{"is_metadata": True, "target_category": None, "retries": 0}]
+    for cat in categories:
+        tasks.append({"is_metadata": False, "target_category": cat, "retries": 0})
+
+    image_base64 = None
+    if image_path and image_path.exists():
+        image_base64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
+
+    task_queue = queue.Queue()
+    for task in tasks:
+        task_queue.put(task)
+
+    scheduler = DistributedTaskScheduler(app_config.slave_addrs)
+
+    results = []
+    results_lock = threading.Lock()
+    completed_tasks = set()  # Set of (is_metadata, target_category) that have succeeded
+    completed_lock = threading.Lock()
+
+    # Track currently active tasks per worker
+    active_assignments = {}
+    assignments_lock = threading.Lock()
+
+    def is_task_done(task):
+        with completed_lock:
+            key = (task["is_metadata"], task["target_category"])
+            return key in completed_tasks
+
+    def mark_task_done(task):
+        with completed_lock:
+            key = (task["is_metadata"], task["target_category"])
+            if key not in completed_tasks:
+                completed_tasks.add(key)
+                task_queue.task_done()  # Increment queue completion safely exactly once
+
+    def find_unfinished_speculative_task(my_url, is_my_local):
+        # Speculative work stealing: find any task currently assigned to another slower node 
+        # (or just any task) that has NOT completed yet.
+        with assignments_lock:
+            for worker_url, assigned_task in active_assignments.items():
+                if assigned_task is None:
+                    continue
+                is_other_local = (worker_url == "local")
+                if is_my_local and not is_other_local:
+                    if not is_task_done(assigned_task):
+                        return copy.deepcopy(assigned_task)
+                elif not is_my_local and not is_other_local and worker_url != my_url:
+                    my_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
+                    other_score = scheduler.slave_metadata.get(worker_url, {}).get("compute_score", 5.0)
+                    if my_score > other_score:
+                        if not is_task_done(assigned_task):
+                            return copy.deepcopy(assigned_task)
+        return None
+
+    def worker_loop(slave_url: str) -> None:
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
+        is_local = False
+        try:
+            parsed = urlparse(slave_url)
+            hostname = parsed.hostname or ""
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            if hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+                is_local = True
+            elif port == app_config.port:
+                try:
+                    ip = socket.gethostbyname(hostname)
+                    if ip.startswith("127."):
+                        is_local = True
+                    else:
+                        my_hostname = socket.gethostname()
+                        if hostname == my_hostname:
+                            is_local = True
+                        else:
+                            my_ips = socket.gethostbyname_ex(my_hostname)[2]
+                            if ip in my_ips:
+                                 is_local = True
+                except Exception:
+                    if hostname == "192.168.0.13":
+                        is_local = True
+        except Exception:
+            pass
+
+        local_client = None
+        if is_local:
+            is_face = "face" in prompt_name
+            llm_config = face_llm_config if is_face else report_llm_config
+            local_client = LlamaCppChatClient(llm_config)
+            print(f"[Distributed] URL {slave_url} detected as local. Bypassing HTTP to run directly via LlamaCppChatClient.")
+
+        while True:
+            if consecutive_failures >= max_consecutive_failures:
+                print(f"[Distributed][Offline] Slave {slave_url} failed consecutively {max_consecutive_failures} times. Stopping worker thread.")
+                break
+
+            task = None
+            speculative = False
+
+            try:
+                task = task_queue.get(block=True, timeout=0.5)
+                if is_task_done(task):
+                    task_queue.task_done()
+                    continue
+            except queue.Empty:
+                task = find_unfinished_speculative_task(slave_url, is_local)
+                if task is None:
+                    break
+                speculative = True
+
+            with assignments_lock:
+                active_assignments[slave_url] = task
+
+            is_meta = task["is_metadata"]
+            cat = task["target_category"]
+
+            # If it's a remote slave, check its availability status first (Hybrid Mode Support)
+            compute_score = 5.0
+            if not is_local:
+                try:
+                    status_url = f"{slave_url.rstrip('/')}/api/distributed/status"
+                    res = requests.get(status_url, timeout=2.0)
+                    if res.status_code == 200:
+                        status_data = res.json()
+                        if status_data.get("status") == "busy" and not speculative:
+                            task_queue.put(task)
+                            task_queue.task_done()
+                            time.sleep(1.0)
+                            continue
+                        score = status_data.get("compute_score")
+                        if score is not None:
+                            scheduler.slave_metadata[slave_url]["compute_score"] = float(score)
+                            compute_score = float(score)
+                except Exception:
+                    compute_score = scheduler.slave_metadata.get(slave_url, {}).get("compute_score", 5.0)
+            else:
+                try:
+                    compute_score = local_client.get_compute_score()
+                except Exception:
+                    compute_score = 5.0
+
+            # Task Routing based on performance
+            if not speculative:
+                is_core_category = cat in (
+                    "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
+                    "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
+                    "첫인상과 분위기", "관계 강점"
+                )
+                if is_core_category and compute_score < 20.0:
+                    other_high_perf_exists = any(
+                        meta.get("compute_score", 0.0) >= 20.0 
+                        for meta in scheduler.slave_metadata.values()
+                    )
+                    if other_high_perf_exists:
+                        task_queue.put(task)
+                        task_queue.task_done()
+                        time.sleep(0.5)
+                        continue
+
+            rendered = None
+            if is_local or app_config.debug:
+                from oracle_report.prompt_templates import render_distributed_prompt_template
+                try:
+                    rendered = render_distributed_prompt_template(
+                        name=prompt_name,
+                        values=values,
+                        target_category=cat,
+                        is_metadata=is_meta,
+                    )
+                except Exception as e:
+                    rendered = f"[Failed to render prompt for debug/local]: {e}"
+
+            if app_config.debug:
+                prefix_tag = "SPECULATIVE" if speculative else "NORMAL"
+                print(f"\n--- [DEBUG: Distributed {prefix_tag} Request to {slave_url}] ---")
+                print(f"Category: {cat or 'metadata'}")
+                print(f"Prompt:\n{rendered}")
+                print("-" * 50 + "\n", flush=True)
+
+            success = False
+            output = None
+            error_msg = ""
+            start_time = time.perf_counter()
+
+            if is_local:
+                try:
+                    output = local_client.generate(rendered, image_path=image_path)
+                    success = True
+                except Exception as e:
+                    error_msg = f"Direct local generation failed: {e}"
+            else:
+                api_url = f"{slave_url.rstrip('/')}/api/distributed/generate"
+                payload = {
+                    "prompt_name": prompt_name,
+                    "target_category": cat,
+                    "is_metadata": is_meta,
+                    "values": values,
+                    "image_base64": image_base64
+                }
+                try:
+                    res = requests.post(api_url, json=payload, timeout=300.0)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if data.get("status") == "success":
+                            success = True
+                            output = data.get("output")
+                        else:
+                            error_msg = data.get("error", "Unknown slave error")
+                    else:
+                        error_msg = f"HTTP status {res.status_code}"
+                except Exception as e:
+                    error_msg = str(e)
+
+            elapsed = time.perf_counter() - start_time
+            device_name = "local" if is_local else slave_url
+
+            with assignments_lock:
+                active_assignments[slave_url] = None
+
+            if success:
+                consecutive_failures = 0
+                print(f"[Distributed] Task '{cat or 'metadata'}' completed on {device_name} in {elapsed:.2f}s")
+                already_done = is_task_done(task)
+                if not already_done:
+                    mark_task_done(task)
+                    with results_lock:
+                        results.append({"task": task, "success": True, "output": output})
+            else:
+                consecutive_failures += 1
+                print(f"[Distributed] Task '{cat or 'metadata'}' failed on {device_name} in {elapsed:.2f}s. Error: {error_msg}")
+                if not speculative:
+                    task["retries"] += 1
+                    if task["retries"] <= 3:
+                        print(f"[Distributed][Retry] Task {cat or 'metadata'} failed on {slave_url} (Error: {error_msg}). Retrying ({task['retries']}/3)...")
+                        task_queue.put(task)
+                        time.sleep(1.0)
+                    else:
+                        print(f"[Distributed][Error] Task {cat or 'metadata'} failed on {slave_url} after 3 retries. Error: {error_msg}")
+                        mark_task_done(task)
+                        with results_lock:
+                            results.append({"task": task, "success": False, "error": error_msg})
+                        task_queue.task_done()
+
+    def local_worker_loop() -> None:
+        from oracle_report.prompt_templates import render_distributed_prompt_template
+        is_face = "face" in prompt_name
+        llm_config = face_llm_config if is_face else report_llm_config
+        client = LlamaCppChatClient(llm_config)
+
+        try:
+            local_score = client.get_compute_score()
+        except Exception:
+            local_score = 5.0
+
+        while True:
+            task = None
+            speculative = False
+
+            try:
+                task = task_queue.get(block=True, timeout=0.5)
+                if is_task_done(task):
+                    task_queue.task_done()
+                    continue
+            except queue.Empty:
+                task = find_unfinished_speculative_task("local", True)
+                if task is None:
+                    break
+                speculative = True
+
+            with assignments_lock:
+                active_assignments["local"] = task
+
+            is_meta = task["is_metadata"]
+            cat = task["target_category"]
+
+            if not speculative:
+                is_core_category = cat in (
+                    "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
+                    "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
+                    "첫인상과 분위기", "관계 강점"
+                )
+                if is_core_category and local_score < 20.0:
+                    other_high_perf_exists = any(
+                        meta.get("compute_score", 0.0) >= 20.0 
+                        for meta in scheduler.slave_metadata.values()
+                    )
+                    if other_high_perf_exists:
+                        task_queue.put(task)
+                        task_queue.task_done()
+                        time.sleep(0.5)
+                        continue
+
+            rendered = render_distributed_prompt_template(
+                name=prompt_name,
+                values=values,
+                target_category=cat,
+                is_metadata=is_meta,
+            )
+
+            if app_config.debug:
+                prefix_tag = "SPECULATIVE" if speculative else "NORMAL"
+                print(f"\n--- [DEBUG: Distributed Local {prefix_tag} Request] ---")
+                print(f"Category: {cat or 'metadata'}")
+                print(f"Prompt:\n{rendered}")
+                print("-" * 50 + "\n", flush=True)
+
+            success = False
+            output = None
+            error_msg = ""
+            start_time = time.perf_counter()
+            try:
+                output = client.generate(rendered, image_path=image_path)
+                success = True
+            except Exception as e:
+                error_msg = str(e)
+
+            elapsed = time.perf_counter() - start_time
+
+            with assignments_lock:
+                active_assignments["local"] = None
+
+            if success:
+                print(f"[Distributed] Task '{cat or 'metadata'}' completed on local in {elapsed:.2f}s")
+                already_done = is_task_done(task)
+                if not already_done:
+                    mark_task_done(task)
+                    with results_lock:
+                        results.append({"task": task, "success": True, "output": output})
+            else:
+                print(f"[Distributed] Task '{cat or 'metadata'}' failed on local in {elapsed:.2f}s. Error: {error_msg}")
+                if not speculative:
+                    task["retries"] += 1
+                    if task["retries"] <= 3:
+                        print(f"[Distributed][Retry] Local task {cat or 'metadata'} failed (Error: {error_msg}). Retrying ({task['retries']}/3)...")
+                        task_queue.put(task)
+                        time.sleep(1.0)
+                    else:
+                        print(f"[Distributed][Error] Local task {cat or 'metadata'} failed after 3 retries. Error: {error_msg}")
+                        mark_task_done(task)
+                        with results_lock:
+                            results.append({"task": task, "success": False, "error": error_msg})
+
+    threads = []
     worker_urls = list(app_config.slave_addrs)
-    # 하이브리드 모드이거나 슬레이브 주소가 아예 지정되지 않은 경우 로컬 워커를 풀에 포함
     if app_config.distributed_role == "hybrid" or not worker_urls:
         if "local" not in worker_urls:
             worker_urls.append("local")
 
-    tasks = [{"is_metadata": True, "target_category": None}]
-    tasks.extend({"is_metadata": False, "target_category": item} for item in categories)
-    image_base64 = _encode_distributed_image(image_path)
-    results = []
-    # 모든 태스크를 병렬로 즉시 전송하기 위해 max_workers를 len(tasks)로 설정
-    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-        futures = []
-        scheduler = DistributedTaskScheduler(worker_urls)
-        for task in tasks:
-            worker_url = scheduler.select_slave("distributed-task")
-            futures.append(
-                executor.submit(
-                    _run_distributed_task,
-                    worker_url,
-                    prompt_name,
-                    values,
-                    task,
-                    image_path,
-                    image_base64,
-                    app_config,
-                ),
-            )
-        for future in as_completed(futures):
-            results.append(future.result())
-    payload = _combine_distributed_outputs(prompt_name, categories, results)
-    result = json.dumps(payload, ensure_ascii=False)
+    for url in worker_urls:
+        if url == "local":
+            for _ in range(2):
+                t = threading.Thread(target=local_worker_loop, daemon=True)
+                t.start()
+                threads.append(t)
+        else:
+            t = threading.Thread(target=worker_loop, args=(url,), daemon=True)
+            t.start()
+            threads.append(t)
+
+    while task_queue.unfinished_tasks > 0:
+        active_workers = any(t.is_alive() for t in threads)
+        if not active_workers:
+            print("[Distributed][Fatal] All worker threads have terminated, but some tasks are still unfinished. Breaking to avoid deadlock.")
+            break
+        time.sleep(0.5)
+
+    meta_output = {}
+    blocks_outputs = []
+
+    for r in results:
+        if not r["success"]:
+            print(f"[Distributed] Task failed: {r.get('error')}")
+            continue
+
+        output_str = r["output"]
+        cleaned = output_str.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and (lines[0].startswith("```json") or lines[0] == "```"):
+                cleaned = "\n".join(lines[1:-1])
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start >= 0 and end >= start:
+            cleaned = cleaned[start : end + 1]
+
+        try:
+            parsed = json.loads(cleaned)
+        except Exception as e:
+            print(f"[Distributed] JSON parsing failed: {e}")
+            parsed = {}
+
+        if r["task"]["is_metadata"]:
+            meta_output = parsed
+        else:
+            blocks_outputs.append(parsed)
+
+    final_dict = meta_output
+    block_key = "saju_blocks"
+    if "face" in prompt_name:
+        block_key = "pair_blocks" if ("couple" in prompt_name or "copule" in prompt_name) else "face_blocks"
+
+    ordered_blocks = []
+    for cat in categories:
+        matched = None
+        for b in blocks_outputs:
+            if b.get("category") == cat:
+                matched = b
+                break
+        if matched:
+            ordered_blocks.append(matched)
+        else:
+            ordered_blocks.append({"category": cat, "title": "분석 오류", "summary": "연산 실패", "body": "해당 카테고리의 분석을 생성하지 못했습니다."})
+
+    final_dict[block_key] = ordered_blocks
+    result = json.dumps(final_dict, ensure_ascii=False)
     return result
 
 
