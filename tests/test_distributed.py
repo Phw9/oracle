@@ -49,7 +49,7 @@ def test_distributed_prompt_split_category() -> None:
     assert "[분석 대상 카테고리]" in rendered.body
 
 
-def test_distributed_prompt_rejects_saju_split() -> None:
+def test_distributed_prompt_saju_split() -> None:
     values = {
         "name": "홍길동",
         "gender": "남성",
@@ -59,12 +59,13 @@ def test_distributed_prompt_rejects_saju_split() -> None:
         "saju_text": "사주 테스트 텍스트",
     }
 
-    with pytest.raises(ValueError, match="unsupported distributed prompt template"):
-        render_distributed_prompt_template(
-            name="saju_reading",
-            values=values,
-            is_metadata=True,
-        )
+    rendered = render_distributed_prompt_template(
+        name="saju_reading",
+        values=values,
+        is_metadata=True,
+    )
+    assert "essence" in rendered.body
+    assert "saju_subtitle" in rendered.body
 
 
 def test_distributed_task_scheduler_round_robin() -> None:

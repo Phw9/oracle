@@ -118,6 +118,36 @@ class FakeLlmClient:
                 },
                 ensure_ascii=False,
             )
+        elif "saju_reading" in prompt or "사주" in prompt:
+            if "category" in prompt:
+                cat = "사주"
+                num = 1
+                saju_cats = ["종합 형국", "타고난 성향과 심리 패턴", "재물운과 적성", "연애운과 인간관계", "올해의 운세", "총평 및 인생의 조언"]
+                for i, c in enumerate(saju_cats):
+                    if c in prompt:
+                        cat = c
+                        num = i + 1
+                        break
+                result = json.dumps(
+                    {
+                        "category": cat,
+                        "title": f"사주 제목 {num}",
+                        "summary": f"사주 요약 {num}",
+                        "body": _block_body("사주", num),
+                    },
+                    ensure_ascii=False,
+                )
+            else:
+                result = json.dumps(
+                    {
+                        "essence": "사주 핵심 문장",
+                        "element_note": "사주 오행 메모",
+                        "saju_subtitle": "사주 소제목",
+                        "tags": ["사주 태그"],
+                        "disclaimer": "사주 고지",
+                    },
+                    ensure_ascii=False,
+                )
         elif "face_blocks" in prompt:
             result = json.dumps(
                 {

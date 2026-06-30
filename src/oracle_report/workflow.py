@@ -891,14 +891,41 @@ def _build_saju_analysis(
     profile: BirthProfile,
     manse_lookup: ManseLookupResult,
 ) -> _GeneratedText:
-    prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
-    result = _safe_generate(
-        client,
-        prompt,
-        None,
-        "사주정보를 생성하지 못했습니다.",
-        debug_label="saju_analysis",
-    )
+    distributed_app_config = _load_active_distributed_app_config()
+    if distributed_app_config is not None:
+        categories = (
+            "종합 형국",
+            "타고난 성향과 심리 패턴",
+            "재물운과 적성",
+            "연애운과 인간관계",
+            "올해의 운세",
+            "총평 및 인생의 조언",
+        )
+        values = {
+            "name": profile.name,
+            "gender": manse_lookup.gender,
+            "timezone": "KST",
+            "saju_text": manse_lookup.formatted_text,
+        }
+        result = _safe_generate_distributed(
+            "saju_reading",
+            values,
+            categories,
+            None,
+            distributed_app_config,
+            client,
+            "사주정보를 생성하지 못했습니다.",
+            "saju_analysis",
+        )
+    else:
+        prompt = build_saju_reading_prompt(profile, manse_lookup.formatted_text)
+        result = _safe_generate(
+            client,
+            prompt,
+            None,
+            "사주정보를 생성하지 못했습니다.",
+            debug_label="saju_analysis",
+        )
     return result
 
 
@@ -910,20 +937,48 @@ def _build_compatibility_saju_analysis(
     left_manse: ManseLookupResult,
     right_manse: ManseLookupResult,
 ) -> _GeneratedText:
-    prompt = build_couple_saju_reading_prompt(
-        left_profile,
-        right_profile,
-        mode,
-        left_manse.formatted_text,
-        right_manse.formatted_text,
-    )
-    result = _safe_generate(
-        client,
-        prompt,
-        None,
-        "궁합 사주정보를 생성하지 못했습니다.",
-        debug_label="saju_analysis_couple",
-    )
+    distributed_app_config = _load_active_distributed_app_config()
+    if distributed_app_config is not None:
+        from oracle_report.saju.repository import birth_time_display_from_profile
+        categories = ("관계 구조", "상호 보완", "갈등 관리", "실천 제안")
+        values = {
+            "mode": mode,
+            "left_name": left_profile.name,
+            "left_gender": left_profile.gender,
+            "left_birth_datetime": left_profile.birth_datetime.isoformat(),
+            "left_birth_time_text": birth_time_display_from_profile(left_profile),
+            "right_name": right_profile.name,
+            "right_gender": right_profile.gender,
+            "right_birth_datetime": right_profile.birth_datetime.isoformat(),
+            "right_birth_time_text": birth_time_display_from_profile(right_profile),
+            "left_saju_text": left_manse.formatted_text,
+            "right_saju_text": right_manse.formatted_text,
+        }
+        result = _safe_generate_distributed(
+            "saju_reading_couple",
+            values,
+            categories,
+            None,
+            distributed_app_config,
+            client,
+            "궁합 사주정보를 생성하지 못했습니다.",
+            "saju_analysis_couple",
+        )
+    else:
+        prompt = build_couple_saju_reading_prompt(
+            left_profile,
+            right_profile,
+            mode,
+            left_manse.formatted_text,
+            right_manse.formatted_text,
+        )
+        result = _safe_generate(
+            client,
+            prompt,
+            None,
+            "궁합 사주정보를 생성하지 못했습니다.",
+            debug_label="saju_analysis_couple",
+        )
     return result
 
 
@@ -1005,6 +1060,7 @@ def _safe_generate_distributed(
             categories,
             image_path,
             app_config,
+            client,
         )
         print(
             f"\n[LLM RAW:{debug_label}:BEGIN]\n"
@@ -1188,6 +1244,7 @@ def _generate_distributed(
     categories: tuple[str, ...],
     image_path: Path | None,
     app_config,
+    client: TextGenerator | None = None,
 ) -> str:
     import queue
     import threading
@@ -1288,8 +1345,8 @@ def _generate_distributed(
         except Exception:
             pass
 
-        local_client = None
-        if is_local:
+        local_client = client
+        if is_local and local_client is None:
             is_face = "face" in prompt_name
             llm_config = face_llm_config if is_face else report_llm_config
             local_client = LlamaCppChatClient(llm_config)
@@ -1451,10 +1508,12 @@ def _generate_distributed(
         from oracle_report.prompt_templates import render_distributed_prompt_template
         is_face = "face" in prompt_name
         llm_config = face_llm_config if is_face else report_llm_config
-        client = LlamaCppChatClient(llm_config)
+        local_client = client
+        if local_client is None:
+            local_client = LlamaCppChatClient(llm_config)
 
         try:
-            local_score = client.get_compute_score()
+            local_score = local_client.get_compute_score()
         except Exception:
             local_score = 5.0
 
@@ -1515,7 +1574,7 @@ def _generate_distributed(
             error_msg = ""
             start_time = time.perf_counter()
             try:
-                output = client.generate(rendered, image_path=image_path)
+                output = local_client.generate(rendered, image_path=image_path)
                 success = True
             except Exception as e:
                 error_msg = str(e)
