@@ -1641,7 +1641,8 @@ def _generate_distributed(
                 is_core_category = cat in (
                     "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
                     "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
-                    "첫인상과 분위기", "관계 강점"
+                    "첫인상과 분위기", "관계 강점",
+                    "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
                 if is_core_category and compute_score < 20.0:
                     other_high_perf_exists = any(
@@ -1776,7 +1777,8 @@ def _generate_distributed(
                 is_core_category = cat in (
                     "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
                     "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
-                    "첫인상과 분위기", "관계 강점"
+                    "첫인상과 분위기", "관계 강점",
+                    "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
                 if is_core_category and local_score < 20.0:
                     other_high_perf_exists = any(
