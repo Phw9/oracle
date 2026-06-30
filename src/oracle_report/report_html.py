@@ -175,6 +175,7 @@ class _CompatibilityReportView:
     saju_blocks: tuple[_ReportBlock, ...]
     synth_title: str
     synth_body: str
+    convergence: tuple[_Convergence, ...]
     action_title: str
     action_body: str
     tags: tuple[str, ...]
@@ -394,6 +395,12 @@ def _build_compatibility_report_view(
     payload = _load_generated_payload(generated_text)
     left_view = _compatibility_person_view(left_profile, left_manse)
     right_view = _compatibility_person_view(right_profile, right_manse)
+    saju_text = "\n".join(
+        (
+            left_manse.reading.interpretation,
+            right_manse.reading.interpretation,
+        ),
+    )
     result = _CompatibilityReportView(
         left=left_view,
         right=right_view,
@@ -431,8 +438,9 @@ def _build_compatibility_report_view(
         synth_body=_payload_text(
             payload,
             "synthesis_body",
-            "두 사람의 사주 흐름을 중심으로 관계의 분위기와 실천 방향을 정리합니다.",
+            "두 사람의 사주 흐름과 얼굴 관찰 메모가 만나는 지점을 중심으로 관계의 분위기를 읽습니다.",
         ),
+        convergence=_payload_convergence(payload, face_analysis, saju_text),
         action_title=_payload_text(
             payload,
             "action_title",
@@ -900,10 +908,17 @@ def _render_pair_profile(person: _CompatibilityPersonView, label: str) -> str:
 
 
 def _render_compatibility_synthesis(view: _CompatibilityReportView) -> str:
+    convergence = "\n".join(
+        f"""      <div class="cv"><span class="g">{escape(item.face)}</span><span class="eq">↔</span><span class="s">{escape(item.saju)}</span></div>"""
+        for item in view.convergence
+    )
     result = f"""
   <section class="synth fade">
     <div class="b-title serif">{escape(view.synth_title)}</div>
     <div class="b-body">{_paragraphs(view.synth_body)}</div>
+    <div class="converge">
+{convergence}
+    </div>
   </section>
 """
     return result
@@ -1006,10 +1021,26 @@ def _render_block(block: _ReportBlock) -> str:
 
 
 def _render_synthesis(view: _PersonalReportView) -> str:
-    result = f"""
+    if view.skip_face:
+        result = f"""
   <section class="synth fade">
     <div class="b-title serif">{escape(view.synth_title)}</div>
     <div class="b-body">{_paragraphs(view.synth_body)}</div>
+    <div class="b-body synth-summary">{_paragraphs(view.synth_summary)}</div>
+  </section>
+"""
+    else:
+        convergence = "\n".join(
+            f"""      <div class="cv"><span class="g">{escape(item.face)}</span><span class="eq">＝</span><span class="s">{escape(item.saju)}</span></div>"""
+            for item in view.convergence
+        )
+        result = f"""
+  <section class="synth fade">
+    <div class="b-title serif">{escape(view.synth_title)}</div>
+    <div class="b-body">{_paragraphs(view.synth_body)}</div>
+    <div class="converge">
+{convergence}
+    </div>
     <div class="b-body synth-summary">{_paragraphs(view.synth_summary)}</div>
   </section>
 """

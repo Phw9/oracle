@@ -65,7 +65,7 @@ def test_compatibility_report_html_uses_structured_layout() -> None:
     assert "left 님과 right 님" in html
 
 
-def test_compatibility_report_html_hides_face_saju_comparison() -> None:
+def test_compatibility_report_html_shows_face_saju_comparison() -> None:
     repository = ManseRepository()
     left = BirthProfile(
         name="left",
@@ -101,10 +101,9 @@ def test_compatibility_report_html_hides_face_saju_comparison() -> None:
 
     assert "사주 총정리" in html
     assert "사주 흐름만 정리한 본문" in html
-    assert "궁합 관상 근거" not in html
-    assert "궁합 사주 근거" not in html
-    assert "↔" not in html
-    assert "사주와 얼굴 관찰 종합" not in html
+    assert "궁합 관상 근거" in html
+    assert "궁합 사주 근거" in html
+    assert "↔" in html
 
 
 def test_report_profile_shows_unknown_birth_time_without_helper_basis() -> None:
