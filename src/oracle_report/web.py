@@ -151,6 +151,71 @@ def create_app() -> Flask:
             </div>
           </div>
 
+          <section id="oracle-more" class="more-section" aria-label="더보기">
+            <div class="more-head">
+              <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+              <h2>오라를 더 자세히 소개할게요!</h2>
+              <p>분석 방식부터 진행 과정, 자주 묻는 질문까지 한 번에 확인해보세요.</p>
+            </div>
+
+            <div class="more-grid">
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">ORACLE은 이렇게 달라요</span>
+                  <h3>전통 지혜와 AI 기술의 완벽한 만남</h3>
+                  <ul>
+                    <li><span>◎</span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
+                    <li><span>▤</span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
+                    <li><span>♡</span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
+                    <li><span>▣</span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
+                  </ul>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+                    <p><strong>당신의 운명은 특별합니다.</strong><br>오라와 함께 더 나은 미래를 만들어가요!</p>
+                  </div>
+                </div>
+                <img class="more-preview" src="/static/assets/oracle-more-difference.png" alt="ORACLE 서비스 차별점 화면 미리보기">
+              </article>
+
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">분석 진행 과정</span>
+                  <h3>오라와 함께 운명을 분석하는 과정</h3>
+                  <ol>
+                    <li><span>1</span><strong>얼굴 인식</strong><em>사진을 촬영하거나 업로드해요.</em></li>
+                    <li><span>2</span><strong>정보 입력</strong><em>생년월일시 등 필요한 정보를 입력해요.</em></li>
+                    <li><span>3</span><strong>AI 분석</strong><em>AI가 사주와 관상을 종합 분석해요.</em></li>
+                    <li><span>4</span><strong>결과 확인</strong><em>나만의 운세 리포트를 확인해요.</em></li>
+                    <li><span>5</span><strong>안전한 저장</strong><em>결과는 기기 내에서만 안전하게 저장돼요.</em></li>
+                  </ol>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+                    <p><strong>모든 과정이 기기 내에서 안전하게!</strong><br>당신의 프라이버시를 최우선으로 생각해요.</p>
+                  </div>
+                </div>
+                <img class="more-preview" src="/static/assets/oracle-more-process.png" alt="ORACLE 분석 진행 과정 화면 미리보기">
+              </article>
+
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">오라가 도와줄게요</span>
+                  <h3>궁금할 때 바로 확인하는 도움말</h3>
+                  <div class="faq-list">
+                    <div><span>▣</span><strong>얼굴 사진은 어떻게 찍어야 하나요?</strong><em>정면을 바라보고 밝은 곳에서 찍어주세요.</em></div>
+                    <div><span>▦</span><strong>사주 정보는 어떻게 입력하나요?</strong><em>정확한 생년월일시를 입력해주시면 돼요.</em></div>
+                    <div><span>▤</span><strong>분석 결과는 어디서 확인하나요?</strong><em>운세 리포트에서 언제든 확인할 수 있어요.</em></div>
+                    <div><span>▣</span><strong>개인 정보는 안전한가요?</strong><em>100% 온디바이스 처리로 안전해요.</em></div>
+                  </div>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+                    <p><strong>오라는 언제나 여러분의 운명 친구예요!</strong><br>신뢰할 수 있는 AI 분석을 약속드려요.</p>
+                  </div>
+                </div>
+                <img class="more-preview" src="/static/assets/oracle-more-help.png" alt="ORACLE 도움말 화면 미리보기">
+              </article>
+            </div>
+          </section>
+
           <footer class="home-foot" aria-label="하단 메뉴">
             <a class="foot-item foot-item-active" href="/">
               <span class="foot-icon">⌂</span>
@@ -164,7 +229,7 @@ def create_app() -> Flask:
               <span class="foot-icon">♡</span>
               <span>궁합 리포트</span>
             </a>
-            <a class="foot-item" href="/">
+            <a class="foot-item" href="#oracle-more">
               <span class="foot-icon">•••</span>
               <span>더보기</span>
             </a>
@@ -1234,6 +1299,182 @@ def _render_page(
             color: var(--ink);
             font-size: 17px;
             line-height: 1.6;
+          }}
+          .more-section {{
+            max-width: 1320px;
+            margin: 34px auto 0;
+            scroll-margin-top: 34px;
+          }}
+          .more-head {{
+            margin-bottom: 22px;
+            text-align: center;
+          }}
+          .more-head .logo {{
+            position: relative;
+            display: inline-block;
+            font-family: "Song Myung", serif;
+            font-size: 38px;
+            letter-spacing: 0;
+            color: var(--ink);
+          }}
+          .more-head .logo .stamp {{
+            position: absolute;
+            top: -2px;
+            right: -36px;
+            width: 30px;
+            height: 30px;
+            border: 2px solid var(--hwa);
+            border-radius: 7px;
+            color: var(--hwa);
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(9deg);
+          }}
+          .more-head h2 {{
+            margin: 18px 0 8px;
+            font-family: "Gowun Batang", serif;
+            font-size: 42px;
+            color: var(--ink);
+          }}
+          .more-head p {{
+            margin: 0;
+            color: var(--ink-soft);
+            font-size: 19px;
+          }}
+          .more-grid {{
+            display: grid;
+            gap: 24px;
+          }}
+          .more-card {{
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+            gap: 26px;
+            align-items: stretch;
+            padding: 28px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 18px 46px -30px rgba(74, 47, 38, 0.34);
+            overflow: hidden;
+          }}
+          .more-card:nth-child(2) {{
+            grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+          }}
+          .more-card:nth-child(2) .more-preview {{
+            order: -1;
+          }}
+          .more-copy {{
+            min-width: 0;
+          }}
+          .more-kicker {{
+            display: inline-flex;
+            align-items: center;
+            min-height: 38px;
+            padding: 7px 16px;
+            border-radius: 999px;
+            background: rgba(255, 111, 130, 0.1);
+            color: var(--hwa);
+            font-family: "Gowun Batang", serif;
+            font-size: 17px;
+            font-weight: 700;
+          }}
+          .more-copy h3 {{
+            margin: 16px 0 20px;
+            font-family: "Gowun Batang", serif;
+            font-size: 34px;
+            line-height: 1.25;
+            color: var(--ink);
+          }}
+          .more-copy ul, .more-copy ol {{
+            display: grid;
+            gap: 14px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }}
+          .more-copy li, .faq-list div {{
+            display: grid;
+            grid-template-columns: 58px 1fr;
+            column-gap: 16px;
+            align-items: center;
+            min-height: 94px;
+            padding: 16px 18px;
+            border: 1px solid var(--line-soft);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.82);
+          }}
+          .more-copy li > span, .faq-list div > span {{
+            grid-row: span 2;
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff2e8;
+            color: var(--gold);
+            font-family: "Gowun Batang", serif;
+            font-size: 26px;
+            font-weight: 700;
+          }}
+          .more-copy li strong, .faq-list strong {{
+            display: block;
+            color: var(--ink);
+            font-family: "Gowun Batang", serif;
+            font-size: 22px;
+            line-height: 1.35;
+          }}
+          .more-copy li em, .faq-list em {{
+            display: block;
+            margin-top: 4px;
+            color: var(--ink-soft);
+            font-size: 16px;
+            font-style: normal;
+            line-height: 1.55;
+          }}
+          .faq-list {{
+            display: grid;
+            gap: 14px;
+          }}
+          .more-note {{
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-top: 18px;
+            padding: 18px 22px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(255, 111, 130, 0.12), rgba(255, 255, 255, 0.72));
+          }}
+          .more-note img {{
+            width: 96px;
+            height: 96px;
+            object-fit: contain;
+            flex: 0 0 auto;
+          }}
+          .more-note p {{
+            margin: 0;
+            color: var(--ink-soft);
+            font-size: 17px;
+            line-height: 1.55;
+          }}
+          .more-note strong {{
+            color: var(--hwa);
+            font-family: "Gowun Batang", serif;
+            font-size: 22px;
+          }}
+          .more-preview {{
+            width: 100%;
+            height: 100%;
+            min-height: 540px;
+            max-height: 720px;
+            object-fit: cover;
+            object-position: top center;
+            border: 1px solid var(--line-soft);
+            border-radius: 8px;
+            background: #fffaf4;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
           }}
           .home-foot {{
             position: fixed;
