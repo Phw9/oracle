@@ -1093,11 +1093,58 @@ def _prefixed_face_prompt_values(
 class DistributedTaskScheduler:
     def __init__(self, slave_addrs: list[str]) -> None:
         self.slave_addrs = slave_addrs
-        self.slave_metadata = {
-            addr: {"cuda": False, "weight": 1.0, "compute_score": 5.0}
-            for addr in slave_addrs
-        }
+        self.slave_metadata = {}
         self._next_index = 0
+        self._update_slave_statuses()
+
+    def _update_slave_statuses(self) -> None:
+        import requests
+        from concurrent.futures import ThreadPoolExecutor
+        from oracle_report.config import load_face_llm_config
+        from oracle_report.llm import is_local_llm_running, LlamaCppChatClient
+
+        def get_status(addr: str) -> tuple[str, dict[str, object]]:
+            if addr == "local":
+                is_busy = is_local_llm_running()
+                tps = 1.0
+                score = 2.0
+                try:
+                    llm_config = load_face_llm_config()
+                    client = LlamaCppChatClient(llm_config)
+                    tps = client.get_or_measure_tps()
+                    score = client.get_compute_score()
+                except Exception:
+                    pass
+                return addr, {
+                    "status": "busy" if is_busy else "idle",
+                    "compute_score": score,
+                    "tps": tps,
+                }
+            else:
+                try:
+                    response = requests.get(
+                        f"{addr.rstrip('/')}/api/distributed/status",
+                        timeout=2.0,
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        return addr, {
+                            "status": data.get("status", "idle"),
+                            "compute_score": float(data.get("compute_score", 5.0)),
+                            "tps": float(data.get("tps", 1.0)),
+                        }
+                except Exception:
+                    pass
+                return addr, {
+                    "status": "busy",
+                    "compute_score": 0.1,
+                    "tps": 0.1,
+                }
+
+        with ThreadPoolExecutor(max_workers=max(1, len(self.slave_addrs))) as executor:
+            results = executor.map(get_status, self.slave_addrs)
+            for addr, meta in results:
+                self.slave_metadata[addr] = meta
 
     def select_slave(self, task_name: str) -> str:
         del task_name
@@ -1105,9 +1152,32 @@ class DistributedTaskScheduler:
             raise RuntimeError(
                 "No slave addresses available for distributed task execution.",
             )
-        result = self.slave_addrs[self._next_index % len(self.slave_addrs)]
+        
+        # 1. idle한 워커 중 compute_score가 가장 높은 순으로 정렬
+        idle_workers = [
+            addr
+            for addr, meta in self.slave_metadata.items()
+            if meta.get("status") == "idle"
+        ]
+        if idle_workers:
+            idle_workers.sort(
+                key=lambda addr: self.slave_metadata[addr].get("compute_score", 1.0),
+                reverse=True,
+            )
+            selected = idle_workers[0]
+            # 한 워커로 쏠림 방지를 위해 선택된 워커의 임시 상태 변경
+            self.slave_metadata[selected]["status"] = "busy"
+            return selected
+        
+        # 2. 모든 워커가 busy하다면 전체 워커 중 compute_score가 가장 높은 순으로 라운드 로빈 선택
+        all_workers = list(self.slave_addrs)
+        all_workers.sort(
+            key=lambda addr: self.slave_metadata.get(addr, {}).get("compute_score", 1.0),
+            reverse=True,
+        )
+        selected = all_workers[self._next_index % len(all_workers)]
         self._next_index += 1
-        return result
+        return selected
 
 
 def _generate_distributed(
@@ -1119,14 +1189,20 @@ def _generate_distributed(
 ) -> str:
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    worker_urls = tuple(app_config.slave_addrs) or ("local",)
+    worker_urls = list(app_config.slave_addrs)
+    # 하이브리드 모드이거나 슬레이브 주소가 아예 지정되지 않은 경우 로컬 워커를 풀에 포함
+    if app_config.distributed_role == "hybrid" or not worker_urls:
+        if "local" not in worker_urls:
+            worker_urls.append("local")
+
     tasks = [{"is_metadata": True, "target_category": None}]
     tasks.extend({"is_metadata": False, "target_category": item} for item in categories)
     image_base64 = _encode_distributed_image(image_path)
     results = []
-    with ThreadPoolExecutor(max_workers=len(worker_urls)) as executor:
+    # 모든 태스크를 병렬로 즉시 전송하기 위해 max_workers를 len(tasks)로 설정
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         futures = []
-        scheduler = DistributedTaskScheduler(list(worker_urls))
+        scheduler = DistributedTaskScheduler(worker_urls)
         for task in tasks:
             worker_url = scheduler.select_slave("distributed-task")
             futures.append(
