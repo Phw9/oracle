@@ -49,6 +49,18 @@ FACE_ANALYSIS_MODE_LANDMARK_RULE = 2
 FACE_ANALYSIS_MODES = (FACE_ANALYSIS_MODE_LLM_IMAGE, FACE_ANALYSIS_MODE_LANDMARK_RULE)
 _UNKNOWN_BIRTH_TIME_VALUES = frozenset(("", "모름", "미상", "unknown", "none"))
 _FACE_CROP_MARGIN_RATIO = 0.2
+_SAJU_DAY_MASTER_HONORIFICS = (
+    "갑목님",
+    "을목님",
+    "병화님",
+    "정화님",
+    "무토님",
+    "기토님",
+    "경금님",
+    "신금님",
+    "임수님",
+    "계수님",
+)
 _T = TypeVar("_T")
 
 
@@ -926,6 +938,7 @@ def _build_saju_analysis(
             "사주정보를 생성하지 못했습니다.",
             debug_label="saju_analysis",
         )
+    result = _replace_day_master_honorifics(result, profile.name, "saju_analysis")
     return result
 
 
@@ -2228,6 +2241,50 @@ def _normalize_generated_output_text(text: str, label: str = "llm_json") -> str:
     result = text
     if not error and payload:
         result = json.dumps(_normalize_payload_text(payload), ensure_ascii=False)
+    return result
+
+
+def _replace_day_master_honorifics(
+    generated: _GeneratedText,
+    name: str,
+    label: str,
+) -> _GeneratedText:
+    cleaned_name = name.strip()
+    result = generated
+    if generated.error != "" or cleaned_name == "":
+        return result
+    payload, error = _load_json_payload_or_error(generated.text, label=label)
+    if error:
+        return result
+    fixed_payload = _replace_day_master_honorifics_in_value(
+        payload,
+        f"{cleaned_name}님",
+    )
+    if fixed_payload != payload:
+        print(f"[LLM JSON REPAIR:{label}] replaced day-master honorifics with input name.")
+        result = _GeneratedText(
+            text=json.dumps(_normalize_payload_text(fixed_payload), ensure_ascii=False),
+            error="",
+        )
+    return result
+
+
+def _replace_day_master_honorifics_in_value(value: Any, replacement: str) -> Any:
+    result = value
+    if isinstance(value, str):
+        result = value
+        for honorific in _SAJU_DAY_MASTER_HONORIFICS:
+            result = result.replace(honorific, replacement)
+    elif isinstance(value, list):
+        result = [
+            _replace_day_master_honorifics_in_value(item, replacement)
+            for item in value
+        ]
+    elif isinstance(value, dict):
+        result = {
+            key: _replace_day_master_honorifics_in_value(item, replacement)
+            for key, item in value.items()
+        }
     return result
 
 

@@ -334,6 +334,31 @@ class MalformedJsonReportClient:
 ```"""
 
 
+class DayMasterHonorificReportClient:
+    def generate(self, prompt: str, image_path: Path | None = None) -> str:
+        del prompt
+        del image_path
+        result = json.dumps(
+            {
+                "essence": "임수님은 넓은 시야가 돋보여요.",
+                "element_note": "임수님에게는 현실 감각을 보완하는 흐름이 필요해요.",
+                "saju_subtitle": "임수님의 균형",
+                "saju_blocks": [
+                    {
+                        "category": "종합 형국",
+                        "title": "임수님이 잡아야 할 중심",
+                        "summary": "임수님은 변화에 강한 흐름을 보여요.",
+                        "body": "임수님은 큰 흐름을 보는 힘이 있어요. 임수님은 변화를 잘 받아들일 수 있어요.",
+                    },
+                ],
+                "tags": ["임수", "변화"],
+                "disclaimer": "참고용 해석이에요.",
+            },
+            ensure_ascii=False,
+        )
+        return result
+
+
 def test_personal_workflow_runs_without_real_camera_or_llm(
     tmp_path: Path,
     capsys,
@@ -845,6 +870,39 @@ def test_personal_workflow_uses_repaired_saju_json_output(tmp_path: Path) -> Non
     assert "보정 제목" in result.report_html
     assert "보정된 결과예요." in result.report_html
     assert "보정 고지예요." in result.report_html
+
+
+def test_personal_workflow_replaces_day_master_honorific_with_name(
+    tmp_path: Path,
+) -> None:
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="",
+        gender="남성",
+        target_gender="여성",
+        skip_face=True,
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        face_llm_config=_llm_config(),
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        face_client=FailingFaceClient(),
+        report_client=DayMasterHonorificReportClient(),
+        capture_runner=None,
+    )
+
+    assert "임수님" not in result.markdown
+    assert "임수님" not in result.report_html
+    assert "홍길동님은 넓은 시야" in result.markdown
+    assert "홍길동님의 균형" in result.report_html
+    assert '"임수"' in result.markdown
 
 
 def test_personal_workflow_keeps_partial_saju_json_without_full_ui_fallback(

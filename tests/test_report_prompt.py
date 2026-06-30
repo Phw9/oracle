@@ -107,6 +107,9 @@ def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
     assert "좋은 내용 -> 안 좋은 내용 -> 좋은 내용" in prompt.prefix
     assert "사주 입력" not in prompt.prefix
     assert "사주 입력" in prompt.body
+    assert "같은 근거와 같은 표현을 여러 블록에서 반복하지 않습니다" in prompt.prefix
+    assert "[블록별 근거 배분]" in prompt.prefix
+    assert "일간 하나로 모든 블록을 설명하지 않습니다" in prompt.prefix
 
 
 def test_saju_reading_prompt_uses_input_name_for_honorifics() -> None:
@@ -121,6 +124,7 @@ def test_saju_reading_prompt_uses_input_name_for_honorifics() -> None:
     assert "임수님" not in prompt.body
     assert "입력받은 이름 필드만 사용" in prompt.prefix
     assert "일간이나 오행" in prompt.prefix
+    assert "임수님, 계수님처럼 일간에 '님'을 붙인 표현은 절대 쓰지 않습니다" in prompt.prefix
 
 
 def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:
