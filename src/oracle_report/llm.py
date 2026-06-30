@@ -100,6 +100,12 @@ class LlamaCppChatClient:
         return 2.0
 
     def get_compute_score(self) -> float:
+        env_score = os.getenv("ORACLE_COMPUTE_SCORE")
+        if env_score is not None:
+            try:
+                return float(env_score)
+            except ValueError:
+                pass
         tps = self.get_or_measure_tps()
         param_size = self.get_model_parameter_size()
         score = tps * param_size

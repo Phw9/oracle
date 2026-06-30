@@ -430,10 +430,22 @@ def create_app() -> Flask:
         tps = 1.0
         score = 2.0
         model_name = llm_config.model
-        if not is_busy:
+        
+        env_score = os.getenv("ORACLE_COMPUTE_SCORE")
+        if env_score is not None:
             try:
-                tps = client.get_or_measure_tps()
-                score = client.get_compute_score()
+                score = float(env_score)
+                tps = score / client.get_model_parameter_size()
+            except Exception:
+                pass
+        else:
+            try:
+                if getattr(client, "_measured_tps", None) is not None:
+                    tps = client.get_or_measure_tps()
+                    score = client.get_compute_score()
+                elif not is_busy:
+                    tps = client.get_or_measure_tps()
+                    score = client.get_compute_score()
             except Exception:
                 pass
                 
