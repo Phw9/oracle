@@ -19,6 +19,7 @@ from oracle_report.workflow import (
     CompatibilityWorkflowInput,
     PersonalWorkflowInput,
     _load_json_payload_or_error,
+    _normalize_payload_text,
     _run_sequential_pair_capture,
     run_compatibility_workflow,
     run_personal_workflow,
@@ -60,6 +61,49 @@ def test_load_json_payload_ignores_text_after_first_object() -> None:
     assert payload == {"essence": "핵심"}
 
 
+def test_normalize_payload_removes_summary_prefix_from_body() -> None:
+    payload = {
+        "saju_blocks": [
+            {
+                "category": "종합 형국",
+                "title": "테스트 제목",
+                "summary": "전반적인 흐름은 유연한 사고가 돋보여요.",
+                "body": "전반적인 흐름은 유연한 사고가 돋보여요. 생활 속에서는 기준을 세우는 습관이 도움이 될 수 있어요.",
+            },
+        ],
+    }
+
+    result = _normalize_payload_text(payload)
+
+    assert (
+        result["saju_blocks"][0]["body"]
+        == "생활 속에서는 기준을 세우는 습관이 도움이 될 수 있어요."
+    )
+
+
+def test_normalize_payload_removes_emoji_from_llm_text() -> None:
+    payload = {
+        "essence": "현실적인 기준을 살짝 챙겨주면 좋아요. 💡",
+        "saju_blocks": [
+            {
+                "category": "올해의 운세",
+                "title": "에너지 분배",
+                "summary": "활동성이 올라오는 흐름이에요. 🔥",
+                "body": "에너지를 한곳에 몰아쓰기보다 나누어 쓰면 좋아요. 👍",
+            },
+        ],
+    }
+
+    result = _normalize_payload_text(payload)
+
+    assert result["essence"] == "현실적인 기준을 살짝 챙겨주면 좋아요."
+    assert result["saju_blocks"][0]["summary"] == "활동성이 올라오는 흐름이에요."
+    assert (
+        result["saju_blocks"][0]["body"]
+        == "에너지를 한곳에 몰아쓰기보다 나누어 쓰면 좋아요."
+    )
+
+
 class FakeLlmClient:
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         result = "LLM 결과"
@@ -72,7 +116,7 @@ class FakeLlmClient:
                 },
                 ensure_ascii=False,
             )
-        elif "pair_blocks" in prompt:
+        elif "\"synthesis_title\"" in prompt and "\"action_title\"" in prompt:
             result = json.dumps(
                 {
                     "essence": "두 사람 궁합 핵심 문장",

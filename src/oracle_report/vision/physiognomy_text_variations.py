@@ -80,6 +80,21 @@ _PAIR_BLOCK_PARTS = {
     "caution": ("mouth", "jaw"),
 }
 
+_PERSONAL_TITLE_BADGES = {
+    "basic": "첫인상 체크!",
+    "strength": "강점 뿜뿜!",
+    "relationship": "소통 찰떡!",
+    "direction": "레벨업 포인트!",
+    "advice": "생활 꿀팁!",
+}
+
+_PAIR_TITLE_BADGES = {
+    "first_impression": "케미 체크!",
+    "communication": "소통 찰떡!",
+    "strength": "시너지 포인트!",
+    "caution": "오해 방지!",
+}
+
 _PAIR_MODE_GUIDANCE = {
     "연인": {
         "summary_prefix": "연인 관계에서는 ",
@@ -312,7 +327,7 @@ _PERSONAL_TEMPLATES: dict[str, tuple[dict[str, str], ...]] = {
             "body": "{primary_evidence} {secondary_evidence} 이런 조합은 급하게 밀어붙이기보다 상황을 확인하고 균형을 맞추려는 인상으로 이어져요. 계획을 크게 벌리기보다 작은 기준을 세워 꾸준히 이어가면 장점이 더 잘 살아나요.",
         },
         {
-            "title": "{primary_label}이 살아나는 얼굴 흐름",
+            "title": "{primary_label_subject} 살아나는 얼굴 흐름",
             "summary": "{primary_summary} 얼굴 전체에서 안정적인 기준점이 보여요.",
             "body": "{primary_evidence} 또한 {secondary_label}에서는 {secondary_impression} 분위기가 함께 읽혀요. 이런 인상은 주변에 신뢰감을 주기 쉬우니, 중요한 선택에서는 속도보다 일관성을 우선하면 좋아요.",
         },
@@ -592,9 +607,11 @@ def build_pair_face_payload(
             pair_mode,
         ),
         "pair_blocks": blocks,
-        "face_summary": _PAIR_MODE_GUIDANCE[pair_mode]["face_summary"].format(
-            left_name=left_name,
-            right_name=right_name,
+        "face_summary": _soften_guidance_text(
+            _PAIR_MODE_GUIDANCE[pair_mode]["face_summary"].format(
+                left_name=left_name,
+                right_name=right_name,
+            ),
         ),
     }
     return result
@@ -709,11 +726,11 @@ def _part_impression(part_key: str, tone: str) -> str:
 
 def _part_strength(part_key: str, tone: str) -> str:
     impression = _part_impression(part_key, tone)
-    result = f"{impression}을 바탕으로 상황을 차분히 정리해 가는 힘"
+    result = f"{_with_object_particle(impression)} 바탕으로 상황을 차분히 정리해 가는 힘"
     if part_key == "eyes":
         result = f"{impression}으로 상대의 반응을 섬세하게 읽는 힘"
     elif part_key == "mouth":
-        result = f"{impression}을 통해 관계의 온도를 편안하게 맞추는 힘"
+        result = f"{_with_object_particle(impression)} 통해 관계의 온도를 편안하게 맞추는 힘"
     elif part_key == "jaw":
         result = f"{impression}으로 시작한 일을 끝까지 이어가는 힘"
     return result
@@ -759,7 +776,7 @@ _PERSONAL_EXPANSION_RULES: dict[str, dict[str, tuple[str, ...]]] = {
     "strength": {
         "titles": (
             "{primary_label}에서 읽히는 장점",
-            "{secondary_label}이 받쳐주는 기세",
+            "{secondary_label_subject} 받쳐주는 기세",
             "차분히 드러나는 존재감",
             "{main_impression}을 살리는 힘",
             "관찰력과 중심감이 만나는 강점",
@@ -783,7 +800,7 @@ _PERSONAL_EXPANSION_RULES: dict[str, dict[str, tuple[str, ...]]] = {
         "titles": (
             "{primary_label}에서 보이는 관계 감각",
             "편안하게 온도를 맞추는 대화",
-            "{secondary_label}이 만드는 소통 분위기",
+            "{secondary_label_subject} 만드는 소통 분위기",
             "상대를 살피며 반응하는 인상",
             "부드럽게 이어지는 대인 흐름",
         ),
@@ -1035,10 +1052,16 @@ def _build_pair_block(
         "seed_text": seed_text,
         "left_main": left_profile.impression,
         "right_main": right_profile.impression,
+        "left_fact": _named_profile_fact_sentence(left_name, left_profile),
+        "right_fact": _named_profile_fact_sentence(right_name, right_profile),
         "left_evidence": left_evidence,
         "right_evidence": right_evidence,
         "left_named_evidence": _named_evidence_phrase(left_name, left_evidence),
         "right_named_evidence": _named_evidence_phrase(right_name, right_evidence),
+        "left_strength": left_profile.strength,
+        "right_strength": right_profile.strength,
+        "left_caution": left_profile.caution,
+        "right_caution": right_profile.caution,
     }
     result = {
         "category": _PAIR_CATEGORIES[category_key],
@@ -1057,9 +1080,12 @@ def _personal_template_values(
     category_key: str,
 ) -> dict[str, str]:
     result = {
+        "seed_text": seed_text,
         "main_impression": primary.impression,
         "primary_label": primary.label,
+        "primary_label_subject": _with_subject_particle(primary.label),
         "primary_impression": primary.impression,
+        "primary_fact": _profile_fact_sentence(primary),
         "primary_summary": f"{primary.label}에서는 {primary.impression}이 읽혀요.",
         "primary_evidence": _evidence_phrase(
             primary,
@@ -1067,7 +1093,9 @@ def _personal_template_values(
             f"{category_key}:primary",
         ),
         "secondary_label": secondary.label,
+        "secondary_label_subject": _with_subject_particle(secondary.label),
         "secondary_impression": secondary.impression,
+        "secondary_fact": _profile_fact_sentence(secondary),
         "secondary_summary": f"{secondary.label}에서는 {secondary.impression}이 보여요.",
         "secondary_evidence": _evidence_phrase(
             secondary,
@@ -1081,35 +1109,64 @@ def _personal_template_values(
     return result
 
 
+_PERSONAL_BODY_RULES: dict[str, tuple[str, ...]] = {
+    "basic": (
+        "{primary_fact} {secondary_fact} 두 포인트가 만나 첫인상은 {main_impression}으로 깔끔하게 잡혀요! 처음부터 분위기가 과하게 튀기보다, 차분히 중심을 잡는 타입으로 보일 수 있어요. 중요한 선택 앞에서는 속도보다 기준을 먼저 세우면 얼굴에서 보이는 장점이 더 톡톡 살아나요!",
+        "{primary_fact} {secondary_fact} 전체 흐름을 보면 첫인상은 무리해서 강하게 보이기보다 {main_impression}으로 정리되는 편이에요. 다만 처음 느낌만 믿고 바로 달리기보다는, 상황을 한 번 스캔하는 여유가 잘 맞아요. 이 안정감을 생활 속 기준으로 바꾸면 시작 운이 꽤 든든하게 잡혀요!",
+        "{primary_fact} {secondary_fact} 이 조합은 첫 만남에서 편안한 기준점이 먼저 잡히는 인상으로 볼 수 있어요. 새로운 환경에서는 말을 많이 앞세우기보다, 분위기를 파악한 뒤 움직일 때 장점이 더 잘 살아나요. 첫인상 체크는 통과, 이제 중요한 건 차분한 실행력을 놓치지 않는 거예요!",
+    ),
+    "strength": (
+        "{primary_fact} {secondary_fact} 이 조합은 {strength}으로 연결될 수 있어서, 필요한 순간에 존재감이 꽤 선명하게 살아나요! 다만 {caution}은 살짝 챙겨야 힘이 과하게 몰리지 않아요. 관찰한 내용을 짧게 정리해 말하면 강점 운이 더 톡톡 올라와요!",
+        "{primary_fact} {secondary_fact} 여기서 보이는 강점은 한 번에 확 밀어붙이는 힘보다, 흐름을 읽고 적당한 타이밍에 중심을 잡는 힘에 가까워요! 가끔은 생각이 길어질 수 있으니 핵심을 하나만 골라 행동으로 옮기는 게 좋아요. 작은 성공을 꾸준히 보여주면 존재감이 훨씬 뿜뿜 살아나요!",
+        "{primary_fact} {secondary_fact} 얼굴에서 읽히는 장점은 {main_impression}을 바탕으로 상황을 차분히 다루는 쪽이에요! 조심할 점은 {caution}을 잊지 않는 거예요. 기준을 짧고 분명하게 보여주면 좋은 기세가 더 자연스럽게 따라와요!",
+    ),
+    "relationship": (
+        "{primary_fact} {secondary_fact} 관계에서는 {strength}이 좋은 매력 포인트로 보일 수 있어요! 다만 {caution}을 놓치면 마음과 다르게 오해가 생길 수 있어요. 말은 부드럽게, 핵심은 짧게 가져가면 소통 리듬이 훨씬 찰떡으로 맞아요!",
+        "{primary_fact} {secondary_fact} 사람들과의 관계에서는 먼저 분위기를 읽고, 그다음 표현을 맞추는 흐름이 강점으로 보여요! 너무 오래 배려하다가 핵심을 놓치면 답답함이 쌓일 수 있어요. 필요한 말은 짧게 꺼내고 반응을 확인하면 관계 운이 한결 편안해져요!",
+        "{primary_fact} {secondary_fact} 이 흐름은 처음부터 강하게 다가가기보다, 상대가 편해지는 지점을 찾아가는 방식에 잘 맞아요! 대신 모든 반응을 혼자 해석하려고 하면 생각이 복잡해질 수 있어요. 중요한 이야기는 질문으로 확인하면 대화 분위기가 더 부드럽게 풀려요!",
+    ),
+    "direction": (
+        "{primary_fact} {secondary_fact} 앞으로는 {main_impression}을 생활 속 기준으로 바꿀 때 흐름이 안정적으로 커져요! 갑작스러운 변화보다 반복 가능한 루틴이 더 잘 맞을 수 있어요. 작은 기준 하나를 꾸준히 지키면 레벨업 포인트가 꽤 탄탄하게 쌓여요!",
+        "{primary_fact} {secondary_fact} 이 얼굴 흐름은 한 번에 크게 뒤집는 운보다, 준비된 선택을 꾸준히 이어갈 때 더 빛나요! 선택지가 많을수록 오히려 기준을 좁히는 연습이 도움이 될 수 있어요. 매일 지킬 수 있는 작은 약속 하나가 앞으로의 운을 잡아주는 버튼이 돼요!",
+        "{primary_fact} {secondary_fact} 현재 흐름에서는 가진 장점을 생활 리듬으로 바꾸는 것이 가장 현실적인 방향이에요! 시작보다 유지와 마무리를 챙길 때 안정감이 더 잘 살아날 수 있어요. 오늘 정한 작은 루틴이 내일의 흐름을 꽤 멋지게 끌고 갈 거예요!",
+    ),
+    "advice": (
+        "{primary_fact} {secondary_fact} 생활에서는 {strength}을 잘 쓰는 방향으로 포인트를 잡으면 좋아요! 다만 {caution}을 놓치면 장점이 살짝 흐려질 수 있어요. 하루 끝에 말과 약속을 짧게 정리하는 습관이 바로 써먹기 좋은 꿀팁이에요!",
+        "{primary_fact} {secondary_fact} 조심할 점은 장점을 누르라는 뜻이 아니라, 힘을 더 편하게 쓰기 위한 사용 설명서에 가까워요! 바쁠수록 표정과 말의 여유가 줄어들 수 있으니 한 박자 쉬는 습관이 도움이 돼요. 작게 정리하고 분명히 마무리하면 생활 운이 더 산뜻하게 정돈돼요!",
+        "{primary_fact} {secondary_fact} 이 흐름에서는 다정하게 시작하되 결론이 흐려지지 않게 잡는 것이 좋아요! 부탁이나 거절을 할 때 이유를 너무 길게 늘이면 오히려 피로해질 수 있어요. 핵심을 짧게 말하고 따뜻하게 마무리하면 관계와 일상이 둘 다 가벼워져요!",
+    ),
+}
+
+
+_PAIR_BODY_RULES: dict[str, tuple[str, ...]] = {
+    "first_impression": (
+        "{left_fact} {right_fact} 두 사람의 첫 흐름은 {left_name}님과 {right_name}님이 서로 다른 분위기를 어떻게 받아들이는지 보여줘요! 처음부터 결론을 맞추기보다 편한 거리와 속도를 찾으면 케미가 더 자연스럽게 살아나요. {mode_tip}",
+        "{left_fact} {right_fact} 첫인상에서는 누가 더 맞고 틀리다기보다, 서로의 온도 차이를 어떻게 조율하는지가 포인트예요! 급하게 가까워지기보다 편한 반응을 하나씩 확인하면 관계가 훨씬 부드럽게 시작돼요. {mode_tip}",
+        "{left_fact} {right_fact} 이 조합은 처음부터 같은 결로 붙는 느낌보다, 서로 다른 리듬이 만나 입체감이 생기는 쪽에 가까워요! 첫 흐름을 오래 좋게 가져가려면 상대의 속도를 단정하지 않는 태도가 필요해요. {mode_tip}",
+    ),
+    "communication": (
+        "{left_fact} {right_fact} 소통에서는 두 사람의 반응 속도와 표현 방식이 관계의 리듬을 크게 좌우할 수 있어요! 말이 엇갈릴 때는 바로 결론 내리기보다 서로가 들은 내용을 짧게 확인하는 게 좋아요. {mode_tip}",
+        "{left_fact} {right_fact} 대화에서는 한쪽이 먼저 살피고 다른 한쪽이 표현으로 풀어내는 차이가 생길 수 있어요! 이 차이는 매력이 되기도 하지만 피곤할 때는 오해로 바뀔 수 있어요. {mode_tip}",
+        "{left_fact} {right_fact} 두 사람은 말의 양보다 타이밍을 맞출 때 훨씬 편해지는 조합으로 볼 수 있어요! 중요한 이야기는 한 번에 몰아서 하기보다 짧게 나눠 말하면 부담이 줄어요. {mode_tip}",
+    ),
+    "strength": (
+        "{left_fact} {right_fact} 관계 강점은 같은 역할을 반복하기보다 서로 다른 장점을 나눠 쓸 때 더 잘 살아나요! 한 사람은 방향을 잡고 다른 한 사람은 분위기를 살피는 식으로 맞추면 시너지가 톡톡 생겨요. {mode_tip}",
+        "{left_fact} {right_fact} 이 조합은 차이를 문제로 보기보다 서로의 빈틈을 채우는 포인트로 볼 때 힘이 커져요! 익숙해질수록 한쪽이 놓친 부분을 다른 쪽이 챙기는 장점이 선명해질 수 있어요. {mode_tip}",
+        "{left_fact} {right_fact} 함께 있을 때 더 다양한 선택지를 만들 수 있다는 점이 이 관계의 매력 포인트예요! 다만 같은 방식으로 움직이려 하면 답답할 수 있으니 역할을 나누는 편이 좋아요. {mode_tip}",
+    ),
+    "caution": (
+        "{left_fact} {right_fact} 주의할 점은 서로의 반응을 표정이나 분위기만 보고 너무 빨리 단정하지 않는 거예요! 불편한 지점은 오래 묵히기보다 짧게 확인하고 부드럽게 정리하는 편이 좋아요. {mode_tip}",
+        "{left_fact} {right_fact} 편해질수록 표현을 생략하거나 상대가 알아줄 거라고 넘기기 쉬워요! 작은 약속과 말의 마무리를 분명히 하면 관계의 안정감이 훨씬 오래가요. {mode_tip}",
+        "{left_fact} {right_fact} 두 사람의 속도가 다를 때는 결론을 재촉하기보다 다시 이야기할 시간을 정해두는 게 좋아요! 이건 약점 체크가 아니라 관계를 오래 편하게 쓰기 위한 안전장치예요. {mode_tip}",
+    ),
+}
+
+
 def _apply_personal_flow_guidance(
     category_key: str,
     block: dict[str, str],
     values: dict[str, str],
 ) -> dict[str, str]:
-    body = block["body"]
-    strength = values["strength"]
-    caution = values["caution"]
-    guidance = {
-        "basic": (
-            "이 내용은 성향을 단정하기보다 처음 마주했을 때 사람들이 느낄 수 있는 "
-            "분위기를 정리한 참고점이에요."
-        ),
-        "strength": (
-            f"다만 {caution}도 함께 의식하면, {strength}이 더 편안하게 드러날 수 있어요."
-        ),
-        "relationship": (
-            f"관계에서는 {strength}이 장점으로 보일 수 있지만, {caution}을 함께 챙기면 "
-            "오해를 줄이는 데 도움이 될 수 있어요."
-        ),
-        "direction": (
-            "현재 흐름에서는 큰 변화를 서두르기보다 이미 가진 장점을 생활 속 기준으로 "
-            "바꾸는 것이 도움이 될 수 있어요."
-        ),
-        "advice": (
-            f"주의할 점은 단점을 고치는 의미보다 {strength}을 더 잘 쓰기 위한 조율로 "
-            "보면 좋아요."
-        ),
-    }
     summary_prefixes = {
         "basic": "기본 성향과 첫인상에서는 ",
         "strength": "강점으로는 ",
@@ -1122,9 +1179,16 @@ def _apply_personal_flow_guidance(
         _soften_guidance_text(result["summary"]),
         summary_prefixes[category_key],
     )
-    result["body"] = _append_guidance_sentence(
-        _soften_guidance_text(body),
-        guidance[category_key],
+    result["body"] = _soften_guidance_text(
+        _choose_template_text(
+            _PERSONAL_BODY_RULES[category_key],
+            values["seed_text"],
+            f"personal-body:{category_key}",
+        ).format(**values),
+    )
+    result["title"] = _append_title_badge(
+        _soften_guidance_text(result["title"]),
+        _PERSONAL_TITLE_BADGES[category_key],
     )
     return result
 
@@ -1142,25 +1206,25 @@ def _apply_pair_flow_guidance(
         "first_impression": (
             (
                 f"이 첫인상은 관계를 단정하기보다 {left_name}님과 {right_name}님이 "
-                "두 사람의 관계 안에서 서로를 어떤 태도로 받아들일 수 있는지 보여주는 참고점이에요."
+                "두 사람의 관계 안에서 서로를 어떤 태도로 받아들일 수 있는지 보여주는 첫 흐름 체크예요!"
             ),
             (
                 "첫인상은 결과를 정해주는 기준이 아니라, 서로가 어떤 속도와 분위기로 "
-                "가까워질 때 편한지 살펴보는 단서로 보면 좋아요."
+                "가까워질 때 편한지 살짝 확인하는 케미 포인트로 보면 좋아요."
             ),
             (
                 f"{left_name}님과 {right_name}님의 첫 흐름은 한쪽의 장단점을 가르기보다 "
-                "서로가 편안하게 받아들일 수 있는 거리감을 찾는 데 도움이 될 수 있어요."
+                "서로가 편안하게 받아들일 수 있는 거리감을 찾는 데 꽤 좋은 힌트가 될 수 있어요."
             ),
         ),
         "communication": (
             (
                 "소통에서는 누가 맞는지보다 두 사람 사이에 맞는 말의 깊이와 확인 속도를 "
-                "맞추는 태도가 관계를 더 편하게 만드는 데 도움이 될 수 있어요."
+                "맞추는 태도가 관계를 더 편하게 만드는 찰떡 포인트예요."
             ),
             (
                 "대화에서는 결론을 빨리 내는 것보다 서로가 같은 의미로 이해했는지 확인하는 "
-                "과정이 관계의 편안함을 키울 수 있어요."
+                "과정이 관계의 편안함을 포근하게 키우는 소통 꿀팁이에요."
             ),
             (
                 "말의 양이나 반응 속도가 다를 수 있으니, 중요한 이야기는 짧게 나누고 다시 "
@@ -1170,29 +1234,29 @@ def _apply_pair_flow_guidance(
         "strength": (
             (
                 "차이를 단점으로 보기보다 두 사람 사이에서 서로에게 기대할 수 있는 역할을 "
-                "나누는 기준으로 삼으면 장점이 더 안정적으로 살아날 수 있어요."
+                "나누는 기준으로 삼으면 장점이 더 안정적으로 톡톡 살아날 수 있어요."
             ),
             (
                 "서로 다른 흐름은 맞지 않는다는 뜻보다 함께 있을 때 채울 수 있는 지점이 "
-                "다르다는 신호로 보면 도움이 될 수 있어요."
+                "다르다는 시너지 신호로 보면 좋아요."
             ),
             (
                 "각자의 강점이 드러나는 방식이 다를수록 같은 역할을 하려 하기보다 서로가 "
-                "편한 자리를 나누는 것이 관계의 힘을 살릴 수 있어요."
+                "편한 자리를 나누는 것이 관계의 힘을 톡톡 살릴 수 있어요."
             ),
         ),
         "caution": (
             (
                 "주의할 점은 관계의 약점이라기보다 서로의 선을 지키면서 강점을 오래 쓰기 "
-                "위해 조율할 부분으로 보면 도움이 될 수 있어요."
+                "위해 맞춰볼 안전장치 포인트로 보면 좋아요."
             ),
             (
                 "조심할 부분은 두 사람이 맞지 않는다는 의미가 아니라, 편안함을 유지하기 "
-                "위해 미리 확인해두면 좋은 기준에 가까워요."
+                "위해 미리 확인해두면 좋은 작은 기준에 가까워요."
             ),
             (
                 "서로의 반응을 혼자 해석하기 쉬운 순간일수록, 짧게 확인하고 부드럽게 "
-                "마무리하는 습관이 관계의 안정감을 지켜줄 수 있어요."
+                "마무리하는 습관이 관계의 안정감을 지켜주는 꿀팁이에요."
             ),
         ),
     }
@@ -1211,21 +1275,30 @@ def _apply_pair_flow_guidance(
         category_summary,
         mode_guidance["summary_prefix"],
     )
-    result["body"] = _append_guidance_sentence(
-        _soften_guidance_text(result["body"]),
-        _choose_template_text(
-            guidance[category_key],
-            values["seed_text"],
-            f"pair-flow:{mode}:{category_key}:common",
-        ),
+    common_tip = _choose_template_text(
+        guidance[category_key],
+        values["seed_text"],
+        f"pair-flow:{mode}:{category_key}:common",
     )
-    result["body"] = _append_guidance_sentence(
-        result["body"],
-        _choose_template_text(
+    mode_tip = _choose_template_text(
             mode_guidance["guidance"][category_key],
             values["seed_text"],
             f"pair-flow:{mode}:{category_key}:mode",
+    )
+    result["body"] = _soften_guidance_text(
+        _choose_template_text(
+            _PAIR_BODY_RULES[category_key],
+            values["seed_text"],
+            f"pair-body:{mode}:{category_key}",
+        ).format(
+            **values,
+            common_tip=common_tip,
+            mode_tip=mode_tip,
         ),
+    )
+    result["title"] = _append_title_badge(
+        _soften_guidance_text(result["title"]),
+        _PAIR_TITLE_BADGES[category_key],
     )
     return result
 
@@ -1239,6 +1312,16 @@ def _pair_mode(mode: str) -> str:
 
 def _prepend_mode_context(text: str, prefix: str) -> str:
     result = text.strip()
+    category_prefixes = (
+        "첫인상에서는 ",
+        "소통에서는 ",
+        "관계 강점으로는 ",
+        "주의할 점으로는 ",
+    )
+    for category_prefix in category_prefixes:
+        if result.startswith(category_prefix):
+            result = result[len(category_prefix) :]
+            break
     if not result.startswith(prefix):
         result = f"{prefix}{result}"
     return result
@@ -1246,8 +1329,9 @@ def _prepend_mode_context(text: str, prefix: str) -> str:
 
 def _append_guidance_sentence(text: str, guidance: str) -> str:
     result = text.strip()
-    if guidance not in result:
-        result = f"{result} {guidance}"
+    guidance_text = _soften_guidance_text(guidance)
+    if guidance_text not in result:
+        result = f"{result} {guidance_text}"
     return result
 
 
@@ -1265,24 +1349,40 @@ def _prepend_once(text: str, prefix: str) -> str:
     return result
 
 
+def _append_title_badge(title: str, badge: str) -> str:
+    result = title.strip()
+    if badge not in result:
+        separator = ", " if not result.endswith(("!", "?")) else " "
+        result = f"{result}{separator}{badge}"
+    return result
+
+
 def _soften_guidance_text(text: str) -> str:
     replacements = (
-        ("중요해요.", "중요할 수 있어요."),
-        ("필요해요.", "도움이 될 수 있어요."),
-        ("좋아요.", "도움이 될 수 있어요."),
-        ("잘 맞아요.", "잘 맞을 수 있어요."),
-        ("유리해요.", "도움이 될 수 있어요."),
-        ("살아나요.", "살아날 수 있어요."),
-        ("드러나요.", "드러날 수 있어요."),
-        ("보여요.", "보일 수 있어요."),
-        ("읽혀요.", "읽힐 수 있어요."),
-        ("이어져요.", "이어질 수 있어요."),
-        ("만들어줘요.", "만들어줄 수 있어요."),
-        ("해줘요.", "해줄 수 있어요."),
+        ("중요해요.", "중요한 포인트예요!"),
+        ("필요해요.", "챙겨두면 좋아요!"),
+        ("잘 맞아요.", "잘 맞아요!"),
+        ("유리해요.", "도움이 될 수 있어요!"),
+        ("도움이 될 수 있어요.", "좋은 힌트가 될 수 있어요!"),
+        ("살아날 수 있어요.", "톡톡 살아날 수 있어요!"),
+        ("살아나요.", "톡톡 살아나요!"),
+        ("드러날 수 있어요.", "톡톡 드러날 수 있어요!"),
+        ("드러나요.", "톡톡 드러나요!"),
+        ("보여요.", "보여요!"),
+        ("읽혀요.", "읽혀요!"),
+        ("좋겠어요.", "좋겠어요!"),
     )
     result = text
     for old_text, new_text in replacements:
         result = result.replace(old_text, new_text)
+    result = result.replace("톡톡 톡톡", "톡톡")
+    return result
+
+
+def _with_light_sparkle(text: str) -> str:
+    result = text.strip()
+    if result.endswith("요."):
+        result = f"{result[:-1]}!"
     return result
 
 
@@ -1296,16 +1396,45 @@ def _compact_part_label(label: str) -> str:
     return result
 
 
+def _with_object_particle(text: str) -> str:
+    particle = "을" if _has_final_consonant(text) else "를"
+    result = f"{text}{particle}"
+    return result
+
+
+def _with_topic_particle(text: str) -> str:
+    particle = "은" if _has_final_consonant(text) else "는"
+    result = f"{text}{particle}"
+    return result
+
+
+def _with_subject_particle(text: str) -> str:
+    particle = "이" if _has_final_consonant(text) else "가"
+    result = f"{text}{particle}"
+    return result
+
+
+def _has_final_consonant(text: str) -> bool:
+    for char in reversed(text.strip()):
+        code = ord(char)
+        if 0xAC00 <= code <= 0xD7A3:
+            result = (code - 0xAC00) % 28 != 0
+            return result
+        if char.isalnum():
+            return True
+    return False
+
+
 def _evidence_phrase(profile: FacePartProfile, seed_text: str, salt: str) -> str:
     observations = _profile_observations(profile)
     first = observations[0]
     if len(observations) > 1:
         second = observations[1]
         templates = (
-            "{label}을 보면 {first} 여기에 {second} 이 점이 더해져 {impression} 쪽으로 자연스럽게 읽혀요.",
-            "{first} 또 {second} 그래서 {label}은 {impression}으로 정리해볼 수 있어요.",
-            "{label}에서는 {first} {second} 두 단서가 모여 {impression}을 만들어줘요.",
-            "먼저 {label} 쪽에서는 {first} 이어서 {second} 이런 흐름이 {impression}을 보여주는 단서가 돼요.",
+            "{label_object} 보면 {first} 여기에 {second} 이 점이 더해져 {impression} 쪽으로 자연스럽게 읽혀요.",
+            "{first} 또 {second} 그래서 {label_topic} {impression}으로 정리해볼 수 있어요.",
+            "{label}에서는 {first} {second} 두 단서가 모여 {impression_object} 만들어줘요.",
+            "먼저 {label} 쪽에서는 {first} 이어서 {second} 이런 흐름이 {impression_object} 보여주는 단서가 돼요.",
             "{first} 여기에 {second} 이 점이 더해지면서 {label}의 {impression}이 부드럽게 살아나요.",
             "{label}의 흐름을 풀어보면 {first} {second} 전체적으로는 {impression}에 가까워요.",
             "{first} {second} 이 관찰은 단정이라기보다 {label}에서 {impression}이 보인다는 참고점으로 보면 좋아요.",
@@ -1316,10 +1445,10 @@ def _evidence_phrase(profile: FacePartProfile, seed_text: str, salt: str) -> str
     else:
         second = ""
         templates = (
-            "{label}을 보면 {first} 이 부분이 {impression} 쪽으로 자연스럽게 읽혀요.",
-            "{first} 그래서 {label}은 {impression}으로 정리해볼 수 있어요.",
-            "{label}에서는 {first} 이 단서가 {impression}을 만들어줘요.",
-            "먼저 {label} 쪽에서는 {first} 이 점이 {impression}을 보여주는 단서가 돼요.",
+            "{label_object} 보면 {first} 이 부분이 {impression} 쪽으로 자연스럽게 읽혀요.",
+            "{first} 그래서 {label_topic} {impression}으로 정리해볼 수 있어요.",
+            "{label}에서는 {first} 이 단서가 {impression_object} 만들어줘요.",
+            "먼저 {label} 쪽에서는 {first} 이 점이 {impression_object} 보여주는 단서가 돼요.",
             "{first} 이 점이 {label}의 {impression}을 부드럽게 살려줘요.",
             "{label}의 흐름을 풀어보면 {first} 전체적으로는 {impression}에 가까워요.",
             "{first} 이 관찰은 단정이라기보다 {label}에서 {impression}이 보인다는 참고점으로 보면 좋아요.",
@@ -1330,11 +1459,52 @@ def _evidence_phrase(profile: FacePartProfile, seed_text: str, salt: str) -> str
     template = _choose_template_text(templates, seed_text, f"evidence:{salt}")
     result = template.format(
         label=profile.label,
+        label_object=_with_object_particle(profile.label),
+        label_topic=_with_topic_particle(profile.label),
         first=first,
         second=second,
         impression=profile.impression,
+        impression_object=_with_object_particle(profile.impression),
     )
     result = " ".join(result.split())
+    return result
+
+
+def _profile_fact_sentence(profile: FacePartProfile) -> str:
+    observation = _trim_profile_label_from_observation(
+        profile,
+        _profile_observations(profile)[0],
+    )
+    result = f"{profile.label}에서는 {observation}"
+    return result
+
+
+def _named_profile_fact_sentence(name: str, profile: FacePartProfile) -> str:
+    cleaned_name = name.strip()
+    observation = _trim_profile_label_from_observation(
+        profile,
+        _profile_observations(profile)[0],
+    )
+    result = _profile_fact_sentence(profile)
+    if cleaned_name:
+        result = f"{cleaned_name}님은 {profile.label}에서 {observation}"
+    return result
+
+
+def _trim_profile_label_from_observation(
+    profile: FacePartProfile,
+    observation: str,
+) -> str:
+    result = observation.strip()
+    for prefix in (
+        f"{profile.label}에서는 ",
+        f"{profile.label}에서 ",
+        f"{profile.label} 쪽에서는 ",
+        f"{profile.label} 쪽에서 ",
+    ):
+        if result.startswith(prefix):
+            result = result[len(prefix) :]
+            break
     return result
 
 
@@ -1401,7 +1571,9 @@ def _build_personal_subtitle(
         f"{balance.impression}을 기반으로 얼굴의 중심이 편안하게 잡혀 보여요.",
         f"{nose.label}의 {nose.impression}이 전체 인상에 부드러운 기준점을 만들어줘요.",
     )
-    result = _choose_template_text(options, seed_text, "subtitle")
+    result = _with_light_sparkle(
+        _soften_guidance_text(_choose_template_text(options, seed_text, "subtitle")),
+    )
     return result
 
 
@@ -1421,7 +1593,7 @@ def _build_personal_summary(
         f"{profiles['balance'].impression}을 바탕으로 {mouth.impression}이 더해져, 차분하면서도 편안한 소통 흐름이 돋보여요.",
         f"{eyes.impression}이 관계의 시작을 부드럽게 열어주고, {jaw.impression}이 마무리의 안정감을 더해줘요.",
     )
-    result = _choose_template_text(options, seed_text, "summary")
+    result = _soften_guidance_text(_choose_template_text(options, seed_text, "summary"))
     return result
 
 
@@ -1441,7 +1613,11 @@ def _build_pair_subtitle(
         "각자의 리듬을 확인할수록 편안해지는 관계 분위기",
         "서로의 장점을 느리게 맞춰가는 소통 인상",
     )
-    result = _choose_template_text(options, seed_text, "pair-subtitle")
+    result = _with_light_sparkle(
+        _soften_guidance_text(
+            _choose_template_text(options, seed_text, "pair-subtitle"),
+        ),
+    )
     return result
 
 

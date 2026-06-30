@@ -6,7 +6,6 @@ from html import escape
 from typing import Any, Mapping
 
 from oracle_report.models import BirthProfile
-from oracle_report.recommender import FaceRecommendation
 from oracle_report.saju.calendar import BRANCH_ELEMENTS, STEM_ELEMENTS
 from oracle_report.saju.engine import ELEMENTS
 from oracle_report.saju.repository import (
@@ -119,14 +118,6 @@ class _ReportBlock:
 class _Convergence:
     face: str
     saju: str
-
-
-@dataclass(frozen=True)
-class _RecommendationCard:
-    name: str
-    score: int
-    reason: str
-    tag: str
 
 
 @dataclass(frozen=True)
@@ -1021,26 +1012,10 @@ def _render_block(block: _ReportBlock) -> str:
 
 
 def _render_synthesis(view: _PersonalReportView) -> str:
-    if view.skip_face:
-        result = f"""
+    result = f"""
   <section class="synth fade">
     <div class="b-title serif">{escape(view.synth_title)}</div>
     <div class="b-body">{_paragraphs(view.synth_body)}</div>
-    <div class="b-body synth-summary">{_paragraphs(view.synth_summary)}</div>
-  </section>
-"""
-    else:
-        convergence = "\n".join(
-            f"""      <div class="cv"><span class="g">{escape(item.face)}</span><span class="eq">＝</span><span class="s">{escape(item.saju)}</span></div>"""
-            for item in view.convergence
-        )
-        result = f"""
-  <section class="synth fade">
-    <div class="b-title serif">{escape(view.synth_title)}</div>
-    <div class="b-body">{_paragraphs(view.synth_body)}</div>
-    <div class="converge">
-{convergence}
-    </div>
     <div class="b-body synth-summary">{_paragraphs(view.synth_summary)}</div>
   </section>
 """

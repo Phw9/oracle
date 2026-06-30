@@ -18,10 +18,6 @@ from oracle_report.models import (
     FaceBox,
     SequentialPairCaptureArtifact,
 )
-from oracle_report.recommender import (
-    FaceRecommendation,
-    recommend_faces,
-)
 from oracle_report.report import (
     build_couple_saju_reading_prompt,
     build_saju_reading_prompt,
@@ -64,6 +60,14 @@ _SAJU_DAY_MASTER_TERM_REPLACEMENTS = (
     ("신금", "금 기운"),
     ("임수", "물 기운"),
     ("계수", "물 기운"),
+)
+_EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F1E6-\U0001F1FF"
+    "\U0001F300-\U0001FAFF"
+    "\U00002600-\U000027BF"
+    "\U0001F900-\U0001F9FF"
+    "]+"
 )
 _T = TypeVar("_T")
 
@@ -914,6 +918,46 @@ def _normalize_payload_text(value: Any) -> Any:
         result = [_normalize_payload_text(item) for item in value]
     elif isinstance(value, dict):
         result = {key: _normalize_payload_text(item) for key, item in value.items()}
+        result = _remove_repeated_summary_from_block(result)
+    return result
+
+
+def _remove_repeated_summary_from_block(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = payload.get("summary")
+    body = payload.get("body")
+    if isinstance(summary, str) and isinstance(body, str):
+        payload["body"] = _strip_summary_prefix(summary, body)
+    return payload
+
+
+def _strip_summary_prefix(summary: str, body: str) -> str:
+    summary_text = _normalize_inline_text(summary)
+    body_text = _normalize_inline_text(body)
+    candidates = [
+        summary_text,
+        _first_sentence(summary_text),
+    ]
+    result = body_text
+    for candidate in candidates:
+        stripped = _strip_text_prefix(candidate, result)
+        if stripped != result and stripped:
+            result = stripped
+            break
+    return result
+
+
+def _first_sentence(text: str) -> str:
+    match = re.match(r"^.+?[.!?](?:\s|$)", text)
+    result = match.group(0).strip() if match else text
+    return result
+
+
+def _strip_text_prefix(prefix: str, text: str) -> str:
+    result = text
+    normalized_prefix = prefix.strip()
+    if normalized_prefix and text.startswith(normalized_prefix):
+        result = text[len(normalized_prefix) :].lstrip()
+        result = re.sub(r"^[.!?]+\s*", "", result)
     return result
 
 
@@ -924,6 +968,9 @@ def _normalize_inline_text(text: str) -> str:
     normalized_text = normalized_text.replace("\r\n", " ")
     normalized_text = normalized_text.replace("\n", " ")
     normalized_text = normalized_text.replace("\r", " ")
+    normalized_text = _EMOJI_PATTERN.sub(" ", normalized_text)
+    normalized_text = normalized_text.replace("\ufe0f", " ")
+    normalized_text = normalized_text.replace("\u200d", " ")
     result = " ".join(normalized_text.split())
     return result
 

@@ -4,7 +4,6 @@ import json
 from datetime import datetime
 
 from oracle_report.models import BirthProfile
-from oracle_report.recommender import FaceRecommendation
 from oracle_report.report_html import (
     render_compatibility_report_html,
     render_personal_report_html,
@@ -33,6 +32,40 @@ def test_report_html_fallback_face_blocks_explain_terms() -> None:
     assert "눈은 시선의 또렷함" in html
     assert "삼정은 얼굴을 위" in html
 
+
+def test_personal_report_keeps_synthesis_without_face_saju_comparison() -> None:
+    profile = BirthProfile(
+        name="tester",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    generated_text = json.dumps(
+        {
+            "essence": "사주 핵심",
+            "synthesis_title": "전체 흐름을 정리하면",
+            "synthesis_body": "사주 흐름을 중심으로 정리한 본문",
+            "synthesis_summary": "강점은 살리고 부족한 리듬은 보완하세요.",
+            "convergence": [
+                {"face": "개인 관상 비교 근거", "saju": "개인 사주 비교 근거"},
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    html = render_personal_report_html(
+        profile,
+        ManseRepository().lookup(profile),
+        "얼굴 관찰 fixture",
+        generated_text,
+    )
+
+    assert "전체 흐름을 정리하면" in html
+    assert "사주 흐름을 중심으로 정리한 본문" in html
+    assert "강점은 살리고 부족한 리듬은 보완하세요." in html
+    assert "나 를 채 워 주 는 키 워 드" in html
+    assert "개인 관상 비교 근거" not in html
+    assert "개인 사주 비교 근거" not in html
+    assert "＝" not in html
 
 
 def test_compatibility_report_html_uses_structured_layout() -> None:
