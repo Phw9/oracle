@@ -215,3 +215,97 @@ def _template_slot_id(name: str, configured_value: object) -> int | None:
     if configured_value is not None:
         result = int(configured_value)
     return result
+
+
+def render_distributed_prompt_template(
+    name: str,
+    values: Mapping[str, object],
+    target_category: str | None = None,
+    is_metadata: bool = False,
+) -> RenderedPrompt:
+    rendered = render_prompt_template(name, values)
+    if not (target_category or is_metadata):
+        return rendered
+    if name not in (
+        "personal_face_analysis",
+        "face_analysis_copule",
+        "saju_reading",
+        "saju_reading_couple",
+    ):
+        raise ValueError(f"unsupported distributed prompt template: {name}")
+
+    prefix = rendered.prefix
+    schema_start = prefix.find("[출력 JSON 스키마]")
+    
+    # 1. Isolate the static system rules before the schema block
+    prefix_before_schema = prefix[:schema_start] if schema_start != -1 else prefix
+    
+    # 2. Extract static common body (saju birth profile / data)
+    common_body = rendered.body
+    
+    # 3. Unify static parts as the new prefix so that they are 100% identical in token sequence
+    unified_common_prefix = f"{prefix_before_schema.strip()}\n\n{common_body.strip()}"
+    
+    # 4. Construct category-specific suffix instructions to go into the body segment
+    suffix_instructions = ""
+    if is_metadata:
+        if name == "saju_reading":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. saju_blocks 필드는 절대 포함하지 마라.
+{
+  "essence": "이 사주의 전체적인 흐름และ 삶의 방향성을 3~4문장의 풍부한 해설 단락(약 150~200자)으로 요약한 내용",
+  "element_note": "[오행 분포]의 강한 기운과 보완이 필요한 기운이 생활 리듬에 어떻게 드러나는지 1-2문장으로 설명",
+  "saju_subtitle": "사주 섹션 핵심을 8-16자 안팎의 짧은 문구",
+  "tags": ["태그1", "태그2", "태그3", "태그4"],
+  "disclaimer": "참고용 엔터테인먼트 리포트라는 짧은 고지"
+}"""
+        elif name == "personal_face_analysis":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. face_blocks 필드는 절대 포함하지 마라.
+{
+  "face_subtitle": "얼굴 관찰 섹션 오른쪽 짧은 키워드",
+  "face_summary": "관상 관찰을 1문장으로 요약"
+}"""
+        elif name == "saju_reading_couple":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. saju_blocks 필드는 절대 포함하지 마라.
+{
+  "essence": "두 사람의 사주 궁합 핵심 요약",
+  "saju_subtitle": "사주 섹션 짧은 부제",
+  "synthesis_title": "사주 궁합 종합 제목",
+  "synthesis_body": "두 사람의 사주 흐름을 종합한 설명",
+  "action_title": "관계를 좋게 만드는 행동 제안 제목",
+  "action_body": "실천 가능한 행동 제안",
+  "tags": ["태그1", "태그2", "태그3", "태그4"],
+  "disclaimer": "참고용 엔터테인먼트 리포트라는 짧은 고지"
+}"""
+        elif name == "face_analysis_copule":
+            suffix_instructions = """[출력 JSON 스키마]
+너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. pair_blocks 필드는 절대 포함하지 마라.
+{
+  "pair_subtitle": "관상 기반 관계 분위기 부제",
+  "face_summary": "두 사람의 관상 관찰을 1문장으로 요약"
+}"""
+        else:
+            raise ValueError(f"unsupported distributed prompt template: {name}")
+    else:
+        suffix_instructions = f"""[출력 JSON 스키마]
+당신은 오직 '{target_category}' 카테고리에 대한 분석만 수행합니다.
+다른 메타데이터 필드나 다른 카테고리 블록은 절대 포함하지 말고, 오직 아래 포맷의 단일 JSON 객체 하나만 출력해야 합니다.
+{{
+  "category": "{target_category}",
+  "title": "이 분석을 대표하는 호기심을 자극하면서도 핵심을 찌르는 제목",
+  "summary": "쉬운 한국어 해요체의 짧은 요약 문장",
+  "body": "이 분석에 대한 구체적이고 현실적인 설명 본문"
+}}
+
+[분석 대상 카테고리]
+- 카테고리: {target_category}"""
+
+    result = RenderedPrompt(
+        name=f"{rendered.name}_split",
+        prefix=unified_common_prefix,
+        body=suffix_instructions,
+        slot_id=rendered.slot_id,
+    )
+    return result

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -78,6 +78,11 @@ class AppConfig:
     host: str
     port: int
     debug: bool
+    distributed_role: str | None = None
+    distributed_split: bool = False
+    distributed_warmup: bool = False
+    master_addr: str | None = None
+    slave_addrs: tuple[str, ...] = field(default_factory=tuple)
 
 
 def load_capture_config() -> CaptureConfig:
@@ -133,10 +138,27 @@ def load_report_llm_config() -> LlmConfig:
 
 def load_app_config() -> AppConfig:
     _load_dotenv()
+    role = os.getenv("ORACLE_DISTRIBUTED_ROLE")
+    if role == "":
+        role = None
+
+    slave_addrs_str = os.getenv("ORACLE_SLAVE_ADDRS", "").strip()
+    if slave_addrs_str:
+        slave_addrs = tuple(
+            addr.strip() for addr in slave_addrs_str.split(",") if addr.strip()
+        )
+    else:
+        slave_addrs = ()
+
     result = AppConfig(
         host=os.getenv("ORACLE_APP_HOST", "0.0.0.0"),
         port=_read_positive_int("ORACLE_APP_PORT", 8501),
         debug=_read_bool("ORACLE_APP_DEBUG", False),
+        distributed_role=role,
+        distributed_split=_read_bool("ORACLE_DISTRIBUTED_SPLIT", False),
+        distributed_warmup=_read_bool("ORACLE_DISTRIBUTED_WARMUP", False),
+        master_addr=os.getenv("ORACLE_MASTER_ADDR"),
+        slave_addrs=slave_addrs,
     )
     return result
 

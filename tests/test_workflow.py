@@ -940,3 +940,70 @@ def test_personal_workflow_keeps_partial_saju_json_without_full_ui_fallback(
     assert "오행 분포는" in result.report_html
     assert "사주 데이터는 강점과 보완점을 함께 보여주는 참고 지도입니다." in result.report_html
     assert "final report JSON field saju_blocks has 1 blocks" not in result.markdown
+def test_personal_saju_follows_main_when_distributed_split_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_DISTRIBUTED_ROLE", "master")
+    monkeypatch.setenv("ORACLE_DISTRIBUTED_SPLIT", "1")
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="홍길동",
+        birth_date="1995-03-15",
+        birth_time="",
+        gender="남성",
+        target_gender="여성",
+        skip_face=True,
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        report_client=FakeLlmClient(),
+        capture_runner=None,
+    )
+
+    assert "사주 핵심 문장" in result.report_html
+    assert "사주 제목 1" in result.report_html
+    assert "사주정보를 생성하지 못했습니다" not in result.report_html
+
+
+def test_compatibility_saju_follows_main_when_distributed_split_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_DISTRIBUTED_ROLE", "master")
+    monkeypatch.setenv("ORACLE_DISTRIBUTED_SPLIT", "1")
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+    capture_config = _capture_config(tmp_path)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = CompatibilityWorkflowInput(
+        left_name="갑",
+        left_birth_date="1995-03-15",
+        left_birth_time="14:30",
+        left_gender="남성",
+        right_name="을",
+        right_birth_date="1997-05-20",
+        right_birth_time="",
+        right_gender="여성",
+        mode="연인",
+    )
+
+    result = run_compatibility_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        report_client=FakeLlmClient(),
+        capture_runner=_fake_single_capture,
+        inter_capture_delay_seconds=0.0,
+    )
+
+    assert "두 사람 궁합 핵심 문장" in result.report_html
+    assert "궁합 행동 제목" in result.report_html
+    assert "궁합 사주정보를 생성하지 못했습니다" not in result.report_html
+

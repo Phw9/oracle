@@ -33,9 +33,9 @@ def test_run_script_accepts_windows_virtualenv() -> None:
 def test_run_script_consumes_legacy_distributed_options() -> None:
     script_text = (ROOT_DIR / "run.sh").read_text(encoding="utf-8")
 
-    assert "--distributed-role|--master-addr|--slave-addrs)" in script_text
-    assert "--distributed-role=*|--master-addr=*|--slave-addrs=*)" in script_text
-    assert "--distributed-split|--distributed-warmup)" in script_text
+    assert "--distributed-role)" in script_text
+    assert "--distributed-split)" in script_text
+    assert "--slave-addrs)" in script_text
 
 
 def test_scripts_find_windows_llama_server_binary() -> None:

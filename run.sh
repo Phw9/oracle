@@ -257,14 +257,25 @@ parse_args() {
         LLAMA_BATCH_SIZE="$2"
         shift 2
         ;;
-      --distributed-role|--master-addr|--slave-addrs)
+      --distributed-role)
+        RUN_ORACLE_DISTRIBUTED_ROLE="$2"
         shift 2
         ;;
-      --distributed-role=*|--master-addr=*|--slave-addrs=*)
+      --distributed-split)
+        RUN_ORACLE_DISTRIBUTED_SPLIT=1
         shift 1
         ;;
-      --distributed-split|--distributed-warmup)
+      --distributed-warmup)
+        RUN_ORACLE_DISTRIBUTED_WARMUP=1
         shift 1
+        ;;
+      --master-addr)
+        RUN_ORACLE_MASTER_ADDR="$2"
+        shift 2
+        ;;
+      --slave-addrs)
+        RUN_ORACLE_SLAVE_ADDRS="$2"
+        shift 2
         ;;
       --reasoning)
         RUN_ORACLE_REASONING=1
@@ -430,6 +441,12 @@ apply_run_config() {
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
 
   export ORACLE_REASONING="${RUN_ORACLE_REASONING:-${ORACLE_REASONING:-0}}"
+
+  export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-${ORACLE_DISTRIBUTED_ROLE:-}}"
+  export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-${ORACLE_DISTRIBUTED_SPLIT:-0}}"
+  export ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-${ORACLE_DISTRIBUTED_WARMUP:-0}}"
+  export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-${ORACLE_MASTER_ADDR:-}}"
+  export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-${ORACLE_SLAVE_ADDRS:-}}"
 
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
 }
