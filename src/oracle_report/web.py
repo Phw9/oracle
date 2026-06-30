@@ -103,18 +103,6 @@ def create_app() -> Flask:
             <div class="speech">안녕하세요!</div>
             <h1 aria-label="오늘도 운명을 함께 찾아볼까요?">오늘도 <span>운명</span>을<br>함께 찾아볼까요?</h1>
             <p aria-label="오라와 함께 나의 운명과 인연을 쉽고 재미있게 알아보세요!"><strong>오라</strong>와 함께 나의 운명과 인연을<br>쉽고 재미있게 알아보세요!</p>
-            <div class="cloud cloud-left" aria-hidden="true"></div>
-            <div class="cloud cloud-right" aria-hidden="true"></div>
-            <div class="spark spark-a" aria-hidden="true">✦</div>
-            <div class="spark spark-b" aria-hidden="true">✧</div>
-            <div class="spark spark-c" aria-hidden="true">♡</div>
-            <div class="hero-orbit" aria-hidden="true">
-              <span class="element wood">木</span>
-              <span class="element fire">火</span>
-              <span class="element earth">土</span>
-              <span class="element metal">金</span>
-              <span class="element water">水</span>
-            </div>
             <img class="oracle-character" src="/static/assets/oracle-character.png" alt="돋보기로 운명을 살피는 오라 캐릭터">
           </section>
 
@@ -977,7 +965,6 @@ def _render_page(
           }}
           .home-hero {{
             position: relative;
-            min-height: 660px;
             text-align: center;
             padding-top: 28px;
           }}
@@ -1029,124 +1016,14 @@ def _render_page(
             position: relative;
             z-index: 2;
             display: block;
-            width: min(560px, 86vw);
+            width: min(800px, 102vw);
             height: auto;
             object-fit: contain;
             object-position: center center;
-            margin: 0 auto;
+            margin: 18px auto -78px;
             border: 0;
             border-radius: 0;
             mix-blend-mode: normal;
-            transform: translateY(-38px);
-          }}
-          .hero-orbit {{
-            position: absolute;
-            left: 50%;
-            bottom: 72px;
-            width: min(520px, 78vw);
-            aspect-ratio: 1 / 1;
-            transform: translateX(-50%);
-            border: 2px solid rgba(238, 190, 123, 0.28);
-            border-radius: 999px;
-            background:
-              linear-gradient(90deg, transparent 49.8%, rgba(238, 190, 123, 0.26) 50%, transparent 50.2%),
-              linear-gradient(0deg, transparent 49.8%, rgba(238, 190, 123, 0.26) 50%, transparent 50.2%);
-            opacity: 0.75;
-            z-index: 1;
-          }}
-          .hero-orbit .element {{
-            position: absolute;
-            width: 62px;
-            height: 62px;
-            border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.78);
-            border: 2px solid currentColor;
-            font-family: "Gowun Batang", serif;
-            font-size: 31px;
-            font-weight: 700;
-          }}
-          .element.wood {{
-            top: 16%;
-            left: 9%;
-            color: #42b883;
-          }}
-          .element.fire {{
-            top: -6%;
-            left: 50%;
-            color: #ff8a8a;
-            transform: translateX(-50%);
-          }}
-          .element.earth {{
-            top: 18%;
-            right: 7%;
-            color: #e7a513;
-          }}
-          .element.metal {{
-            top: 57%;
-            right: -4%;
-            color: #9d9d9d;
-          }}
-          .element.water {{
-            top: 55%;
-            left: -4%;
-            color: #5cb9ee;
-          }}
-          .cloud {{
-            position: absolute;
-            width: 116px;
-            height: 42px;
-            border: 2px solid #f4d6b6;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.56);
-          }}
-          .cloud::before, .cloud::after {{
-            content: "";
-            position: absolute;
-            bottom: 14px;
-            border: 2px solid #f4d6b6;
-            border-bottom: 0;
-            border-radius: 999px 999px 0 0;
-            background: #fff9f2;
-          }}
-          .cloud::before {{
-            left: 24px;
-            width: 38px;
-            height: 34px;
-          }}
-          .cloud::after {{
-            right: 22px;
-            width: 50px;
-            height: 48px;
-          }}
-          .cloud-left {{
-            top: 156px;
-            left: 10%;
-          }}
-          .cloud-right {{
-            top: 272px;
-            right: 6%;
-          }}
-          .spark {{
-            position: absolute;
-            color: #f0bd63;
-            font-size: 31px;
-            z-index: 0;
-          }}
-          .spark-a {{
-            top: 188px;
-            right: 15%;
-          }}
-          .spark-b {{
-            top: 330px;
-            left: 8%;
-          }}
-          .spark-c {{
-            top: 408px;
-            right: 15%;
-            color: #ffc6cf;
           }}
           .cards {{
             display: grid;
@@ -1758,7 +1635,6 @@ def _render_page(
               font-size: 14px;
             }}
             .home-hero {{
-              min-height: 500px;
               padding-top: 18px;
             }}
             .home-hero .speech {{
@@ -1774,19 +1650,8 @@ def _render_page(
               font-size: 17px;
             }}
             .oracle-character {{
-              width: min(380px, 92vw);
-              transform: translateY(-24px);
-            }}
-            .hero-orbit {{
-              bottom: 44px;
-            }}
-            .hero-orbit .element {{
-              width: 44px;
-              height: 44px;
-              font-size: 22px;
-            }}
-            .cloud, .spark {{
-              display: none;
+              width: min(560px, 122vw);
+              margin: 8px -11vw -52px;
             }}
             .mode {{
               min-height: 210px;

@@ -31,7 +31,8 @@ def test_home_page_uses_oracle_home_layout_and_hover_effects() -> None:
     assert 'aria-label="메뉴"' not in html
     assert "오늘도 운명을 함께 찾아볼까요?" in html
     assert "오라와 함께 나의 운명과 인연을" in html
-    assert 'class="hero-orbit"' in html
+    assert 'class="hero-orbit"' not in html
+    assert 'class="cloud cloud-left"' not in html
     assert 'class="mode solo"' in html
     assert "나의 운세 보기" in html
     assert 'href="/personal"' in html
