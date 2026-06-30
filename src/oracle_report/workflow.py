@@ -1544,7 +1544,9 @@ def _generate_distributed(
                 elif not is_my_local and worker_url != my_url:
                     my_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
                     other_score = scheduler.slave_metadata.get(worker_url, {}).get("compute_score", 5.0)
-                    if my_score > other_score:
+                    is_other_master = (worker_url == "local")
+                    limit_passed = (my_score >= other_score) if is_other_master else (my_score > other_score)
+                    if limit_passed:
                         if not is_task_done(assigned_task):
                             return copy.deepcopy(assigned_task)
         return None
@@ -1644,12 +1646,12 @@ def _generate_distributed(
                     "첫인상과 분위기", "관계 강점",
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
-                if is_core_category and compute_score < 20.0:
-                    other_high_perf_exists = any(
-                        meta.get("compute_score", 0.0) >= 20.0 
+                if is_core_category:
+                    other_better_perf_exists = any(
+                        meta.get("compute_score", 0.0) > compute_score
                         for meta in scheduler.slave_metadata.values()
                     )
-                    if other_high_perf_exists:
+                    if other_better_perf_exists:
                         task_queue.put(task)
                         task_queue.task_done()
                         time.sleep(0.5)
@@ -1780,12 +1782,12 @@ def _generate_distributed(
                     "첫인상과 분위기", "관계 강점",
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
-                if is_core_category and local_score < 20.0:
-                    other_high_perf_exists = any(
-                        meta.get("compute_score", 0.0) >= 20.0 
+                if is_core_category:
+                    other_better_perf_exists = any(
+                        meta.get("compute_score", 0.0) > local_score
                         for meta in scheduler.slave_metadata.values()
                     )
-                    if other_high_perf_exists:
+                    if other_better_perf_exists:
                         task_queue.put(task)
                         task_queue.task_done()
                         time.sleep(0.5)
