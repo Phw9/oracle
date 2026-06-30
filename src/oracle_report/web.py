@@ -89,50 +89,132 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        body = """
+        body = f"""
         <div class="oracle-home-shell">
-          <div class="top">
-            <div class="logo">ORACLE<span class="stamp serif">運</span></div>
-            <div class="tag">관상 &amp; 사주 · 운명 해설</div>
-          </div>
+          <section id="oracle-home" class="home-view" aria-label="홈">
+            <header class="home-nav">
+              <div class="brand-lockup">
+                <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+                <div class="tag">관상 &amp; 사주 · 운명 해설</div>
+              </div>
+            </header>
 
-          <div class="hero">
-            <div class="halo"></div>
-            <div class="ring"></div>
-            <div class="illust">
-              <img src="/static/assets/saju.jpg" alt="관상 일러스트" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-              <div class="ph" style="display:none"><span class="em">🔮</span>assets/saju.jpg<br>관상 일러스트 삽입</div>
+            <section class="home-hero">
+              <div class="speech">안녕하세요!</div>
+              <h1 aria-label="오늘도 운명을 함께 찾아볼까요?">오늘도 <span>운명</span>을<br>함께 찾아볼까요?</h1>
+              <p aria-label="오라와 함께 나의 운명과 인연을 쉽고 재미있게 알아보세요!"><strong>오라</strong>와 함께 나의 운명과 인연을<br>쉽고 재미있게 알아보세요!</p>
+              <img class="oracle-character" src="/static/assets/oracle-character.png" alt="돋보기로 운명을 살피는 오라 캐릭터">
+            </section>
+
+            <div class="cards">
+              <a class="mode solo" href="/personal">
+                <div class="mode-copy">
+                  <span class="ic">☘</span>
+                  <h2>나의 운세 보기</h2>
+                  <p>사주 · 관상 · 운세를<br>종합적으로 분석해드려요!</p>
+                  <span class="go">시작하기 <span class="arr">→</span></span>
+                </div>
+                <img class="mode-art mode-art-solo" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              </a>
+
+              <a class="mode pair" href="/compatibility">
+                <div class="mode-copy">
+                  <span class="ic">♥</span>
+                  <h2>우리 궁합 보기</h2>
+                  <p>두 사람의 인연과 궁합을<br>AI가 정밀하게 분석해드려요!</p>
+                  <span class="go">시작하기 <span class="arr">→</span></span>
+                </div>
+                <img class="mode-art mode-art-pair" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+              </a>
             </div>
-          </div>
 
-          <div class="greet serif">당신의 얼굴과 사주를 펼쳐볼까요?</div>
-
-          <div class="cards">
-            <a class="mode solo" href="/personal">
-              <span class="tagline">혼자서</span>
-              <div class="ic">🧑‍🦰</div>
-              <h2>개인 리포트</h2>
-              <p>관상 · 사주 · 보완 분석에<br>궁합 좋은 얼굴 추천까지</p>
-              <span class="go">시작하기 <span class="arr">→</span></span>
-            </a>
-
-            <a class="mode pair" href="/compatibility">
-              <span class="tagline">둘이서</span>
-              <div class="ic">💞</div>
-              <h2>두 사람 궁합</h2>
-              <p>첫 번째 사람 촬영 후, 3초 뒤<br>두 번째 사람을 순차 촬영</p>
-              <span class="go">시작하기 <span class="arr">→</span></span>
-            </a>
-          </div>
-
-          <div class="home-foot">
-            <div class="chips">
-              <span class="chip">📷 카메라 관상</span>
-              <span class="chip">🗓️ 만세력 사주</span>
-              <span class="chip">🔒 100% 온-디바이스</span>
+            <div class="feature-row">
+              <div class="feature">
+                <span class="feature-ic camera"><img src="/static/assets/camera.png" width="35" height="35" alt="" aria-hidden="true"></span>
+                <strong>얼굴 분석</strong>
+                <p>사진 한 장으로<br>관상을 분석해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic calendar"><img src="/static/assets/calendar.png" width="35" height="35" alt="" aria-hidden="true"></span>
+                <strong>사주 분석</strong>
+                <p>생년월일시를 기반으로<br>사주를 분석해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic ai"><img src="/static/assets/ai.png" width="35" height="35" alt="" aria-hidden="true"></span>
+                <strong>100% 온디바이스</strong>
+                <p>모든 분석이 기기 내에서<br>이루어져 안전해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic lock"><img src="/static/assets/privacy.png" width="35" height="35" alt="" aria-hidden="true"></span>
+                <strong>프라이버시 보호</strong>
+                <p>당신의 데이터는 외부로<br>전송되지 않아요</p>
+              </div>
             </div>
-            얼굴 이미지와 개인정보는 기기 안에서만 처리되고 외부로 전송되지 않아요.<br>Oracle은 재미를 위한 콘텐츠예요.
-          </div>
+          </section>
+
+          <section id="oracle-more" class="more-section" aria-label="더보기">
+            <div class="more-head">
+              <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+              <h2>오라를 더 자세히 소개할게요!</h2>
+              <p>분석 방식부터 진행 과정, 자주 묻는 질문까지 한 번에 확인해보세요.</p>
+            </div>
+
+            <div class="more-grid">
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">ORACLE은 이렇게 달라요</span>
+                  <h3>전통 지혜와 AI 기술의 완벽한 만남</h3>
+                  <ul>
+                    <li><span>◎</span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
+                    <li><span>▤</span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
+                    <li><span>♡</span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
+                    <li><span>▣</span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
+                  </ul>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+                    <p><strong>당신의 운명은 특별합니다.</strong><br>오라와 함께 더 나은 미래를 만들어가요!</p>
+                  </div>
+                </div>
+              </article>
+
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">분석 진행 과정</span>
+                  <h3>오라와 함께 운명을 분석하는 과정</h3>
+                  <ol>
+                    <li><span>1</span><strong>얼굴 인식</strong><em>사진을 촬영하거나 업로드해요.</em></li>
+                    <li><span>2</span><strong>정보 입력</strong><em>생년월일시 등 필요한 정보를 입력해요.</em></li>
+                    <li><span>3</span><strong>AI 분석</strong><em>AI가 사주와 관상을 종합 분석해요.</em></li>
+                    <li><span>4</span><strong>결과 확인</strong><em>나만의 운세 리포트를 확인해요.</em></li>
+                    <li><span>5</span><strong>안전한 저장</strong><em>결과는 기기 내에서만 안전하게 저장돼요.</em></li>
+                  </ol>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+                    <p><strong>모든 과정이 기기 내에서 안전하게!</strong><br>당신의 프라이버시를 최우선으로 생각해요.</p>
+                  </div>
+                </div>
+              </article>
+
+              <article class="more-card">
+                <div class="more-copy">
+                  <span class="more-kicker">오라가 도와줄게요</span>
+                  <h3>궁금할 때 바로 확인하는 도움말</h3>
+                  <div class="faq-list">
+                    <div><span>▣</span><strong>얼굴 사진은 어떻게 찍어야 하나요?</strong><em>정면을 바라보고 밝은 곳에서 찍어주세요.</em></div>
+                    <div><span>▦</span><strong>사주 정보는 어떻게 입력하나요?</strong><em>정확한 생년월일시를 입력해주시면 돼요.</em></div>
+                    <div><span>▤</span><strong>분석 결과는 어디서 확인하나요?</strong><em>운세 리포트에서 언제든 확인할 수 있어요.</em></div>
+                    <div><span>▣</span><strong>개인 정보는 안전한가요?</strong><em>100% 온디바이스 처리로 안전해요.</em></div>
+                  </div>
+                  <div class="more-note">
+                    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+                    <p><strong>오라는 언제나 여러분의 운명 친구예요!</strong><br>신뢰할 수 있는 AI 분석을 약속드려요.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {_bottom_nav("home", home_tabs=True)}
         </div>
         """
         result = _render_page("Oracle", body, page_class="home-page", show_heading=False)
@@ -155,7 +237,7 @@ def create_app() -> Flask:
         result = _render_page(
             "개인 리포트",
             body,
-            page_class="input-page",
+            page_class="input-page personal-page",
             show_heading=False,
         )
         return result
@@ -179,7 +261,7 @@ def create_app() -> Flask:
         result = _render_page(
             "개인 리포트 결과",
             body,
-            page_class="result-page",
+            page_class="result-page personal-result-page",
             show_heading=False,
         )
         return result
@@ -198,7 +280,12 @@ def create_app() -> Flask:
                 return result
             except Exception as exc:
                 body = _error_panel(exc) + _compatibility_form()
-        result = _render_page("두 사람 궁합", body)
+        result = _render_page(
+            "두 사람 궁합",
+            body,
+            page_class="input-page compatibility-page",
+            show_heading=False,
+        )
         return result
 
     @app.post("/api/compatibility")
@@ -546,62 +633,116 @@ def _face_db_path() -> Path:
     return result
 
 
+def _bottom_nav(active: str, *, home_tabs: bool = False) -> str:
+    home_href = "#oracle-home" if home_tabs else "/#oracle-home"
+    more_href = "#oracle-more" if home_tabs else "/#oracle-more"
+    home_tab = ' data-home-tab="home"' if home_tabs else ""
+    more_tab = ' data-home-tab="more"' if home_tabs else ""
+    home_active = " foot-item-active" if active == "home" else ""
+    personal_active = " foot-item-active" if active == "personal" else ""
+    compatibility_active = " foot-item-active" if active == "compatibility" else ""
+    more_active = " foot-item-active" if active == "more" else ""
+    result = f"""
+    <footer class="home-foot" aria-label="하단 메뉴">
+      <a class="foot-item foot-item-home{home_active}" href="{home_href}"{home_tab}>
+        <span class="foot-icon">⌂</span>
+        <span>홈</span>
+      </a>
+      <a class="foot-item{personal_active}" href="/personal">
+        <span class="foot-icon">▤</span>
+        <span>운세 리포트</span>
+      </a>
+      <a class="foot-item{compatibility_active}" href="/compatibility">
+        <span class="foot-icon">♡</span>
+        <span>궁합 리포트</span>
+      </a>
+      <a class="foot-item foot-item-more{more_active}" href="{more_href}"{more_tab}>
+        <span class="foot-icon">•••</span>
+        <span>더보기</span>
+      </a>
+    </footer>
+    """
+    return result
+
+
 def _personal_form() -> str:
     mode_options = _face_analysis_mode_options()
     gender_options = _gender_options(required=True)
     target_gender_options = _gender_options(required=False)
     birth_time_options = _birth_time_options()
     result = f"""
-    <div class="oracle-input-shell">
-      <div class="brand">
-        <div class="logo">ORACLE</div>
+    <div class="oracle-input-shell personal-oracle-shell">
+      <div class="input-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/" aria-label="홈으로 돌아가기">‹</a>
+        <span class="heart-mark" aria-hidden="true">♡</span>
+      </div>
+
+      <div class="brand personal-brand">
+        <div class="logo"><span aria-hidden="true">✧</span>ORACLE<span aria-hidden="true">✧</span></div>
         <div class="tag">관상 &amp; 사주 리포트</div>
         <div class="ornament"></div>
       </div>
 
-      <div class="input-card">
-        <div class="card-head">
-          <h1>개인 리포트</h1>
-          <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
+      <div class="input-card personal-card">
+        <div class="cloud cloud-left" aria-hidden="true"></div>
+        <div class="cloud cloud-right" aria-hidden="true"></div>
+
+        <div class="card-head personal-card-head">
+          <div class="title-block">
+            <h1><span aria-hidden="true">♡</span>개인 리포트<span aria-hidden="true">♡</span></h1>
+            <p>당신의 얼굴과 사주가 그리는 한 장의 이야기</p>
+          </div>
+          <div class="guide-ora">
+            <div class="speech-bubble">정확한 리포트를<br>위해 정보를 입력해줘!</div>
+            <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+          </div>
         </div>
 
-        <form method="post" class="workflow-form input-form" data-workflow-api="/api/personal">
+        <form method="post" class="workflow-form input-form personal-form" data-workflow-api="/api/personal">
           <input type="hidden" name="skip_face" value="0">
-          <div class="field lead">
-            <label>이름</label>
-            <input name="name" placeholder="이름을 입력하세요" required>
-          </div>
-          <div class="field-stack">
-            <div class="field">
+          <div class="personal-field-list">
+            <div class="field personal-field lead">
+              <span class="field-icon" aria-hidden="true">☻</span>
+              <label>이름</label>
+              <input name="name" placeholder="이름을 입력해주세요" required>
+            </div>
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">▣</span>
               <label>생년월일</label>
               <input name="birth_date" type="date" min="1800-01-01" max="2300-12-31" required>
             </div>
-            <div class="field">
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">◷</span>
               <label>태어난 시간<span class="hint">모르면 '모름'을 선택하세요</span></label>
               <select name="birth_time">{birth_time_options}</select>
             </div>
-            <div class="field">
+            <div class="field personal-field">
+              <span class="field-icon" aria-hidden="true">♡</span>
               <label>성별</label>
               <select name="gender" required>{gender_options}</select>
             </div>
-            <div class="field">
-              <label>추천받고 싶은 얼굴 성별</label>
-              <select name="target_gender">{target_gender_options}</select>
-            </div>
-            <div class="field">
-              <label>관상 분석 모드</label>
-              <select name="face_analysis_mode">{mode_options}</select>
-            </div>
           </div>
           <div class="actions">
-            <button type="submit" class="btn btn-primary" onclick="this.form.skip_face.value='0';">개인 리포트 촬영 시작</button>
-            <button type="submit" class="btn btn-ghost" onclick="this.form.skip_face.value='1';">관상 없이 사주만 보기</button>
+            <button type="submit" class="btn btn-primary" onclick="this.form.skip_face.value='0';">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              개인 리포트 촬영 시작
+              <span aria-hidden="true">✦</span>
+            </button>
+            <button type="submit" class="btn btn-ghost" onclick="this.form.skip_face.value='1';">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              관상 없이 사주만 보기
+            </button>
           </div>
         </form>
 
-        <p class="footnote">입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.</p>
+        <p class="footnote personal-footnote">
+          <span aria-hidden="true">♡</span>
+          입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.
+          <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+        </p>
       </div>
     </div>
+    {_bottom_nav("personal")}
     """
     return result
 
@@ -615,29 +756,75 @@ def _compatibility_form() -> str:
     birth_time_options = _birth_time_options()
     face_mode_options = _face_analysis_mode_options()
     result = f"""
-    <form method="post" class="panel workflow-form" data-workflow-api="/api/compatibility">
-      <h2>두 사람 궁합</h2>
-      <div class="grid">
-        <fieldset>
-          <legend>첫 번째 사람</legend>
-          <label>이름<input name="left_name" required></label>
-          <label>생년월일<input name="left_birth_date" type="date" min="1800-01-01" max="2300-12-31" required></label>
-          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
-          <label>성별<select name="left_gender" required>{gender_options}</select></label>
-        </fieldset>
-        <fieldset>
-          <legend>두 번째 사람</legend>
-          <label>이름<input name="right_name" required></label>
-          <label>생년월일<input name="right_birth_date" type="date" min="1800-01-01" max="2300-12-31" required></label>
-          <label>태어난 시간<span class="hint">모르면 모름 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
-          <label>성별<select name="right_gender" required>{gender_options}</select></label>
-        </fieldset>
+
+    <div class="oracle-input-shell compatibility-oracle-shell">
+      <div class="input-topbar compatibility-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/" aria-label="홈으로 돌아가기">‹</a>
+        <span class="compatibility-heart-mark" aria-hidden="true">♡</span>
       </div>
-      <label>궁합 모드<select name="mode">{mode_options}</select></label>
-      <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
-      <p class="hint">두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
-      <button type="submit">두 사람 궁합 촬영 시작</button>
-    </form>
+
+      <div class="brand compatibility-brand">
+        <div class="logo"><span aria-hidden="true">✦</span>ORACLE<span aria-hidden="true">✦</span></div>
+        <div class="tag">우리 궁합 리포트</div>
+        <div class="ornament"></div>
+      </div>
+
+      <div class="input-card compatibility-card">
+        <div class="compat-cloud compat-cloud-left" aria-hidden="true"></div>
+        <span class="compat-spark compat-spark-left" aria-hidden="true">✦</span>
+        <span class="compat-spark compat-spark-right" aria-hidden="true">✦</span>
+        <img class="compat-hero-ora" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+
+        <div class="card-head compatibility-card-head">
+          <div class="title-block">
+            <h1><span aria-hidden="true">♥</span>우리 궁합 리포트<span aria-hidden="true">♥</span></h1>
+            <p>두 사람의 인연과 궁합을 분석해드려요!</p>
+          </div>
+          <div class="compat-speech">두 사람의 정보를<br>입력해보세요!</div>
+        </div>
+
+        <form method="post" class="workflow-form compatibility-form" data-workflow-api="/api/compatibility">
+          <div class="compat-people">
+            <fieldset class="compat-person">
+              <legend><span aria-hidden="true">♥</span>첫 번째 사람</legend>
+              <label>이름<input name="left_name" placeholder="이름을 입력해주세요" required></label>
+              <label>생년월일<input name="left_birth_date" type="date" required></label>
+              <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
+              <label>성별<select name="left_gender" required>{gender_options}</select></label>
+            </fieldset>
+
+            <div class="compat-heart-bridge" aria-hidden="true">
+              <span>♥</span>
+            </div>
+
+            <fieldset class="compat-person">
+              <legend><span aria-hidden="true">♥</span>두 번째 사람</legend>
+              <label>이름<input name="right_name" placeholder="이름을 입력해주세요" required></label>
+              <label>생년월일<input name="right_birth_date" type="date" required></label>
+              <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
+              <label>성별<select name="right_gender" required>{gender_options}</select></label>
+            </fieldset>
+          </div>
+
+          <div class="compat-options">
+            <label>궁합 모드<select name="mode">{mode_options}</select></label>
+            <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
+          </div>
+
+          <p class="compat-note"><span aria-hidden="true">💡</span>두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
+
+          <div class="compat-actions">
+            <button type="submit" class="btn btn-primary compat-submit">
+              <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              우리 궁합 촬영 시작
+            </button>
+          </div>
+        </form>
+
+        <img class="compat-bottom-ora" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+      </div>
+    </div>
+    {_bottom_nav("compatibility")}
     """
     return result
 
@@ -683,18 +870,31 @@ def _face_analysis_mode_options() -> str:
 
 def _personal_result_page(job_id: str, skip_face: bool) -> str:
     result = f"""
-    <div class="oracle-result-shell">
-      <div class="brand">
+    <div class="oracle-result-shell personal-result-shell">
+      <div class="input-topbar result-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/personal" aria-label="입력 화면으로 돌아가기">‹</a>
+        <span class="heart-mark" aria-hidden="true">♡</span>
+      </div>
+
+      <div class="brand personal-result-brand">
         <div class="logo">ORACLE</div>
         <div class="tag">개인 리포트 결과</div>
         <div class="ornament"></div>
       </div>
+
+      <div class="result-sky" aria-hidden="true">
+        <span class="result-cloud result-cloud-left"></span>
+        <span class="result-spark result-spark-left">✧</span>
+        <span class="result-spark result-spark-right">✧</span>
+        <img class="result-hero-ora" src="/static/assets/oracle-character.png" alt="">
+      </div>
+
       <div class="result-actions">
         <a class="result-action" href="/personal">입력 다시 하기</a>
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
-      {_capture_preview_panel(job_id=job_id, skip_face=skip_face)}
+      {_capture_preview_panel(job_id=job_id, skip_face=skip_face, cute=True)}
     </div>
     """
     return result
@@ -723,6 +923,7 @@ def _capture_preview_panel(
     *,
     job_id: str = "",
     skip_face: bool = False,
+    cute: bool = False,
 ) -> str:
     job_attr = f' data-workflow-result-job="{escape(job_id)}"' if job_id != "" else ""
     skip_attr = ' data-skip-face="1"' if skip_face else ' data-skip-face="0"'
@@ -743,15 +944,49 @@ def _capture_preview_panel(
         if skip_face
         else "정면 얼굴을 카메라 중앙에 맞춰 주세요."
     )
-    result = f"""
-    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="true"{job_attr}{skip_attr}{loading_hidden}>
-      <span class="loading-spinner" aria-hidden="true"></span>
-      <div>
-        <strong id="workflow-loading-title">{loading_title}</strong>
-        <p id="workflow-loading-message" class="hint">{loading_message}</p>
+    loading_heart = (
+        '<span class="loading-heart" aria-hidden="true">♡</span>' if cute else ""
+    )
+    if cute:
+        preview_content = f"""
+      <h2><span class="capture-title-icon" aria-hidden="true">▣</span>실시간 촬영 상태</h2>
+      <div class="capture-stage">
+        <div class="capture-direction">
+          <span class="capture-heart" aria-hidden="true">♡</span>
+          <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+          <strong>정면 얼굴을 <span>카메라 중앙</span>에 맞춰 주세요.</strong>
+          <span class="capture-heart" aria-hidden="true">♡</span>
+        </div>
+        <div class="capture-visual">
+          <img id="capture-preview-image" alt="실시간 촬영 상태">
+          <span class="camera-corner camera-corner-tl" aria-hidden="true"></span>
+          <span class="camera-corner camera-corner-tr" aria-hidden="true"></span>
+          <span class="camera-corner camera-corner-bl" aria-hidden="true"></span>
+          <span class="camera-corner camera-corner-br" aria-hidden="true"></span>
+          <span class="face-guide" aria-hidden="true"></span>
+          <div class="capture-side-note capture-side-note-left" aria-hidden="true">
+            <p>카메라를<br>눈높이에 맞추고<br>정면을 바라봐 주세요!</p>
+            <span>✧</span>
+            <img src="/static/assets/oracle-pair-card.png" alt="">
+          </div>
+          <div class="capture-side-note capture-side-note-right" aria-hidden="true">
+            <p>밝은 곳에서<br>촬영하면 더<br>정확해요!</p>
+            <span>✧</span>
+            <img src="/static/assets/oracle-solo-card.png" alt="">
+          </div>
+          <div class="capture-privacy-veil" hidden>
+            <div class="veil-card">
+              <span class="veil-mark" aria-hidden="true">✦</span>
+              <strong>얼굴 인식 완료</strong>
+              <p>이제 리포트를 예쁘게 빚는 중이에요.</p>
+            </div>
+          </div>
+        </div>
+        <p id="workflow-status" class="hint capture-tip"><span aria-hidden="true">✧</span>{status_text}<span aria-hidden="true">☆</span></p>
       </div>
-    </section>
-    <section class="panel capture-preview"{preview_hidden}>
+        """
+    else:
+        preview_content = f"""
       <h2>실시간 촬영 상태</h2>
       <img id="capture-preview-image" alt="실시간 촬영 상태">
       <div class="capture-privacy-veil" hidden>
@@ -762,6 +997,19 @@ def _capture_preview_panel(
         </div>
       </div>
       <p id="workflow-status" class="hint">{status_text}</p>
+        """
+    cute_class = " capture-preview-cute" if cute else ""
+    result = f"""
+    <section id="workflow-loading" class="panel workflow-loading" role="status" aria-live="polite" aria-busy="true"{job_attr}{skip_attr}{loading_hidden}>
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <div>
+        <strong id="workflow-loading-title">{loading_title}</strong>
+        <p id="workflow-loading-message" class="hint">{loading_message}</p>
+      </div>
+      {loading_heart}
+    </section>
+    <section class="panel capture-preview{cute_class}"{preview_hidden}>
+      {preview_content}
     </section>
     <section id="workflow-result"></section>
     """
@@ -811,16 +1059,16 @@ def _render_page(
         <style>
           :root {{
             color-scheme: light;
-            --paper: #f6f1e7;
-            --paper-2: #fbf8f1;
-            --ink: #2a2520;
-            --ink-soft: #6b6256;
-            --line: #dad0be;
-            --line-soft: #e7dece;
-            --mok: #3a7d5c;
-            --mok-deep: #2f6549;
-            --hwa: #c25239;
-            --gold: #a8823c;
+            --paper: #fff8ef;
+            --paper-2: #ffffff;
+            --ink: #4a2f26;
+            --ink-soft: #7a6257;
+            --line: #f1d8cf;
+            --line-soft: #f7e6df;
+            --mok: #42b883;
+            --mok-deep: #16845a;
+            --hwa: #ff6f82;
+            --gold: #d8a24b;
             font-family: "Gowun Dodum", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: var(--paper);
             color: var(--ink);
@@ -833,8 +1081,8 @@ def _render_page(
             min-height: 100vh;
             background: var(--paper);
             background-image:
-              radial-gradient(circle at 18% 8%, rgba(58, 125, 92, 0.05), transparent 42%),
-              radial-gradient(circle at 86% 26%, rgba(194, 82, 57, 0.045), transparent 42%);
+              linear-gradient(180deg, #fffaf4 0%, #fff3e8 56%, #ffe9ea 100%),
+              repeating-linear-gradient(90deg, rgba(216, 162, 75, 0.08) 0 1px, transparent 1px 120px);
             -webkit-font-smoothing: antialiased;
           }}
           main {{
@@ -844,11 +1092,11 @@ def _render_page(
           }}
           main.input-page {{
             width: min(860px, calc(100vw - 48px));
-            padding: 24px 0;
+            padding: 24px 0 112px;
           }}
           main.home-page {{
-            width: min(860px, calc(100vw - 40px));
-            padding: 40px 0 60px;
+            width: min(1180px, calc(100vw - 48px));
+            padding: 22px 0 112px;
           }}
           h1 {{
             margin: 0 0 24px;
@@ -886,120 +1134,140 @@ def _render_page(
             font-family: "Gowun Batang", serif;
           }}
           .oracle-home-shell {{
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             width: 100%;
+            overflow: hidden;
           }}
-          .top {{
-            text-align: center;
-            margin-bottom: 30px;
+          .oracle-home-shell.more-active .home-view {{
+            display: none;
           }}
-          .top .logo {{
+          .oracle-home-shell.more-active .more-section {{
+            display: block;
+          }}
+          .oracle-home-shell.more-active .foot-item-active {{
+            color: var(--ink-soft);
+          }}
+          .oracle-home-shell.more-active .foot-item-more {{
+            color: var(--hwa);
+          }}
+          .home-nav {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 18px;
+            margin-bottom: 6px;
+          }}
+          .brand-lockup .logo {{
             font-family: "Song Myung", serif;
-            font-size: 46px;
-            letter-spacing: 0.2em;
+            font-size: 36px;
+            letter-spacing: 0;
             color: var(--ink);
             position: relative;
             display: inline-block;
           }}
-          .top .logo .stamp {{
+          .brand-lockup .logo .stamp {{
             position: absolute;
-            top: -6px;
-            right: -46px;
-            width: 40px;
-            height: 40px;
+            top: -2px;
+            right: -34px;
+            width: 30px;
+            height: 30px;
             border: 2px solid var(--hwa);
             border-radius: 8px;
             color: var(--hwa);
-            font-size: 19px;
+            font-size: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
             transform: rotate(9deg);
             opacity: 0.9;
           }}
-          .top .tag {{
-            font-size: 13px;
-            letter-spacing: 0.4em;
-            color: var(--gold);
-            text-transform: uppercase;
-            margin-top: 14px;
+          .brand-lockup .tag {{
+            font-size: 15px;
+            color: var(--ink);
+            margin-top: 6px;
           }}
-          .hero {{
+          .home-hero {{
             position: relative;
-            margin: 6px 0 36px;
-            width: 230px;
-            height: 230px;
-            display: flex;
+            text-align: center;
+            padding-top: 14px;
+          }}
+          .home-hero .speech {{
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-          }}
-          .hero .halo {{
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(204, 154, 59, 0.18), rgba(194, 82, 57, 0.06) 60%, transparent 72%);
-          }}
-          .hero .ring {{
-            position: absolute;
-            inset: 14px;
-            border: 1.5px dashed var(--gold);
-            border-radius: 50%;
-            opacity: 0.5;
-            animation: oracle-spin 40s linear infinite;
-          }}
-          .hero .illust {{
-            position: relative;
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            overflow: hidden;
-            background: #ffffff;
-            border: 3px solid #ffffff;
-            box-shadow: 0 14px 36px -14px rgba(46, 37, 32, 0.5);
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-          }}
-          .hero .illust img {{
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center 12%;
-          }}
-          .illust .ph {{
-            font-size: 12px;
-            color: #b6a98c;
-            text-align: center;
-            padding: 14px;
-            line-height: 1.6;
-          }}
-          .illust .ph .em {{
-            font-size: 40px;
-            display: block;
-            margin-bottom: 6px;
-          }}
-          .greet {{
+            min-height: 44px;
+            padding: 8px 24px;
+            border: 2px solid #ffc6cf;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.64);
+            color: var(--hwa);
             font-family: "Gowun Batang", serif;
             font-size: 18px;
-            color: var(--ink-soft);
-            margin-bottom: 24px;
+            font-weight: 700;
+            position: relative;
+          }}
+          .home-hero .speech::after {{
+            content: "";
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            width: 14px;
+            height: 14px;
+            border-right: 2px solid #ffc6cf;
+            border-bottom: 2px solid #ffc6cf;
+            background: #fff8f3;
+            transform: translateX(-50%) rotate(45deg);
+          }}
+          .home-hero h1 {{
+            margin: 18px 0 10px;
+            font-family: "Gowun Batang", serif;
+            font-size: 50px;
+            line-height: 1.12;
+            color: var(--ink);
+            letter-spacing: 0;
+          }}
+          .home-hero h1 span, .home-hero p strong {{
+            color: var(--hwa);
+          }}
+          .home-hero p {{
+            margin: 0 auto 14px;
+            color: var(--ink);
+            font-size: 18px;
+            line-height: 1.55;
+          }}
+          .oracle-character {{
+            position: relative;
+            z-index: 2;
+            display: block;
+            width: min(620px, 78vw);
+            height: auto;
+            object-fit: contain;
+            object-position: center center;
+            margin: 4px auto -62px;
+            border: 0;
+            border-radius: 0;
+            mix-blend-mode: normal;
           }}
           .cards {{
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 18px;
             width: 100%;
-            max-width: 780px;
+            max-width: 960px;
+            margin: -16px auto 20px;
+            position: relative;
+            z-index: 4;
           }}
           .mode {{
             position: relative;
-            display: block;
-            background: var(--paper-2);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 30px 26px 26px;
+            display: flex;
+            min-height: 210px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            padding: 28px 30px;
             color: inherit;
             cursor: pointer;
             overflow: hidden;
@@ -1010,10 +1278,21 @@ def _render_page(
           .mode::after {{
             content: "";
             position: absolute;
-            inset: 6px;
-            border: 1px solid var(--line-soft);
-            border-radius: 9px;
+            inset: 0;
+            opacity: 0.5;
             pointer-events: none;
+          }}
+          .mode.solo {{
+            border-color: #a9dfc5;
+          }}
+          .mode.pair {{
+            border-color: #ffc5cb;
+          }}
+          .mode.solo::after {{
+            background: linear-gradient(120deg, rgba(66, 184, 131, 0.12), transparent 60%);
+          }}
+          .mode.pair::after {{
+            background: linear-gradient(120deg, rgba(255, 111, 130, 0.13), transparent 60%);
           }}
           .mode:hover {{
             transform: translateY(-6px);
@@ -1025,49 +1304,66 @@ def _render_page(
           .mode.pair:hover {{
             border-color: var(--hwa);
           }}
+          .mode-copy {{
+            position: relative;
+            z-index: 2;
+          }}
           .mode .ic {{
-            width: 54px;
-            height: 54px;
-            border-radius: 14px;
-            display: flex;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             font-size: 27px;
+            line-height: 1;
           }}
           .mode.solo .ic {{
-            background: rgba(58, 125, 92, 0.12);
+            color: var(--mok);
           }}
           .mode.pair .ic {{
-            background: rgba(194, 82, 57, 0.12);
+            color: var(--hwa);
           }}
           .mode h2 {{
             font-family: "Gowun Batang", serif;
-            font-size: 22px;
+            font-size: 31px;
             font-weight: 700;
-            margin: 0 0 8px;
+            margin: 0 0 14px;
+          }}
+          .mode.solo h2 {{
+            color: var(--mok-deep);
+          }}
+          .mode.pair h2 {{
+            color: var(--hwa);
           }}
           .mode p {{
-            font-size: 14px;
-            color: var(--ink-soft);
-            line-height: 1.6;
-            min-height: 42px;
+            font-size: 15px;
+            color: var(--ink);
+            line-height: 1.7;
+            min-height: 46px;
             margin: 0;
           }}
           .mode .go {{
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            justify-content: center;
+            min-width: 160px;
+            min-height: 46px;
             margin-top: 18px;
+            padding: 10px 20px;
+            border-radius: 999px;
             font-family: "Gowun Batang", serif;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
+            color: #ffffff;
           }}
           .mode.solo .go {{
-            color: var(--mok-deep);
+            background: linear-gradient(90deg, #42b883, #66cfa5);
           }}
           .mode.pair .go {{
-            color: var(--hwa);
+            background: linear-gradient(90deg, #ff6f82, #ff8fa0);
           }}
           .mode .go .arr {{
             transition: transform 0.2s;
@@ -1075,45 +1371,289 @@ def _render_page(
           .mode:hover .go .arr {{
             transform: translateX(4px);
           }}
-          .mode .tagline {{
+          .mode .mode-art {{
+            position: relative;
+            z-index: 2;
+            width: 170px;
+            height: 184px;
+            object-fit: contain;
+            border-radius: 0;
+            mix-blend-mode: normal;
+            flex: 0 0 auto;
+            align-self: flex-end;
+            margin: 0 -14px -18px 0;
+          }}
+          .mode .mode-art-pair {{
+            width: 164px;
+            height: 188px;
+            margin-right: -12px;
+          }}
+          .feature-row {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            max-width: 960px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 14px 40px -28px rgba(74, 47, 38, 0.4);
+            overflow: hidden;
+          }}
+          .feature {{
+            min-height: 132px;
+            padding: 22px 18px 20px;
+            text-align: center;
+            border-right: 1px dashed #e8cfc6;
+          }}
+          .feature:last-child {{
+            border-right: 0;
+          }}
+          .feature-ic {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 54px;
+            height: 54px;
+            margin-bottom: 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+          }}
+          .feature-ic.camera {{
+            background: #ece3ff;
+            color: #7650bf;
+          }}
+          .feature-ic.calendar {{
+            background: #e4f2ff;
+            color: #4381b7;
+          }}
+          .feature-ic.ai {{
+            background: #dff8f1;
+            color: #158672;
+          }}
+          .feature-ic.lock {{
+            background: #fff0c9;
+            color: #c68011;
+          }}
+          .feature strong {{
+            display: block;
+            font-family: "Gowun Batang", serif;
+            font-size: 17px;
+            color: var(--ink);
+          }}
+          .feature p {{
+            margin: 9px 0 0;
+            color: var(--ink);
+            font-size: 12px;
+            line-height: 1.6;
+          }}
+          .more-section {{
+            display: none;
+            max-width: 1040px;
+            margin: 0 auto;
+            scroll-margin-top: 34px;
+          }}
+          .more-head {{
+            margin-bottom: 22px;
+            text-align: center;
+          }}
+          .more-head .logo {{
+            position: relative;
+            display: inline-block;
+            font-family: "Song Myung", serif;
+            font-size: 32px;
+            letter-spacing: 0;
+            color: var(--ink);
+          }}
+          .more-head .logo .stamp {{
             position: absolute;
-            top: 18px;
-            right: 18px;
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-family: "Gowun Dodum", sans-serif;
-          }}
-          .mode.solo .tagline {{
-            background: rgba(58, 125, 92, 0.1);
-            color: var(--mok-deep);
-          }}
-          .mode.pair .tagline {{
-            background: rgba(194, 82, 57, 0.1);
+            top: -2px;
+            right: -30px;
+            width: 25px;
+            height: 25px;
+            border: 2px solid var(--hwa);
+            border-radius: 7px;
             color: var(--hwa);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(9deg);
+          }}
+          .more-head h2 {{
+            margin: 14px 0 6px;
+            font-family: "Gowun Batang", serif;
+            font-size: 34px;
+            color: var(--ink);
+          }}
+          .more-head p {{
+            margin: 0;
+            color: var(--ink-soft);
+            font-size: 15px;
+          }}
+          .more-grid {{
+            display: grid;
+            gap: 18px;
+          }}
+          .more-card {{
+            padding: 24px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 18px 46px -30px rgba(74, 47, 38, 0.34);
+            overflow: hidden;
+          }}
+          .more-copy {{
+            min-width: 0;
+          }}
+          .more-kicker {{
+            display: inline-flex;
+            align-items: center;
+            min-height: 32px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 111, 130, 0.1);
+            color: var(--hwa);
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            font-weight: 700;
+          }}
+          .more-copy h3 {{
+            margin: 12px 0 16px;
+            font-family: "Gowun Batang", serif;
+            font-size: 27px;
+            line-height: 1.25;
+            color: var(--ink);
+          }}
+          .more-copy ul, .more-copy ol {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }}
+          .more-copy li, .faq-list div {{
+            display: grid;
+            grid-template-columns: 46px 1fr;
+            column-gap: 12px;
+            align-items: center;
+            min-height: 76px;
+            padding: 12px 14px;
+            border: 1px solid var(--line-soft);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.82);
+          }}
+          .more-copy li > span, .faq-list div > span {{
+            grid-row: span 2;
+            width: 46px;
+            height: 46px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff2e8;
+            color: var(--gold);
+            font-family: "Gowun Batang", serif;
+            font-size: 20px;
+            font-weight: 700;
+          }}
+          .more-copy li strong, .faq-list strong {{
+            display: block;
+            color: var(--ink);
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            line-height: 1.35;
+          }}
+          .more-copy li em, .faq-list em {{
+            display: block;
+            margin-top: 4px;
+            color: var(--ink-soft);
+            font-size: 13px;
+            font-style: normal;
+            line-height: 1.55;
+          }}
+          .faq-list {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }}
+          .more-note {{
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-top: 14px;
+            padding: 14px 18px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(255, 111, 130, 0.12), rgba(255, 255, 255, 0.72));
+          }}
+          .more-note img {{
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+            flex: 0 0 auto;
+          }}
+          .more-note p {{
+            margin: 0;
+            color: var(--ink-soft);
+            font-size: 14px;
+            line-height: 1.55;
+          }}
+          .more-note strong {{
+            color: var(--hwa);
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
           }}
           .home-foot {{
-            margin-top: 34px;
-            text-align: center;
-            font-size: 12px;
-            color: var(--ink-soft);
-            line-height: 1.8;
-            max-width: 520px;
-          }}
-          .home-foot .chips {{
+            position: fixed;
+            left: 50%;
+            bottom: max(14px, env(safe-area-inset-bottom));
+            z-index: 30;
+            transform: translateX(-50%);
             display: flex;
-            gap: 8px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-          }}
-          .home-foot .chip {{
-            background: var(--paper-2);
+            justify-content: space-around;
+            align-items: center;
+            width: min(960px, calc(100vw - 48px));
+            min-height: 68px;
+            margin: 0;
+            padding: 6px 0;
             border: 1px solid var(--line);
-            border-radius: 20px;
-            padding: 6px 14px;
-            font-size: 12px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.94);
+            box-shadow: 0 16px 42px -24px rgba(74, 47, 38, 0.42);
+            backdrop-filter: blur(14px);
+            text-align: center;
             color: var(--ink);
+          }}
+          .foot-item {{
+            flex: 1;
+            min-height: 54px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            border-right: 1px solid var(--line-soft);
+            color: var(--ink-soft);
+            font-family: "Gowun Batang", serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            letter-spacing: 0;
+          }}
+          .foot-item:last-child {{
+            border-right: 0;
+          }}
+          .foot-item-active {{
+            color: var(--hwa);
+          }}
+          .foot-icon {{
+            display: block;
+            min-height: 20px;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 20px;
+            line-height: 1;
           }}
           .oracle-input-shell {{
             width: 100%;
@@ -1125,12 +1665,12 @@ def _render_page(
           .brand .logo {{
             font-family: "Song Myung", serif;
             font-size: 31px;
-            letter-spacing: 0.22em;
+            letter-spacing: 0;
             color: var(--ink);
           }}
           .brand .tag {{
             font-size: 12px;
-            letter-spacing: 0.4em;
+            letter-spacing: 0;
             color: var(--gold);
             text-transform: uppercase;
             margin-top: 6px;
@@ -1224,7 +1764,7 @@ def _render_page(
             font-weight: 400;
             color: var(--ink-soft);
             margin-top: 2px;
-            letter-spacing: 0.02em;
+            letter-spacing: 0;
           }}
           input, select, button {{
             min-height: 42px;
@@ -1288,7 +1828,7 @@ def _render_page(
             border-radius: 8px;
             border: 1px solid transparent;
             transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
-            letter-spacing: 0.02em;
+            letter-spacing: 0;
           }}
           .btn-primary {{
             background: var(--mok);
@@ -1319,6 +1859,729 @@ def _render_page(
             margin: 16px 0 0;
             line-height: 1.7;
           }}
+          main.personal-page {{
+            width: min(940px, calc(100vw - 58px));
+            padding: 24px 0 104px;
+          }}
+          .personal-oracle-shell {{
+            position: relative;
+            width: 100%;
+          }}
+          .input-topbar {{
+            position: absolute;
+            top: 4px;
+            left: 0;
+            right: 0;
+            z-index: 4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+          }}
+          .back-link, .heart-mark {{
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd7cc;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: var(--ink);
+            box-shadow: 0 12px 28px -22px rgba(74, 47, 38, 0.45);
+          }}
+          .back-link {{
+            pointer-events: auto;
+            color: #5a332a;
+            font-size: 38px;
+            line-height: 0.65;
+            text-decoration: none;
+            padding-bottom: 6px;
+          }}
+          .heart-mark {{
+            color: #ffb6c2;
+            font-size: 31px;
+            transform: rotate(-18deg);
+          }}
+          .personal-brand {{
+            margin-bottom: 30px;
+          }}
+          .personal-brand .logo {{
+            display: inline-flex;
+            align-items: center;
+            gap: 18px;
+            font-size: 32px;
+            line-height: 1;
+          }}
+          .personal-brand .logo span {{
+            color: #f8ad55;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+          }}
+          .personal-brand .tag {{
+            margin-top: 11px;
+            color: #a66a42;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            text-transform: none;
+          }}
+          .personal-brand .ornament {{
+            margin-top: 12px;
+            width: 58px;
+          }}
+          .personal-brand .ornament::before {{
+            top: -13px;
+            background: #fff8ef;
+            font-size: 13px;
+          }}
+          .personal-card {{
+            min-height: 0;
+            padding: 42px 44px 28px;
+            border: 2px solid #ffd8ce;
+            border-radius: 26px;
+            background:
+              radial-gradient(circle at 84% 17%, rgba(255, 239, 242, 0.9), transparent 24%),
+              radial-gradient(circle at 18% 48%, rgba(255, 246, 235, 0.9), transparent 32%),
+              rgba(255, 255, 255, 0.87);
+            box-shadow:
+              0 22px 52px -36px rgba(74, 47, 38, 0.42),
+              inset 0 0 0 8px rgba(255, 249, 245, 0.92);
+          }}
+          .personal-card::before {{
+            inset: 9px;
+            border: 1px solid #ffdcd4;
+            border-radius: 19px;
+          }}
+          .cloud {{
+            position: absolute;
+            top: -38px;
+            width: 76px;
+            height: 33px;
+            border: 2px solid #ffc77e;
+            border-top: 0;
+            border-radius: 0 0 25px 25px;
+            opacity: 0.86;
+          }}
+          .cloud::before, .cloud::after {{
+            content: "";
+            position: absolute;
+            bottom: 12px;
+            border: 2px solid #ffc77e;
+            border-bottom: 0;
+            background: #fff8ef;
+          }}
+          .cloud::before {{
+            left: 13px;
+            width: 29px;
+            height: 29px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .cloud::after {{
+            right: 9px;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .cloud-left {{
+            left: 92px;
+          }}
+          .cloud-right {{
+            right: 142px;
+            top: -35px;
+            transform: scale(0.74);
+          }}
+          .personal-card-head {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 32px;
+            min-height: 126px;
+            margin-bottom: 14px;
+            text-align: center;
+          }}
+          .personal-card-head .title-block {{
+            padding-top: 12px;
+            min-width: 310px;
+          }}
+          .personal-card-head h1 {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 32px;
+            line-height: 1.15;
+          }}
+          .personal-card-head h1 span {{
+            color: #ff8fab;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 18px;
+          }}
+          .personal-card-head p {{
+            margin-top: 13px;
+            color: #92746a;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+          }}
+          .guide-ora {{
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-top: -8px;
+          }}
+          .guide-ora img {{
+            width: 142px;
+            height: 138px;
+            object-fit: contain;
+          }}
+          .speech-bubble {{
+            position: relative;
+            min-width: 145px;
+            margin-top: 16px;
+            padding: 16px 20px;
+            border: 2px solid #f6b8c5;
+            border-radius: 50%;
+            background: #fff3f6;
+            color: #5b3b34;
+            font-family: "Gowun Batang", serif;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.45;
+          }}
+          .speech-bubble::after {{
+            content: "";
+            position: absolute;
+            right: -6px;
+            bottom: 19px;
+            width: 17px;
+            height: 17px;
+            border-right: 2px solid #f6b8c5;
+            border-bottom: 2px solid #f6b8c5;
+            background: #fff3f6;
+            transform: rotate(-22deg);
+          }}
+          .personal-form {{
+            z-index: 1;
+          }}
+          .personal-field-list {{
+            overflow: hidden;
+            border: 1px solid #ffe0d8;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.72);
+          }}
+          .personal-field {{
+            display: grid;
+            grid-template-columns: 58px 128px minmax(0, 1fr);
+            align-items: center;
+            gap: 14px;
+            min-height: 82px;
+            margin: 0;
+            padding: 14px 22px;
+            border-bottom: 1px solid #ffe0d8;
+          }}
+          .personal-field:last-child {{
+            border-bottom: 0;
+          }}
+          .personal-field .field-icon {{
+            width: 46px;
+            height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd9ce;
+            border-radius: 999px;
+            background: #fff9f5;
+            color: #ff7c91;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 25px;
+            box-shadow: 0 10px 24px -20px rgba(255, 111, 130, 0.55);
+          }}
+          .personal-field:nth-child(5) .field-icon,
+          .personal-field:nth-child(6) .field-icon {{
+            color: #f8a94e;
+          }}
+          .personal-field label {{
+            margin: 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+            line-height: 1.35;
+            font-weight: 700;
+          }}
+          .personal-field label .hint {{
+            color: #ff7890;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+          }}
+          .personal-field input,
+          .personal-field select {{
+            min-height: 52px;
+            border: 1px solid #ffd7ce;
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.92);
+            color: #5b3b34;
+            font-size: 16px;
+            padding: 12px 18px;
+          }}
+          .personal-field input::placeholder {{
+            color: #bca8a2;
+          }}
+          .personal-field input:focus,
+          .personal-field select:focus {{
+            border-color: #ff9fad;
+            box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.14);
+          }}
+          .personal-field select {{
+            background-position: right 20px center;
+            padding-right: 46px;
+          }}
+          .personal-field.lead input {{
+            background: rgba(255, 255, 255, 0.92);
+            border-color: #ffd7ce;
+          }}
+          .personal-form .actions {{
+            gap: 18px;
+            margin-top: 24px;
+          }}
+          .personal-form .btn {{
+            min-height: 66px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: 18px;
+            font-size: 18px;
+            box-shadow: 0 18px 34px -24px rgba(255, 111, 130, 0.7);
+          }}
+          .personal-form .btn img {{
+            width: 44px;
+            height: 38px;
+            object-fit: contain;
+          }}
+          .personal-form .btn span {{
+            color: #ffd55a;
+          }}
+          .personal-form .btn-primary {{
+            border: 2px solid #ff86a4;
+            background: linear-gradient(135deg, #ff7898 0%, #ff5f93 100%);
+            color: #ffffff;
+          }}
+          .personal-form .btn-primary:hover {{
+            background: linear-gradient(135deg, #ff6b91 0%, #f65186 100%);
+          }}
+          .personal-form .btn-ghost {{
+            border: 1px solid #ffd8ce;
+            background: linear-gradient(135deg, rgba(255, 250, 246, 0.96), rgba(255, 255, 255, 0.8));
+            color: #4a2f26;
+          }}
+          .personal-form .btn-ghost:hover {{
+            background: #fff7f0;
+          }}
+          .personal-footnote {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            min-height: 68px;
+            margin-top: 24px;
+            padding: 13px 78px;
+            border: 1px solid #ffe0d8;
+            border-radius: 16px;
+            background: linear-gradient(90deg, rgba(255, 242, 247, 0.94), rgba(255, 255, 255, 0.78));
+            color: #6e4940;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            line-height: 1.55;
+          }}
+          .personal-footnote > span {{
+            position: absolute;
+            left: 22px;
+            top: 17px;
+            color: #ffb1c0;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 24px;
+          }}
+          .personal-footnote img {{
+            position: absolute;
+            right: 24px;
+            bottom: 2px;
+            width: 54px;
+            height: 58px;
+            object-fit: contain;
+          }}
+          main.compatibility-page {{
+            width: min(1120px, calc(100vw - 58px));
+            padding: 24px 0 104px;
+          }}
+          .compatibility-oracle-shell {{
+            position: relative;
+            width: 100%;
+          }}
+          .compatibility-topbar {{
+            top: 4px;
+          }}
+          .compatibility-heart-mark {{
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd7cc;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.68);
+            color: #ffb6c2;
+            font-size: 31px;
+            box-shadow: 0 12px 28px -22px rgba(74, 47, 38, 0.45);
+            transform: rotate(-16deg);
+          }}
+          .compatibility-brand {{
+            margin-bottom: 42px;
+          }}
+          .compatibility-brand .logo {{
+            display: inline-flex;
+            align-items: center;
+            gap: 22px;
+            font-size: 36px;
+            line-height: 1;
+          }}
+          .compatibility-brand .logo span {{
+            color: #ffd36f;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 24px;
+          }}
+          .compatibility-brand .tag {{
+            margin-top: 14px;
+            color: #8f5d3e;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            text-transform: none;
+          }}
+          .compatibility-brand .ornament {{
+            margin-top: 13px;
+          }}
+          .compatibility-brand .ornament::before {{
+            content: "×";
+            top: -13px;
+            background: #fff8ef;
+          }}
+          .compatibility-card {{
+            position: relative;
+            min-height: 0;
+            padding: 40px 36px 30px;
+            border: 2px solid #ffd8ce;
+            border-radius: 24px;
+            background:
+              radial-gradient(circle at 82% 10%, rgba(255, 239, 242, 0.9), transparent 22%),
+              radial-gradient(circle at 18% 58%, rgba(255, 246, 235, 0.88), transparent 32%),
+              rgba(255, 255, 255, 0.86);
+            box-shadow:
+              0 22px 52px -36px rgba(74, 47, 38, 0.42),
+              inset 0 0 0 8px rgba(255, 249, 245, 0.92);
+          }}
+          .compatibility-card::before {{
+            inset: 9px;
+            border-color: #ffdcd4;
+            border-radius: 17px;
+          }}
+          .compat-cloud {{
+            position: absolute;
+            top: -58px;
+            width: 124px;
+            height: 48px;
+            border: 2px solid #ffd7b0;
+            border-top: 0;
+            border-radius: 0 0 38px 38px;
+            opacity: 0.9;
+          }}
+          .compat-cloud::before,
+          .compat-cloud::after {{
+            content: "";
+            position: absolute;
+            bottom: 17px;
+            border: 2px solid #ffd7b0;
+            border-bottom: 0;
+            background: #fff8ef;
+          }}
+          .compat-cloud::before {{
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .compat-cloud::after {{
+            right: 18px;
+            width: 58px;
+            height: 58px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .compat-cloud-left {{
+            left: 120px;
+          }}
+          .compat-spark {{
+            position: absolute;
+            color: #ffd36f;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
+          }}
+          .compat-spark-left {{
+            left: 52px;
+            top: -44px;
+          }}
+          .compat-spark-right {{
+            right: 44px;
+            top: 42px;
+          }}
+          .compat-hero-ora {{
+            position: absolute;
+            right: 90px;
+            top: -118px;
+            width: 190px;
+            height: 170px;
+            object-fit: contain;
+          }}
+          .compatibility-card-head {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 58px;
+            min-height: 112px;
+            margin-bottom: 22px;
+            text-align: center;
+          }}
+          .compatibility-card-head .title-block {{
+            min-width: 360px;
+          }}
+          .compatibility-card-head h1 {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 34px;
+            line-height: 1.15;
+          }}
+          .compatibility-card-head h1 span {{
+            color: #ff8fab;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
+          }}
+          .compatibility-card-head p {{
+            margin: 16px 0 0;
+            color: #9a6d75;
+            font-family: "Gowun Batang", serif;
+            font-size: 17px;
+          }}
+          .compat-speech {{
+            position: relative;
+            min-width: 172px;
+            margin-top: -2px;
+            padding: 22px 24px;
+            border: 2px solid #f6b8c5;
+            border-radius: 50%;
+            background: #fff3f6;
+            color: #7a5158;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.55;
+          }}
+          .compat-speech::after {{
+            content: "";
+            position: absolute;
+            left: 34px;
+            bottom: -8px;
+            width: 20px;
+            height: 20px;
+            border-left: 2px solid #f6b8c5;
+            border-bottom: 2px solid #f6b8c5;
+            background: #fff3f6;
+            transform: rotate(-26deg);
+          }}
+          .compatibility-form {{
+            position: relative;
+            z-index: 1;
+          }}
+          .compat-people {{
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr);
+            gap: 22px;
+            align-items: center;
+          }}
+          .compat-person {{
+            min-height: 406px;
+            margin: 0;
+            padding: 24px 22px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.74);
+          }}
+          .compat-person legend {{
+            padding: 0 8px;
+            color: #ff6f82;
+            font-family: "Gowun Batang", serif;
+            font-size: 19px;
+            font-weight: 700;
+          }}
+          .compat-person legend span {{
+            margin-right: 8px;
+            color: #ffb4c3;
+          }}
+          .compat-person label,
+          .compat-options label {{
+            margin: 16px 0 0;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+          }}
+          .compat-person label:first-of-type {{
+            margin-top: 10px;
+          }}
+          .compat-person label .hint {{
+            color: #a88a83;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 11px;
+          }}
+          .compat-person input,
+          .compat-person select,
+          .compat-options select {{
+            min-height: 52px;
+            margin-top: 8px;
+            border: 1px solid #ffd7ce;
+            border-radius: 11px;
+            background-color: rgba(255, 255, 255, 0.92);
+            color: #5b3b34;
+            font-size: 16px;
+            padding: 12px 18px;
+          }}
+          .compat-person input::placeholder {{
+            color: #bca8a2;
+          }}
+          .compat-person input:focus,
+          .compat-person select:focus,
+          .compat-options select:focus {{
+            border-color: #ff9fad;
+            box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.14);
+          }}
+          .compat-person select,
+          .compat-options select {{
+            background-position: right 20px center;
+            padding-right: 46px;
+          }}
+          .compat-heart-bridge {{
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 406px;
+            color: #ff9fb1;
+          }}
+          .compat-heart-bridge::before,
+          .compat-heart-bridge::after {{
+            content: "···";
+            position: absolute;
+            top: 50%;
+            color: #ffc2ce;
+            font-size: 28px;
+            letter-spacing: 5px;
+            transform: translateY(-50%);
+          }}
+          .compat-heart-bridge::before {{
+            left: 2px;
+          }}
+          .compat-heart-bridge::after {{
+            right: -3px;
+          }}
+          .compat-heart-bridge span {{
+            width: 72px;
+            height: 72px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 10px;
+            border: 2px solid #ffbfca;
+            border-radius: 24px;
+            background: radial-gradient(circle at 35% 30%, #ffe4eb, #ffb8c7);
+            color: #ffffff;
+            font-size: 38px;
+            box-shadow: 0 14px 30px -22px rgba(255, 111, 130, 0.74);
+          }}
+          .compat-options {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 22px;
+            margin-top: 18px;
+            padding: 20px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.7);
+          }}
+          .compat-options label {{
+            margin: 0;
+          }}
+          .compat-note {{
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0 0;
+            padding: 12px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 12px;
+            background: linear-gradient(90deg, rgba(255, 242, 247, 0.94), rgba(255, 255, 255, 0.78));
+            color: #7e5a53;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: center;
+          }}
+          .compat-note span {{
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 20px;
+          }}
+          .compat-actions {{
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+          }}
+          .compat-submit {{
+            flex: 0 1 420px;
+            min-height: 68px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            border: 2px solid #ff86a4;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #ff7898 0%, #ff5f93 100%);
+            color: #ffffff;
+            font-size: 20px;
+            box-shadow: 0 16px 30px -22px rgba(255, 111, 130, 0.78);
+          }}
+          .compat-submit:hover {{
+            background: linear-gradient(135deg, #ff6b91 0%, #f65186 100%);
+          }}
+          .compat-submit img {{
+            width: 58px;
+            height: 46px;
+            object-fit: contain;
+          }}
+          .compat-bottom-ora {{
+            position: absolute;
+            right: 34px;
+            bottom: 20px;
+            width: 128px;
+            height: 142px;
+            object-fit: contain;
+            pointer-events: none;
+          }}
           pre {{
             overflow: auto;
             white-space: pre-wrap;
@@ -1343,11 +2606,107 @@ def _render_page(
             position: relative;
           }}
           .oracle-result-shell {{
+            position: relative;
             width: 100%;
           }}
           main.result-page {{
             width: min(960px, calc(100vw - 40px));
             padding: 24px 0 60px;
+          }}
+          main.personal-result-page {{
+            width: min(1120px, calc(100vw - 56px));
+            padding: 24px 0 112px;
+          }}
+          .personal-result-shell {{
+            min-height: 820px;
+          }}
+          .result-topbar {{
+            top: 7px;
+          }}
+          .personal-result-brand {{
+            margin-bottom: 18px;
+          }}
+          .personal-result-brand .logo {{
+            font-size: 39px;
+            line-height: 1;
+          }}
+          .personal-result-brand .tag {{
+            margin-top: 14px;
+            color: #c8844a;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            text-transform: none;
+          }}
+          .personal-result-brand .ornament {{
+            margin-top: 12px;
+          }}
+          .personal-result-brand .ornament::before {{
+            background: #fff8ef;
+          }}
+          .result-sky {{
+            position: absolute;
+            top: 50px;
+            left: 0;
+            right: 0;
+            height: 150px;
+            pointer-events: none;
+          }}
+          .result-cloud {{
+            position: absolute;
+            width: 72px;
+            height: 31px;
+            border: 2px solid #ffd7ce;
+            border-top: 0;
+            border-radius: 0 0 24px 24px;
+            opacity: 0.86;
+          }}
+          .result-cloud::before,
+          .result-cloud::after {{
+            content: "";
+            position: absolute;
+            bottom: 11px;
+            border: 2px solid #ffd7ce;
+            border-bottom: 0;
+            background: #fff8ef;
+          }}
+          .result-cloud::before {{
+            left: 12px;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .result-cloud::after {{
+            right: 8px;
+            width: 37px;
+            height: 37px;
+            border-radius: 999px 999px 0 0;
+          }}
+          .result-cloud-left {{
+            left: 126px;
+            top: 26px;
+          }}
+          .result-spark {{
+            position: absolute;
+            color: #ffc36d;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 30px;
+          }}
+          .result-spark-left {{
+            left: 96px;
+            top: 84px;
+          }}
+          .result-spark-right {{
+            right: 218px;
+            top: 58px;
+          }}
+          .result-hero-ora {{
+            position: absolute;
+            top: 18px;
+            right: 78px;
+            width: 170px;
+            height: 130px;
+            object-fit: contain;
+            object-position: center top;
           }}
           .result-actions {{
             display: flex;
@@ -1355,6 +2714,12 @@ def _render_page(
             gap: 10px;
             margin: 2px 0 22px;
             flex-wrap: wrap;
+          }}
+          .personal-result-shell .result-actions {{
+            position: relative;
+            z-index: 2;
+            gap: 14px;
+            margin: 8px 0 26px;
           }}
           .result-action {{
             min-height: 46px;
@@ -1387,6 +2752,21 @@ def _render_page(
             background: var(--mok-deep);
             border-color: var(--mok-deep);
           }}
+          .personal-result-shell .result-action {{
+            min-width: 134px;
+            min-height: 48px;
+            padding: 11px 22px;
+            border-color: #ffd8ce;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 10px 26px -20px rgba(74, 47, 38, 0.42);
+          }}
+          .personal-result-shell .result-action-primary {{
+            min-width: 174px;
+            border-color: #42b883;
+            background: linear-gradient(135deg, #42b883, #3bbb86);
+            color: #ffffff;
+          }}
           .workflow-loading {{
             display: flex;
             align-items: center;
@@ -1394,6 +2774,19 @@ def _render_page(
             margin-top: 16px;
             border-color: #b7c7aa;
             background: #fbfdf8;
+          }}
+          .personal-result-shell .workflow-loading {{
+            position: relative;
+            z-index: 2;
+            min-height: 88px;
+            margin: 0 auto 22px;
+            padding: 20px 66px 20px 24px;
+            border: 1px solid #bdd8c3;
+            border-radius: 10px;
+            background:
+              radial-gradient(circle at 4% 50%, rgba(66, 184, 131, 0.14), transparent 18%),
+              rgba(255, 255, 255, 0.8);
+            box-shadow: 0 16px 34px -30px rgba(74, 47, 38, 0.38);
           }}
           .workflow-loading[hidden] {{
             display: none;
@@ -1405,6 +2798,15 @@ def _render_page(
           .workflow-loading p {{
             margin: 0;
           }}
+          .personal-result-shell .workflow-loading strong {{
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 18px;
+          }}
+          .personal-result-shell .workflow-loading p {{
+            color: #8b6f64;
+            font-size: 14px;
+          }}
           .loading-spinner {{
             width: 24px;
             height: 24px;
@@ -1414,12 +2816,42 @@ def _render_page(
             border-radius: 999px;
             animation: oracle-spin 0.8s linear infinite;
           }}
+          .personal-result-shell .loading-spinner {{
+            position: relative;
+            width: 34px;
+            height: 34px;
+            flex-basis: 34px;
+            border: 0;
+            animation: oracle-spin 1.8s linear infinite;
+          }}
+          .personal-result-shell .loading-spinner::before {{
+            content: "☘";
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #42b883;
+            font-size: 30px;
+          }}
+          .loading-heart {{
+            display: none;
+          }}
+          .personal-result-shell .loading-heart {{
+            position: absolute;
+            right: 28px;
+            top: 50%;
+            display: block;
+            color: #ff8fab;
+            font-size: 32px;
+            transform: translateY(-50%);
+          }}
           @keyframes oracle-spin {{
             to {{
               transform: rotate(360deg);
             }}
           }}
-          .capture-preview img {{
+          #capture-preview-image {{
             display: block;
             width: 100%;
             max-height: 70vh;
@@ -1427,8 +2859,237 @@ def _render_page(
             border-radius: 6px;
             background: #111111;
           }}
-          .capture-preview.capture-complete img {{
+          .capture-preview.capture-complete #capture-preview-image {{
             filter: blur(12px) saturate(0.75);
+          }}
+          .personal-result-shell .capture-preview {{
+            position: relative;
+            z-index: 2;
+            overflow: visible;
+            padding: 24px 24px 22px;
+            border: 1px solid #ffd8ce;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: 0 18px 44px -34px rgba(74, 47, 38, 0.42);
+          }}
+          .personal-result-shell .capture-preview h2 {{
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 0 0 22px;
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 26px;
+          }}
+          .personal-result-shell .capture-title-icon {{
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd8ce;
+            border-radius: 999px;
+            background: #fff9f5;
+            color: #ff7c91;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 20px;
+          }}
+          .personal-result-shell .capture-stage {{
+            position: relative;
+            overflow: visible;
+            border: 1px solid #ffcfd8;
+            border-radius: 8px;
+            background: #fff9f9;
+          }}
+          .personal-result-shell .capture-direction {{
+            min-height: 86px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            padding: 16px 24px;
+            border-bottom: 1px solid #ffd8ce;
+            background: linear-gradient(90deg, #fff8fb, #fff1f5, #fff8fb);
+            text-align: center;
+          }}
+          .personal-result-shell .capture-direction img {{
+            width: 74px;
+            height: 58px;
+            object-fit: contain;
+          }}
+          .personal-result-shell .capture-direction strong {{
+            color: #4a2f26;
+            font-family: "Gowun Batang", serif;
+            font-size: 27px;
+            line-height: 1.25;
+          }}
+          .personal-result-shell .capture-direction strong span {{
+            color: #ff6f82;
+          }}
+          .personal-result-shell .capture-heart {{
+            color: #ff9caf;
+            font-size: 36px;
+          }}
+          .personal-result-shell .capture-visual {{
+            position: relative;
+            min-height: 500px;
+            overflow: visible;
+            background: #111111;
+          }}
+          .personal-result-shell #capture-preview-image {{
+            height: 500px;
+            max-height: none;
+            object-fit: cover;
+            border-radius: 0;
+          }}
+          .personal-result-shell .camera-corner {{
+            position: absolute;
+            z-index: 3;
+            width: 42px;
+            height: 42px;
+            color: rgba(255, 255, 255, 0.9);
+            border-color: rgba(255, 255, 255, 0.9);
+          }}
+          .personal-result-shell .camera-corner-tl {{
+            left: 26px;
+            top: 26px;
+            border-left: 3px solid;
+            border-top: 3px solid;
+            border-radius: 14px 0 0 0;
+          }}
+          .personal-result-shell .camera-corner-tr {{
+            right: 26px;
+            top: 26px;
+            border-right: 3px solid;
+            border-top: 3px solid;
+            border-radius: 0 14px 0 0;
+          }}
+          .personal-result-shell .camera-corner-bl {{
+            left: 26px;
+            bottom: 26px;
+            border-left: 3px solid;
+            border-bottom: 3px solid;
+            border-radius: 0 0 0 14px;
+          }}
+          .personal-result-shell .camera-corner-br {{
+            right: 26px;
+            bottom: 26px;
+            border-right: 3px solid;
+            border-bottom: 3px solid;
+            border-radius: 0 0 14px 0;
+          }}
+          .personal-result-shell .face-guide {{
+            position: absolute;
+            z-index: 4;
+            left: 50%;
+            top: 50%;
+            width: 290px;
+            height: 330px;
+            border: 3px dashed #ffb0c0;
+            border-radius: 10px;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.54);
+            transform: translate(-50%, -46%);
+          }}
+          .personal-result-shell .face-guide::before,
+          .personal-result-shell .face-guide::after {{
+            content: "";
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 7px solid #ff9caf;
+          }}
+          .personal-result-shell .face-guide::before {{
+            left: -10px;
+            top: -10px;
+            border-right: 0;
+            border-bottom: 0;
+            border-radius: 10px 0 0 0;
+          }}
+          .personal-result-shell .face-guide::after {{
+            right: -10px;
+            bottom: -10px;
+            border-left: 0;
+            border-top: 0;
+            border-radius: 0 0 10px 0;
+          }}
+          .personal-result-shell .capture-side-note {{
+            position: absolute;
+            z-index: 5;
+            width: 174px;
+            color: #5b3b34;
+            text-align: center;
+            pointer-events: none;
+          }}
+          .personal-result-shell .capture-side-note p {{
+            position: relative;
+            margin: 0;
+            padding: 22px 20px;
+            border: 1px solid #ffcfc4;
+            border-radius: 44% 48% 42% 46%;
+            background: #fff2ed;
+            font-family: "Gowun Batang", serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.55;
+          }}
+          .personal-result-shell .capture-side-note p::after {{
+            content: "";
+            position: absolute;
+            bottom: -12px;
+            width: 22px;
+            height: 22px;
+            border-right: 1px solid #ffcfc4;
+            border-bottom: 1px solid #ffcfc4;
+            background: #fff2ed;
+            transform: rotate(45deg);
+          }}
+          .personal-result-shell .capture-side-note span {{
+            position: absolute;
+            right: 18px;
+            top: 20px;
+            color: #ffc36d;
+            font-size: 22px;
+          }}
+          .personal-result-shell .capture-side-note img {{
+            display: block;
+            width: 110px;
+            height: 112px;
+            margin: 8px auto 0;
+            object-fit: contain;
+          }}
+          .personal-result-shell .capture-side-note-left {{
+            left: -186px;
+            bottom: 26px;
+          }}
+          .personal-result-shell .capture-side-note-left p::after {{
+            right: 42px;
+          }}
+          .personal-result-shell .capture-side-note-right {{
+            right: -182px;
+            bottom: 18px;
+          }}
+          .personal-result-shell .capture-side-note-right p::after {{
+            left: 42px;
+          }}
+          .personal-result-shell .capture-tip {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 22px;
+            min-height: 54px;
+            margin: 18px 0 0;
+            border: 1px solid #ffd8ce;
+            border-radius: 8px;
+            background: linear-gradient(90deg, #fff5f7, #fffafa);
+            color: #d36472;
+            font-family: "Gowun Batang", serif;
+            font-size: 16px;
+            font-weight: 700;
+          }}
+          .personal-result-shell .capture-tip span {{
+            color: #ffc36d;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 22px;
           }}
           .capture-privacy-veil {{
             position: absolute;
@@ -1479,6 +3140,89 @@ def _render_page(
             font-size: 13px;
           }}
           @media (max-width: 480px) {{
+            main.home-page {{
+              width: min(100vw - 24px, 1540px);
+              padding-top: 20px;
+            }}
+            .brand-lockup .logo {{
+              font-size: 34px;
+            }}
+            .brand-lockup .logo .stamp {{
+              right: -33px;
+              width: 30px;
+              height: 30px;
+              font-size: 15px;
+            }}
+            .brand-lockup .tag {{
+              font-size: 14px;
+            }}
+            .home-hero {{
+              padding-top: 18px;
+            }}
+            .home-hero .speech {{
+              min-height: 46px;
+              padding: 9px 22px;
+              font-size: 19px;
+            }}
+            .home-hero h1 {{
+              font-size: 42px;
+              margin-top: 22px;
+            }}
+            .home-hero p {{
+              font-size: 17px;
+            }}
+            .oracle-character {{
+              width: min(560px, 122vw);
+              margin: 8px -11vw -52px;
+            }}
+            .mode {{
+              min-height: 230px;
+              padding: 26px 24px;
+            }}
+            .mode h2 {{
+              font-size: 27px;
+            }}
+            .mode p {{
+              font-size: 15px;
+              min-height: 0;
+            }}
+            .mode .go {{
+              min-width: 132px;
+              min-height: 48px;
+              font-size: 16px;
+            }}
+            .mode .mode-art {{
+              width: 150px;
+              height: 170px;
+              margin: 0 -12px -12px 0;
+            }}
+            .mode .mode-art-pair {{
+              width: 142px;
+              height: 172px;
+            }}
+            .home-foot {{
+              width: calc(100vw - 24px);
+              min-height: 74px;
+              bottom: max(10px, env(safe-area-inset-bottom));
+            }}
+            .foot-item {{
+              min-height: 56px;
+              font-size: 12px;
+            }}
+            .foot-icon {{
+              font-size: 21px;
+            }}
+            .feature-row {{
+              grid-template-columns: 1fr;
+            }}
+            .feature {{
+              min-height: 142px;
+              border-right: 0;
+              border-bottom: 1px dashed #e8cfc6;
+            }}
+            .feature:last-child {{
+              border-bottom: 0;
+            }}
             main.input-page {{
               width: min(100vw - 32px, 860px);
               padding: 34px 0;
@@ -1496,15 +3240,27 @@ def _render_page(
           @media (max-width: 680px) {{
             .cards {{
               grid-template-columns: 1fr;
-            }}
-            .top .logo {{
-              font-size: 38px;
-            }}
-            .top .logo .stamp {{
-              right: -40px;
+              margin-top: -18px;
             }}
             .mode p {{
               min-height: 0;
+            }}
+          }}
+          @media (min-width: 481px) and (max-width: 900px) {{
+            .home-hero h1 {{
+              font-size: 58px;
+            }}
+            .home-hero p {{
+              font-size: 21px;
+            }}
+            .feature-row {{
+              grid-template-columns: repeat(2, 1fr);
+            }}
+            .feature:nth-child(2) {{
+              border-right: 0;
+            }}
+            .feature:nth-child(-n+2) {{
+              border-bottom: 1px dashed #e8cfc6;
             }}
           }}
         </style>
@@ -1515,40 +3271,33 @@ def _render_page(
           {body}
         </main>
         <script>
-          document.querySelectorAll('input[type="date"]').forEach((input) => {{
-            input.addEventListener("input", (e) => {{
-              const val = e.target.value;
-              if (val) {{
-                const parts = val.split("-");
-                if (parts[0] && parts[0].length > 4) {{
-                  parts[0] = parts[0].substring(0, 4);
-                  e.target.value = parts.join("-");
-                }}
-              }}
-            }});
 
-            input.addEventListener("keyup", (e) => {{
-              const val = e.target.value;
-              if (val) {{
-                const parts = val.split("-");
-                if (parts[0] && parts[0].length === 4 && !e.target.dataset.focusedNext) {{
-                  e.target.dataset.focusedNext = "true";
-                  setTimeout(() => {{
-                    const tabEvent = new KeyboardEvent("keydown", {{
-                      key: "Tab",
-                      keyCode: 9,
-                      code: "Tab",
-                      bubbles: true,
-                      cancelable: true
-                    }});
-                    e.target.dispatchEvent(tabEvent);
-                  }}, 50);
-                }} else if (parts[0] && parts[0].length < 4) {{
-                  delete e.target.dataset.focusedNext;
-                }}
+          const homeShell = document.querySelector(".oracle-home-shell");
+          if (homeShell) {{
+            const homeTabLinks = homeShell.querySelectorAll("[data-home-tab]");
+            const showHomeTab = (tabName, updateUrl = true) => {{
+              const isMore = tabName === "more";
+              homeShell.classList.toggle("more-active", isMore);
+              homeTabLinks.forEach((link) => {{
+                link.classList.toggle("foot-item-active", link.dataset.homeTab === tabName);
+              }});
+              if (updateUrl) {{
+                const targetHash = isMore ? "#oracle-more" : "#oracle-home";
+                history.replaceState(null, "", targetHash);
               }}
+              window.scrollTo({{ top: 0, behavior: "smooth" }});
+            }};
+            homeTabLinks.forEach((link) => {{
+              link.addEventListener("click", (event) => {{
+                const tabName = link.dataset.homeTab;
+                if (tabName === "home" || tabName === "more") {{
+                  event.preventDefault();
+                  showHomeTab(tabName);
+                }}
+              }});
             }});
-          }});
+            showHomeTab(window.location.hash === "#oracle-more" ? "more" : "home", false);
+          }}
 
           const forms = document.querySelectorAll(".workflow-form");
           forms.forEach((form) => {{
