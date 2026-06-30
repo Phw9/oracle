@@ -862,7 +862,6 @@ def _compatibility_form() -> str:
     )
     gender_options = _gender_options(required=True)
     birth_time_options = _birth_time_options()
-    face_mode_options = _face_analysis_mode_options()
     result = f"""
 
     <div class="oracle-input-shell compatibility-oracle-shell">
@@ -896,7 +895,7 @@ def _compatibility_form() -> str:
             <fieldset class="compat-person">
               <legend><span aria-hidden="true">♥</span>첫 번째 사람</legend>
               <label>이름<input name="left_name" placeholder="이름을 입력해주세요" required></label>
-              <label>생년월일<input name="left_birth_date" type="date" required></label>
+              <label>생년월일<input name="left_birth_date" type="date" min="1800-01-01" max="2300-12-31" required></label>
               <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="left_birth_time">{birth_time_options}</select></label>
               <label>성별<select name="left_gender" required>{gender_options}</select></label>
             </fieldset>
@@ -908,7 +907,7 @@ def _compatibility_form() -> str:
             <fieldset class="compat-person">
               <legend><span aria-hidden="true">♥</span>두 번째 사람</legend>
               <label>이름<input name="right_name" placeholder="이름을 입력해주세요" required></label>
-              <label>생년월일<input name="right_birth_date" type="date" required></label>
+              <label>생년월일<input name="right_birth_date" type="date" min="1800-01-01" max="2300-12-31" required></label>
               <label>태어난 시간<span class="hint">모르면 모름을 선택</span><select name="right_birth_time">{birth_time_options}</select></label>
               <label>성별<select name="right_gender" required>{gender_options}</select></label>
             </fieldset>
@@ -916,7 +915,6 @@ def _compatibility_form() -> str:
 
           <div class="compat-options">
             <label>궁합 모드<select name="mode">{mode_options}</select></label>
-            <label>관상 분석 모드<select name="face_analysis_mode">{face_mode_options}</select></label>
           </div>
 
           <p class="compat-note"><span aria-hidden="true">💡</span>두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
@@ -1021,7 +1019,7 @@ def _compatibility_result_page(job_id: str) -> str:
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
-      {_capture_preview_panel(job_id=job_id, skip_face=False)}
+      {_capture_preview_panel(job_id=job_id, skip_face=False, cute=True)}
     </div>
     """
     return result

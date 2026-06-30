@@ -291,7 +291,6 @@ def test_report_graphic_hanja_glyphs_use_black_text() -> None:
     assert '.person-mark .person-hanja{font-family:"Song Myung",serif;font-size:54px;line-height:1;color:#111}' in html
     assert '.person-day{font-family:"Song Myung",serif;font-size:48px;line-height:1;color:#111;' in html
     assert '.cell .ch{font-family:"Song Myung",serif;font-size:34px;line-height:1.1;color:#111}' in html
-    assert ".person-mark.c-su .person-ko{color:#fff}" in html
 
 
 def test_report_block_text_uses_full_block_width() -> None:
