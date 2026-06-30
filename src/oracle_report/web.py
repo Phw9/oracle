@@ -92,64 +92,66 @@ def create_app() -> Flask:
     def index():
         body = """
         <div class="oracle-home-shell">
-          <header class="home-nav">
-            <div class="brand-lockup">
-              <div class="logo">ORACLE<span class="stamp serif">運</span></div>
-              <div class="tag">관상 &amp; 사주 · 운명 해설</div>
-            </div>
-          </header>
+          <section id="oracle-home" class="home-view" aria-label="홈">
+            <header class="home-nav">
+              <div class="brand-lockup">
+                <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+                <div class="tag">관상 &amp; 사주 · 운명 해설</div>
+              </div>
+            </header>
 
-          <section class="home-hero">
-            <div class="speech">안녕하세요!</div>
-            <h1 aria-label="오늘도 운명을 함께 찾아볼까요?">오늘도 <span>운명</span>을<br>함께 찾아볼까요?</h1>
-            <p aria-label="오라와 함께 나의 운명과 인연을 쉽고 재미있게 알아보세요!"><strong>오라</strong>와 함께 나의 운명과 인연을<br>쉽고 재미있게 알아보세요!</p>
-            <img class="oracle-character" src="/static/assets/oracle-character.png" alt="돋보기로 운명을 살피는 오라 캐릭터">
+            <section class="home-hero">
+              <div class="speech">안녕하세요!</div>
+              <h1 aria-label="오늘도 운명을 함께 찾아볼까요?">오늘도 <span>운명</span>을<br>함께 찾아볼까요?</h1>
+              <p aria-label="오라와 함께 나의 운명과 인연을 쉽고 재미있게 알아보세요!"><strong>오라</strong>와 함께 나의 운명과 인연을<br>쉽고 재미있게 알아보세요!</p>
+              <img class="oracle-character" src="/static/assets/oracle-character.png" alt="돋보기로 운명을 살피는 오라 캐릭터">
+            </section>
+
+            <div class="cards">
+              <a class="mode solo" href="/personal">
+                <div class="mode-copy">
+                  <span class="ic">☘</span>
+                  <h2>나의 운세 보기</h2>
+                  <p>사주 · 관상 · 운세를<br>종합적으로 분석해드려요!</p>
+                  <span class="go">시작하기 <span class="arr">→</span></span>
+                </div>
+                <img class="mode-art mode-art-solo" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+              </a>
+
+              <a class="mode pair" href="/compatibility">
+                <div class="mode-copy">
+                  <span class="ic">♥</span>
+                  <h2>우리 궁합 보기</h2>
+                  <p>두 사람의 인연과 궁합을<br>AI가 정밀하게 분석해드려요!</p>
+                  <span class="go">시작하기 <span class="arr">→</span></span>
+                </div>
+                <img class="mode-art mode-art-pair" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+              </a>
+            </div>
+
+            <div class="feature-row">
+              <div class="feature">
+                <span class="feature-ic camera">▣</span>
+                <strong>얼굴 분석</strong>
+                <p>사진 한 장으로<br>관상을 분석해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic calendar">▦</span>
+                <strong>사주 분석</strong>
+                <p>생년월일시를 기반으로<br>사주를 분석해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic ai">AI</span>
+                <strong>100% 온디바이스</strong>
+                <p>모든 분석이 기기 내에서<br>이루어져 안전해요</p>
+              </div>
+              <div class="feature">
+                <span class="feature-ic lock">▤</span>
+                <strong>프라이버시 보호</strong>
+                <p>당신의 데이터는 외부로<br>전송되지 않아요</p>
+              </div>
+            </div>
           </section>
-
-          <div class="cards">
-            <a class="mode solo" href="/personal">
-              <div class="mode-copy">
-                <span class="ic">☘</span>
-                <h2>나의 운세 보기</h2>
-                <p>사주 · 관상 · 운세를<br>종합적으로 분석해드려요!</p>
-                <span class="go">시작하기 <span class="arr">→</span></span>
-              </div>
-              <img class="mode-art mode-art-solo" src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
-            </a>
-
-            <a class="mode pair" href="/compatibility">
-              <div class="mode-copy">
-                <span class="ic">♥</span>
-                <h2>우리 궁합 보기</h2>
-                <p>두 사람의 인연과 궁합을<br>AI가 정밀하게 분석해드려요!</p>
-                <span class="go">시작하기 <span class="arr">→</span></span>
-              </div>
-              <img class="mode-art mode-art-pair" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
-            </a>
-          </div>
-
-          <div class="feature-row">
-            <div class="feature">
-              <span class="feature-ic camera">▣</span>
-              <strong>얼굴 분석</strong>
-              <p>사진 한 장으로<br>관상을 분석해요</p>
-            </div>
-            <div class="feature">
-              <span class="feature-ic calendar">▦</span>
-              <strong>사주 분석</strong>
-              <p>생년월일시를 기반으로<br>사주를 분석해요</p>
-            </div>
-            <div class="feature">
-              <span class="feature-ic ai">AI</span>
-              <strong>100% 온디바이스</strong>
-              <p>모든 분석이 기기 내에서<br>이루어져 안전해요</p>
-            </div>
-            <div class="feature">
-              <span class="feature-ic lock">▤</span>
-              <strong>프라이버시 보호</strong>
-              <p>당신의 데이터는 외부로<br>전송되지 않아요</p>
-            </div>
-          </div>
 
           <section id="oracle-more" class="more-section" aria-label="더보기">
             <div class="more-head">
@@ -217,7 +219,7 @@ def create_app() -> Flask:
           </section>
 
           <footer class="home-foot" aria-label="하단 메뉴">
-            <a class="foot-item foot-item-active" href="/">
+            <a class="foot-item foot-item-home foot-item-active" href="#oracle-home" data-home-tab="home">
               <span class="foot-icon">⌂</span>
               <span>홈</span>
             </a>
@@ -229,7 +231,7 @@ def create_app() -> Flask:
               <span class="foot-icon">♡</span>
               <span>궁합 리포트</span>
             </a>
-            <a class="foot-item" href="#oracle-more">
+            <a class="foot-item foot-item-more" href="#oracle-more" data-home-tab="more">
               <span class="foot-icon">•••</span>
               <span>더보기</span>
             </a>
@@ -1001,6 +1003,18 @@ def _render_page(
             width: 100%;
             overflow: hidden;
           }}
+          .oracle-home-shell.more-active .home-view {{
+            display: none;
+          }}
+          .oracle-home-shell.more-active .more-section {{
+            display: block;
+          }}
+          .oracle-home-shell.more-active .foot-item-active {{
+            color: var(--ink-soft);
+          }}
+          .oracle-home-shell.more-active .foot-item-more {{
+            color: var(--hwa);
+          }}
           .home-nav {{
             display: flex;
             align-items: flex-start;
@@ -1301,8 +1315,9 @@ def _render_page(
             line-height: 1.6;
           }}
           .more-section {{
+            display: none;
             max-width: 1320px;
-            margin: 34px auto 0;
+            margin: 0 auto;
             scroll-margin-top: 34px;
           }}
           .more-head {{
@@ -2021,6 +2036,33 @@ def _render_page(
           {body}
         </main>
         <script>
+          const homeShell = document.querySelector(".oracle-home-shell");
+          if (homeShell) {{
+            const homeTabLinks = homeShell.querySelectorAll("[data-home-tab]");
+            const showHomeTab = (tabName, updateUrl = true) => {{
+              const isMore = tabName === "more";
+              homeShell.classList.toggle("more-active", isMore);
+              homeTabLinks.forEach((link) => {{
+                link.classList.toggle("foot-item-active", link.dataset.homeTab === tabName);
+              }});
+              if (updateUrl) {{
+                const targetHash = isMore ? "#oracle-more" : "#oracle-home";
+                history.replaceState(null, "", targetHash);
+              }}
+              window.scrollTo({{ top: 0, behavior: "smooth" }});
+            }};
+            homeTabLinks.forEach((link) => {{
+              link.addEventListener("click", (event) => {{
+                const tabName = link.dataset.homeTab;
+                if (tabName === "home" || tabName === "more") {{
+                  event.preventDefault();
+                  showHomeTab(tabName);
+                }}
+              }});
+            }});
+            showHomeTab(window.location.hash === "#oracle-more" ? "more" : "home", false);
+          }}
+
           const forms = document.querySelectorAll(".workflow-form");
           forms.forEach((form) => {{
             form.addEventListener("submit", async (event) => {{
