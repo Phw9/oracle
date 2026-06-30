@@ -1233,16 +1233,26 @@ def _run_distributed_task(
     image_base64: str | None,
     app_config,
 ) -> dict[str, object]:
-    if _is_local_distributed_worker(worker_url, app_config):
-        output = _run_local_distributed_task(prompt_name, values, task, image_path)
-    else:
-        output = _run_remote_distributed_task(
-            worker_url,
-            prompt_name,
-            values,
-            task,
-            image_base64,
-        )
+    try:
+        if _is_local_distributed_worker(worker_url, app_config):
+            output = _run_local_distributed_task(prompt_name, values, task, image_path)
+        else:
+            output = _run_remote_distributed_task(
+                worker_url,
+                prompt_name,
+                values,
+                task,
+                image_base64,
+            )
+    except Exception as exc:
+        import json
+        print(f"[Distributed][Error] Task failed on {worker_url} for task {task}: {exc}", flush=True)
+        output = json.dumps({
+            "category": task.get("target_category") or "오류",
+            "title": "분석 실패",
+            "summary": "일시적인 오류로 분석 결과를 가져오지 못했습니다.",
+            "body": f"분산 노드 연산 중 예외가 발생했습니다: {exc}"
+        }, ensure_ascii=False)
     result = {"task": task, "output": output}
     return result
 
