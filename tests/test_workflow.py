@@ -258,11 +258,6 @@ class RecordingPairSajuClient:
         return result
 
 
-class FailingFaceClient:
-    def generate(self, prompt: str, image_path: Path | None = None) -> str:
-        raise AssertionError("face LLM must not run in landmark rule mode")
-
-
 class FailsOnFacePromptClient(FakeLlmClient):
     def generate(self, prompt: str, image_path: Path | None = None) -> str:
         is_saju_prompt = "\"saju_blocks\"" in prompt
@@ -423,37 +418,9 @@ def test_personal_workflow_uses_rule_based_face_by_default(tmp_path: Path) -> No
     assert "시간 미상" in result.report_html
 
 
-def test_personal_workflow_can_use_llm_face_mode(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("ORACLE_FACE_ANALYSIS_MODE", raising=False)
-    capture_config = _capture_config(tmp_path)
-    manse_db_path = _build_test_manse_db(tmp_path)
-    workflow_input = PersonalWorkflowInput(
-        name="홍길동",
-        birth_date="1995-03-15",
-        birth_time="모름",
-        gender="남성",
-        target_gender="여성",
-        face_analysis_mode=1,
-    )
-
-    result = run_personal_workflow(
-        workflow_input=workflow_input,
-        capture_config=capture_config,
-        report_llm_config=_llm_config(),
-        manse_db_path=manse_db_path,
-        recommendation_db_path=tmp_path / "faces.sqlite",
-        report_client=FakeLlmClient(),
-        capture_runner=_fake_single_capture,
-    )
-
-    assert "관상 제목 1" in result.report_html
-
-
 def test_personal_workflow_rulebase_mode_skips_face_llm(
     tmp_path: Path,
-    monkeypatch,
 ) -> None:
-    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
     capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
     manse_db_path = _build_test_manse_db(tmp_path)
     workflow_input = PersonalWorkflowInput(
@@ -479,6 +446,34 @@ def test_personal_workflow_rulebase_mode_skips_face_llm(
     assert len(payload["face_blocks"]) == 5
     assert "타고난 인상과 기본 상" in result.report_html
     assert "랜드마크 룰 기반" not in result.face_analysis
+
+
+def test_personal_workflow_uses_rule_based_face_by_default(
+    tmp_path: Path,
+) -> None:
+    capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
+    manse_db_path = _build_test_manse_db(tmp_path)
+    workflow_input = PersonalWorkflowInput(
+        name="tester",
+        birth_date="1995-03-15",
+        birth_time="",
+        gender="male",
+        target_gender="female",
+    )
+
+    result = run_personal_workflow(
+        workflow_input=workflow_input,
+        capture_config=capture_config,
+        report_llm_config=_llm_config(),
+        manse_db_path=manse_db_path,
+        recommendation_db_path=tmp_path / "faces.sqlite",
+        report_client=FailsOnFacePromptClient(),
+        capture_runner=run_capture,
+    )
+    payload = json.loads(result.face_analysis)
+
+    assert payload["face_subtitle"]
+    assert len(payload["face_blocks"]) == 5
 
 
 def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) -> None:
@@ -523,9 +518,7 @@ def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) 
 
 def test_compatibility_workflow_rulebase_mode_skips_face_llm(
     tmp_path: Path,
-    monkeypatch,
 ) -> None:
-    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
     capture_config = replace(_capture_config(tmp_path), mock_capture_enabled=True)
     manse_db_path = _build_test_manse_db(tmp_path)
     workflow_input = CompatibilityWorkflowInput(
@@ -665,7 +658,6 @@ def _llm_config() -> LlmConfig:
         timeout_seconds=1.0,
         max_output_tokens=128,
         temperature=0.1,
-        send_image=False,
     )
     return result
 
@@ -682,6 +674,14 @@ def _fake_single_capture(
     ok = cv2.imwrite(str(image_path), image)
     if not ok:
         raise RuntimeError(f"failed to write fake capture image: {image_path}")
+    face_payload_json = json.dumps(
+        {
+            "face_subtitle": "rule subtitle",
+            "face_blocks": _report_blocks("rule face", 5),
+            "face_summary": "rule summary",
+        },
+        ensure_ascii=False,
+    )
     result = CaptureArtifact(
         image_path=image_path,
         face=FaceBox(10, 10, 120, 120),
@@ -787,74 +787,6 @@ def test_personal_workflow_skips_face(tmp_path: Path) -> None:
     assert "관상" not in result.report_html
 
 
-def test_personal_saju_follows_main_when_distributed_split_enabled(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("ORACLE_DISTRIBUTED_ROLE", "master")
-    monkeypatch.setenv("ORACLE_DISTRIBUTED_SPLIT", "1")
-    capture_config = _capture_config(tmp_path)
-    manse_db_path = _build_test_manse_db(tmp_path)
-    workflow_input = PersonalWorkflowInput(
-        name="홍길동",
-        birth_date="1995-03-15",
-        birth_time="",
-        gender="남성",
-        target_gender="여성",
-        skip_face=True,
-    )
-
-    result = run_personal_workflow(
-        workflow_input=workflow_input,
-        capture_config=capture_config,
-        report_llm_config=_llm_config(),
-        manse_db_path=manse_db_path,
-        recommendation_db_path=tmp_path / "faces.sqlite",
-        report_client=FakeLlmClient(),
-        capture_runner=None,
-    )
-
-    assert "사주 핵심 문장" in result.report_html
-    assert "사주 제목 1" in result.report_html
-    assert "사주정보를 생성하지 못했습니다" not in result.report_html
-
-
-def test_compatibility_saju_follows_main_when_distributed_split_enabled(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("ORACLE_DISTRIBUTED_ROLE", "master")
-    monkeypatch.setenv("ORACLE_DISTRIBUTED_SPLIT", "1")
-    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
-    capture_config = _capture_config(tmp_path)
-    manse_db_path = _build_test_manse_db(tmp_path)
-    workflow_input = CompatibilityWorkflowInput(
-        left_name="갑",
-        left_birth_date="1995-03-15",
-        left_birth_time="14:30",
-        left_gender="남성",
-        right_name="을",
-        right_birth_date="1997-05-20",
-        right_birth_time="",
-        right_gender="여성",
-        mode="연인",
-    )
-
-    result = run_compatibility_workflow(
-        workflow_input=workflow_input,
-        capture_config=capture_config,
-        report_llm_config=_llm_config(),
-        manse_db_path=manse_db_path,
-        report_client=FakeLlmClient(),
-        capture_runner=_fake_single_capture,
-        inter_capture_delay_seconds=0.0,
-    )
-
-    assert "두 사람 궁합 핵심 문장" in result.report_html
-    assert "궁합 행동 제목" in result.report_html
-    assert "궁합 사주정보를 생성하지 못했습니다" not in result.report_html
-
-
 def test_personal_workflow_normalizes_newline_markers_in_output_body(
     tmp_path: Path,
     capsys,
@@ -873,11 +805,9 @@ def test_personal_workflow_normalizes_newline_markers_in_output_body(
     result = run_personal_workflow(
         workflow_input=workflow_input,
         capture_config=capture_config,
-        face_llm_config=_llm_config(),
         report_llm_config=_llm_config(),
         manse_db_path=manse_db_path,
         recommendation_db_path=tmp_path / "faces.sqlite",
-        face_client=FailingFaceClient(),
         report_client=NewlineBodyReportClient(),
         capture_runner=None,
     )
@@ -911,12 +841,12 @@ def test_json_payload_loader_repairs_common_llm_format_errors(capsys) -> None:
     “face_summary”: “보정된 요약이에요.”
 }
 ```""",
-        label="personal_face_analysis",
+        label="face_analysis",
     )
 
     captured = capsys.readouterr()
     assert error == ""
-    assert "[LLM JSON REPAIR:personal_face_analysis] applied repairs:" in captured.out
+    assert "[LLM JSON REPAIR:face_analysis] applied repairs:" in captured.out
     assert "normalize_quotes" in captured.out
     assert "insert_missing_commas" in captured.out
     assert "remove_trailing_commas" in captured.out
@@ -939,11 +869,9 @@ def test_personal_workflow_uses_repaired_saju_json_output(tmp_path: Path) -> Non
     result = run_personal_workflow(
         workflow_input=workflow_input,
         capture_config=capture_config,
-        face_llm_config=_llm_config(),
         report_llm_config=_llm_config(),
         manse_db_path=manse_db_path,
         recommendation_db_path=tmp_path / "faces.sqlite",
-        face_client=FailingFaceClient(),
         report_client=MalformedJsonReportClient(),
         capture_runner=None,
     )
@@ -970,11 +898,9 @@ def test_personal_workflow_replaces_day_master_honorific_with_name(
     result = run_personal_workflow(
         workflow_input=workflow_input,
         capture_config=capture_config,
-        face_llm_config=_llm_config(),
         report_llm_config=_llm_config(),
         manse_db_path=manse_db_path,
         recommendation_db_path=tmp_path / "faces.sqlite",
-        face_client=FailingFaceClient(),
         report_client=DayMasterHonorificReportClient(),
         capture_runner=None,
     )

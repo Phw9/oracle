@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -200,6 +199,7 @@ class LlamaCppChatClient:
         prompt: str | RenderedPrompt,
         image_path: Path | None,
     ) -> dict[str, Any]:
+        del image_path
         rendered_prompt = _coerce_rendered_prompt(prompt)
         if not self._config.prompt_cache:
             rendered_prompt = RenderedPrompt(
@@ -209,16 +209,6 @@ class LlamaCppChatClient:
                 slot_id=None,
             )
         content: list[dict[str, Any]] = [{"type": "text", "text": rendered_prompt.body}]
-        if image_path is not None and self._config.send_image:
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": _encode_image_data_url(image_path),
-                        "detail": "low",
-                    },
-                },
-            )
         messages: list[dict[str, Any]] = []
         if rendered_prompt.prefix.strip() != "":
             messages.append({"role": "system", "content": rendered_prompt.prefix})
@@ -243,12 +233,6 @@ class LlamaCppChatClient:
     def _chat_completions_url(self) -> str:
         result = f"{self._config.base_url.rstrip('/')}/chat/completions"
         return result
-
-
-def _encode_image_data_url(image_path: Path) -> str:
-    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
-    result = f"data:image/jpeg;base64,{encoded}"
-    return result
 
 
 def _extract_output_text(root: dict[str, Any]) -> str:

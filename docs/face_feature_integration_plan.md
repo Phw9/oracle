@@ -40,7 +40,6 @@
 | 파일 경로 | `oracle` (현재 분산 추론 적용) | `oracle_face` (관상 고도화 적용) | 병합/통합 전략 (Integration Plan) |
 | :--- | :--- | :--- | :--- |
 | `configs/prompts.json` | 분산 모드 최적화 프롬프트 템플릿 포함 | 고도화된 해요체 및 랜드마크 바인딩 슬롯 장착 | **[병합 필요]** `oracle_face` 기반의 정교한 지침 템플릿을 차용하되, 우리가 개편한 분산 모드 슬롯 구조를 유지합니다. |
-| `src/oracle_report/config.py` | 분산 추론 설정군(`distributed_role` 등) 포함 | 카메라 자동감지 및 Mocking 설정군 포함 | **[병합 필요]** 두 브랜치의 설정 데이터클래스 속성 및 환경 변수 파싱 로직을 유실 없이 유니온(Union) 병합합니다. |
 | `src/oracle_report/llm.py` | 사고모드 대응 및 분산 API 기동 로직 | (변경 미미) | **[oracle 기준 보존]** `oracle` 측에 구현된 사고모드 대응형 토큰 확장 클라이언트를 그대로 사용합니다. |
 | `src/oracle_report/vision/` | 랜드마크 분석 및 카메라 구동 기초 | 랜드마크 비율 고도화, 룰 데이터 확장, 자가 탐색/권한 진단 카메라 탑재 | **[oracle_face 기준 이식]** 고도화된 랜드마크 분석 로직과 카메라 권한 진단 모듈 전체를 `oracle`에 고스란히 이식합니다. |
 | `src/oracle_report/workflow.py` | 분산 작업 큐 및 스레드 스케줄러 탑재 | ThreadPoolExecutor 기반 로컬 병렬화 탑재 | **[통합 설계 필요]** 로컬 병렬화(`ThreadPoolExecutor`)는 분산 모드가 아닐 때(Local 단독 연산)의 병렬 속도 향상에 기여하도록 얹고, 분산 스레드 큐 구조는 그대로 보존합니다. |

@@ -3,7 +3,7 @@ title Oracle Report Current Runtime Flow
 
 start
 :./run.sh 실행;
-:래퍼 옵션 파싱\n- build/debug/release\n- model/port/host/thread/context\n- face_analysis_mode;
+:래퍼 옵션 파싱\n- build/debug/release\n- model/port/host/thread/context;
 
 if (command == build?) then (yes)
   :build.sh 실행\n- 기본 .venv 준비\n- Python 패키지 설치\n- llama.cpp/model/DB 준비;
@@ -84,7 +84,7 @@ else (동기 POST)
 endif
 
 if (개인 리포트?) then (yes)
-  :개인 입력 수집\nname, birth_date, birth_time,\ngender, target_gender,\nface_analysis_mode, skip_face;
+  :개인 입력 수집\nname, birth_date, birth_time,\ngender, target_gender, skip_face;
   :BirthProfile 생성\nbirth_time 미상은 표시용 flag 유지;
   :세션 dir 생성\nruns/personal_<timestamp>;
   :ManseRepository(data/manse.sqlite) 준비;
@@ -103,15 +103,8 @@ if (개인 리포트?) then (yes)
       :capture.jpg 저장;
     end fork
 
-    if (face_analysis_mode == 2?) then (landmark)
-      :캡처 품질/랜드마크에서\n룰 기반 관상 메모 사용;
-    else (LLM/VLM)
-      :personal_face_analysis 프롬프트 생성;
-      :face LLM 호출\nsend_image 설정이면 image_url 포함;
-      if (LLM 오류 또는 빈 응답?) then (yes)
-        :관상 오류 문구로 대체;
-      endif
-    endif
+    :캡처 품질/랜드마크에서
+룰 기반 관상 payload 사용;
   endif
 
   :face_recommendations.sqlite에서\n추천 정보 조회;
@@ -134,7 +127,7 @@ if (개인 리포트?) then (yes)
   :personal_report.html,\npersonal_report.md,\ntimings.log 저장;
 
 else (두 사람 궁합)
-  :궁합 입력 수집\nleft/right name, birth_date,\nbirth_time, gender, mode,\nface_analysis_mode;
+  :궁합 입력 수집\nleft/right name, birth_date,\nbirth_time, gender, mode;
   :mode 검증\n연인/친구/직장동료;
   :두 BirthProfile 생성;
   :세션 dir 생성\nruns/compatibility_<timestamp>;
@@ -154,15 +147,8 @@ else (두 사람 궁합)
     :person_2/capture.jpg 저장;
   end fork
 
-  if (face_analysis_mode == 2?) then (landmark)
-    :두 캡처의 룰 기반 관상 메모 사용;
-  else (LLM/VLM)
-    :compatibility_face_analysis 프롬프트를\n사람별로 생성;
-    :face LLM을 두 번 호출;
-    if (LLM 오류 또는 빈 응답?) then (yes)
-      :관상 오류 문구로 대체;
-    endif
-  endif
+  :두 캡처의 랜드마크에서
+룰 기반 궁합 관상 payload 사용;
 
   :compatibility_final 프롬프트 생성\n두 사람 만세력 + 관상 + 관계 모드;
   :report LLM 호출;

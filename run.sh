@@ -8,15 +8,11 @@ cd "$ROOT_DIR"
 RUN_ORACLE_APP_HOST="${RUN_ORACLE_APP_HOST:-0.0.0.0}"
 RUN_ORACLE_APP_PORT="${RUN_ORACLE_APP_PORT:-8501}"
 RUN_ORACLE_APP_DEBUG="${RUN_ORACLE_APP_DEBUG:-0}"
-RUN_ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}"
 RUN_ORACLE_REASONING="${RUN_ORACLE_REASONING:-0}"
 
 RUN_ORACLE_LLM_BASE_URL="${RUN_ORACLE_LLM_BASE_URL:-http://127.0.0.1:8080/v1}"
 RUN_ORACLE_LLM_MODEL="${RUN_ORACLE_LLM_MODEL:-local-model}"
-RUN_ORACLE_FACE_LLM_MODEL="${RUN_ORACLE_FACE_LLM_MODEL:-$RUN_ORACLE_LLM_MODEL}"
-RUN_ORACLE_FACE_LLM_SEND_IMAGE="${RUN_ORACLE_FACE_LLM_SEND_IMAGE:-0}"
 RUN_ORACLE_REPORT_LLM_MODEL="${RUN_ORACLE_REPORT_LLM_MODEL:-$RUN_ORACLE_LLM_MODEL}"
-RUN_ORACLE_REPORT_LLM_SEND_IMAGE="${RUN_ORACLE_REPORT_LLM_SEND_IMAGE:-0}"
 RUN_ORACLE_LLM_TIMEOUT_SECONDS="${RUN_ORACLE_LLM_TIMEOUT_SECONDS:-${ORACLE_LLM_TIMEOUT_SECONDS:-300}}"
 RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS="${RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS:-${ORACLE_REPORT_LLM_TIMEOUT_SECONDS:-3600}}"
 
@@ -36,7 +32,6 @@ RUN_ORACLE_FACE_MIN_SIZE_PX="${RUN_ORACLE_FACE_MIN_SIZE_PX:-96}"
 RUN_ORACLE_FACE_DETECTION_SCALE="${RUN_ORACLE_FACE_DETECTION_SCALE:-0.5}"
 RUN_ORACLE_FACE_DETECTION_INTERVAL="${RUN_ORACLE_FACE_DETECTION_INTERVAL:-2}"
 RUN_ORACLE_SHOW_PREVIEW="${RUN_ORACLE_SHOW_PREVIEW:-0}"
-RUN_ORACLE_FACE_ANALYSIS_MODE="${RUN_ORACLE_FACE_ANALYSIS_MODE:-2}"
 
 RUN_ORACLE_OUTPUT_DIR="${RUN_ORACLE_OUTPUT_DIR:-$ROOT_DIR/runs}"
 RUN_ORACLE_FACE_DB_PATH="${RUN_ORACLE_FACE_DB_PATH:-$ROOT_DIR/data/face_recommendations.sqlite}"
@@ -208,15 +203,8 @@ Wrapper Options:
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
-  --distributed-role ROLE  Distributed role: master, slave, or hybrid
-  --distributed-split      Split prompts for parallel execution
-  --distributed-warmup     Warmup LLM KV cache on start
   --reasoning              Enable reasoning mode (think tags) for LLM
   --mock-capture           Enable mock capture with default landmark presets
-  --face-rulebase          Generate face report text with landmark rules (default)
-  --face-llm               Generate face report text with LLM instead of rulebase
-  --master-addr ADDR       Master address (e.g., http://192.168.0.5:8501)
-  --slave-addrs ADDRS      Comma-separated list of slave addresses
   --python-env ENV         Force Python env type (active-conda, active-venv, conda, uv, venv, auto)
   --llama-dir DIR          Path to llama.cpp repository
   --extra-llama-args ARGS  Additional raw command-line arguments for llama-server
@@ -264,18 +252,6 @@ parse_args() {
         LLAMA_BATCH_SIZE="$2"
         shift 2
         ;;
-      --distributed-role)
-        RUN_ORACLE_DISTRIBUTED_ROLE="$2"
-        shift 2
-        ;;
-      --distributed-split)
-        RUN_ORACLE_DISTRIBUTED_SPLIT=1
-        shift 1
-        ;;
-      --distributed-warmup)
-        RUN_ORACLE_DISTRIBUTED_WARMUP=1
-        shift 1
-        ;;
       --reasoning)
         RUN_ORACLE_REASONING=1
         shift 1
@@ -284,25 +260,9 @@ parse_args() {
         RUN_ORACLE_MOCK_CAPTURE_ENABLED=1
         shift 1
         ;;
-      --face-rulebase)
-        RUN_ORACLE_FACE_ANALYSIS_MODE=2
-        shift 1
-        ;;
-      --face-llm)
-        RUN_ORACLE_FACE_ANALYSIS_MODE=1
-        shift 1
-        ;;
       --debug)
         RUN_ORACLE_APP_DEBUG=1
         shift 1
-        ;;
-      --master-addr)
-        RUN_ORACLE_MASTER_ADDR="$2"
-        shift 2
-        ;;
-      --slave-addrs)
-        RUN_ORACLE_SLAVE_ADDRS="$2"
-        shift 2
         ;;
       --temperature)
         export ORACLE_LLM_TEMPERATURE="$2"
@@ -425,15 +385,9 @@ apply_run_config() {
     default_max_tokens=4096
   fi
 
-  export ORACLE_FACE_LLM_BASE_URL="$RUN_ORACLE_LLM_BASE_URL"
-  export ORACLE_FACE_LLM_MODEL="$RUN_ORACLE_FACE_LLM_MODEL"
-  export ORACLE_FACE_LLM_SEND_IMAGE="$RUN_ORACLE_FACE_LLM_SEND_IMAGE"
-  export ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS="${ORACLE_FACE_LLM_MAX_OUTPUT_TOKENS:-4096}"
-
   export ORACLE_REPORT_LLM_BASE_URL="$RUN_ORACLE_LLM_BASE_URL"
   export ORACLE_REPORT_LLM_MODEL="$RUN_ORACLE_REPORT_LLM_MODEL"
   export ORACLE_REPORT_LLM_TIMEOUT_SECONDS="$RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS"
-  export ORACLE_REPORT_LLM_SEND_IMAGE="$RUN_ORACLE_REPORT_LLM_SEND_IMAGE"
   export ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS="${ORACLE_REPORT_LLM_MAX_OUTPUT_TOKENS:-$default_max_tokens}"
   export ORACLE_LLM_PROMPT_CACHE="${ORACLE_LLM_PROMPT_CACHE:-0}"
 
@@ -456,18 +410,12 @@ apply_run_config() {
   export ORACLE_FACE_DETECTION_SCALE="$RUN_ORACLE_FACE_DETECTION_SCALE"
   export ORACLE_FACE_DETECTION_INTERVAL="$RUN_ORACLE_FACE_DETECTION_INTERVAL"
   export ORACLE_SHOW_PREVIEW="$RUN_ORACLE_SHOW_PREVIEW"
-  export ORACLE_FACE_ANALYSIS_MODE="$RUN_ORACLE_FACE_ANALYSIS_MODE"
   export ORACLE_MOCK_CAPTURE_ENABLED="${RUN_ORACLE_MOCK_CAPTURE_ENABLED:-${ORACLE_MOCK_CAPTURE_ENABLED:-0}}"
 
   export ORACLE_OUTPUT_DIR="$RUN_ORACLE_OUTPUT_DIR"
   export ORACLE_FACE_DB_PATH="$RUN_ORACLE_FACE_DB_PATH"
 
-  export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-${ORACLE_DISTRIBUTED_ROLE:-}}"
-  export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-${ORACLE_DISTRIBUTED_SPLIT:-0}}"
-  export ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-${RUN_ORACLE_DISTRIBUTED_WARMUP:-0}}"
   export ORACLE_REASONING="${RUN_ORACLE_REASONING:-${ORACLE_REASONING:-0}}"
-  export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-${ORACLE_MASTER_ADDR:-}}"
-  export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-${ORACLE_SLAVE_ADDRS:-}}"
 
   export ORACLE_LLAMA_CPP_DIR="$ORACLE_LLAMA_CPP_DIR"
 }

@@ -6,22 +6,15 @@ from pathlib import Path
 
 from oracle_report import prompt_templates
 from oracle_report.models import BirthProfile
-from oracle_report.physiognomy import FaceReadingInput
 from oracle_report.report import (
-    build_couple_face_analysis_prompt,
     build_couple_saju_reading_prompt,
-    build_compatibility_face_analysis_prompt,
-    build_personal_face_analysis_prompt,
     build_saju_reading_prompt,
 )
 
 
 _PROMPT_TEMPLATE_NAMES = (
-    "personal_face_analysis",
     "saju_reading",
     "saju_reading_couple",
-    "compatibility_face_analysis",
-    "face_analysis_copule",
 )
 
 
@@ -40,32 +33,6 @@ def test_runtime_prompts_define_explicit_cache_prefixes() -> None:
         assert prompt_config["body"]
         assert "${" not in "\n".join(prompt_config["prefix"])
         assert "${" in "\n".join(prompt_config["body"])
-
-
-def test_personal_face_analysis_prompt_contains_required_context() -> None:
-    profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
-
-    prompt = build_personal_face_analysis_prompt(profile, FaceReadingInput(None, None))
-
-    assert "개인 리포트" in prompt
-    assert "1995-03-15 미시(未時)" in prompt
-    assert "신원, 나이, 성별, 민족, 건강" in prompt
-    assert "\"face_blocks\"" in prompt
-
-
-def test_compatibility_face_analysis_prompt_contains_pair_context() -> None:
-    profile = BirthProfile(name="홍길동", birth_datetime=datetime(1995, 3, 15, 14, 30))
-
-    prompt = build_compatibility_face_analysis_prompt(
-        profile,
-        FaceReadingInput(None, None),
-        "첫 번째 사람",
-        "연인",
-    )
-
-    assert "두 사람 궁합 리포트" in prompt
-    assert "궁합 모드: 연인" in prompt
-    assert "현재 분석 대상: 첫 번째 사람" in prompt
 
 
 def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
@@ -143,7 +110,6 @@ def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:
     assert "\"pair_blocks\"" not in prompt
     assert "LEFT SAJU INPUT" in prompt
     assert "RIGHT SAJU INPUT" in prompt
-    assert "face_analysis_copule" not in prompt
     assert "saju_blocks는 6개를 작성합니다" in prompt.prefix
     assert "각 saju_blocks의 summary는 body의 핵심을 1~2개의 짧은 문장" in prompt.prefix
     assert (
@@ -165,70 +131,6 @@ def test_couple_saju_reading_prompt_uses_pair_saju_only() -> None:
     assert "반드시/틀림없이" in prompt.prefix
     assert "좋은 내용은 약 80%, 주의하거나 보완할 내용은 약 20%" in prompt.prefix
     assert "좋은 내용 -> 안 좋은 내용 -> 좋은 내용" in prompt.prefix
-
-
-def test_couple_face_analysis_prompt_uses_pair_face_only() -> None:
-    left = BirthProfile(name="left", birth_datetime=datetime(1995, 3, 15, 14, 30))
-    right = BirthProfile(name="right", birth_datetime=datetime(1997, 5, 20, 9, 0))
-
-    prompt = build_couple_face_analysis_prompt(
-        left,
-        right,
-        "연인",
-        FaceReadingInput(None, None),
-        FaceReadingInput(None, None),
-    )
-
-    assert "\"pair_blocks\"" in prompt
-    assert "\"saju_blocks\"" not in prompt
-    assert "left" in prompt
-    assert "right" in prompt
-
-
-def test_face_analysis_prompts_use_sentence_count_guidance() -> None:
-    profile = BirthProfile(name="tester", birth_datetime=datetime(1995, 3, 15, 14, 30))
-    left = BirthProfile(name="left", birth_datetime=datetime(1995, 3, 15, 14, 30))
-    right = BirthProfile(name="right", birth_datetime=datetime(1997, 5, 20, 9, 0))
-
-    json_prompts = (
-        build_personal_face_analysis_prompt(profile, FaceReadingInput(None, None)),
-        build_couple_face_analysis_prompt(
-            left,
-            right,
-            "연인",
-            FaceReadingInput(None, None),
-            FaceReadingInput(None, None),
-        ),
-    )
-    memo_prompt = build_compatibility_face_analysis_prompt(
-        profile,
-        FaceReadingInput(None, None),
-        "첫 번째 사람",
-        "연인",
-    )
-
-    for prompt in json_prompts:
-        assert "summary는 body의 핵심을 1~2개의 짧은 문장" in prompt
-        assert (
-            f"body는 정확히 {prompt_templates.REPORT_BLOCK_SENTENCE_COUNT}개의 완성된 문장"
-            in prompt
-        )
-        assert "summary와 body는 각각 정확히" not in prompt
-        assert "summary와 body의 문장 수는 서로 같아야" not in prompt
-        assert "자동 줄바꿈 기준" not in prompt
-        assert "5~6줄" not in prompt
-        assert "180~220자" not in prompt
-        assert "약 6줄 분량" not in prompt
-        assert "수동 줄바꿈" in prompt
-        assert "160자" not in prompt
-        assert "최대 4문장" not in prompt
-    assert (
-        f"정확히 {prompt_templates.REPORT_BLOCK_SENTENCE_COUNT}개의 완성된 문장"
-        in memo_prompt
-    )
-    assert "자동 줄바꿈 기준" not in memo_prompt
-    assert "5~6줄" not in memo_prompt
-    assert "180~220자" not in memo_prompt
 
 
 def test_report_sentence_count_guidance_uses_single_constant(monkeypatch) -> None:
@@ -264,12 +166,12 @@ def test_prompt_template_can_be_overridden_from_json(
 ) -> None:
     prompt_path = tmp_path / "prompts.json"
     prompt_path.write_text(
-        json.dumps({"personal_face_analysis": "CUSTOM ${name} ${quality_text}"}),
+        json.dumps({"saju_reading": "CUSTOM ${name} ${saju_text}"}),
         encoding="utf-8",
     )
     monkeypatch.setenv("ORACLE_PROMPTS_PATH", str(prompt_path))
     profile = BirthProfile(name="tester", birth_datetime=datetime(1995, 3, 15, 14, 30))
 
-    prompt = build_personal_face_analysis_prompt(profile, FaceReadingInput(None, None))
+    prompt = build_saju_reading_prompt(profile, "SAJU")
 
-    assert prompt == "CUSTOM tester - 품질 정보 없음"
+    assert prompt == "CUSTOM tester SAJU"

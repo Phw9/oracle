@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -15,7 +15,6 @@ except ImportError:
 
 _LLM_BASE_URL_ENV_NAMES = (
     "ORACLE_LLM_BASE_URL",
-    "ORACLE_FACE_LLM_BASE_URL",
     "ORACLE_REPORT_LLM_BASE_URL",
 )
 
@@ -56,7 +55,6 @@ class CaptureConfig:
     show_preview: bool
     eye_min_count: int
     eyebrow_min_edge_density: float
-    face_analysis_mode: int = 2
     camera_auto_detect: bool = True
     mock_capture_enabled: bool = False
     mock_landmark_metrics_json: str = ""
@@ -71,7 +69,6 @@ class LlmConfig:
     timeout_seconds: float
     max_output_tokens: int
     temperature: float
-    send_image: bool
     prompt_cache: bool = False
     reasoning: bool = False
 
@@ -81,11 +78,6 @@ class AppConfig:
     host: str
     port: int
     debug: bool
-    distributed_role: str | None = None
-    distributed_split: bool = False
-    master_addr: str | None = None
-    slave_addrs: list[str] = field(default_factory=list)
-    distributed_warmup: bool = False
 
 
 def load_capture_config() -> CaptureConfig:
@@ -120,7 +112,6 @@ def load_capture_config() -> CaptureConfig:
             "ORACLE_EYEBROW_MIN_EDGE_DENSITY",
             0.018,
         ),
-        face_analysis_mode=_read_face_analysis_mode(),
         camera_auto_detect=_read_bool("ORACLE_CAMERA_AUTO_DETECT", True),
         mock_capture_enabled=mock_capture_enabled,
         mock_landmark_metrics_json=mock_landmark_metrics_json,
@@ -135,37 +126,22 @@ def load_llm_config() -> LlmConfig:
     return result
 
 
-def load_face_llm_config() -> LlmConfig:
-    result = _load_llm_config("ORACLE_FACE_LLM", send_image_default=False)
-    return result
-
-
 def load_report_llm_config() -> LlmConfig:
-    result = _load_llm_config("ORACLE_REPORT_LLM", send_image_default=False)
+    result = _load_llm_config("ORACLE_REPORT_LLM")
     return result
 
 
 def load_app_config() -> AppConfig:
     _load_dotenv()
-    role = os.getenv("ORACLE_DISTRIBUTED_ROLE")
-    if role not in (None, "", "master", "slave", "hybrid"):
-        raise ValueError("ORACLE_DISTRIBUTED_ROLE must be 'master', 'slave', or 'hybrid'.")
-    slave_addrs_raw = os.getenv("ORACLE_SLAVE_ADDRS", "")
-    slave_addrs = [addr.strip() for addr in slave_addrs_raw.split(",") if addr.strip()]
     result = AppConfig(
         host=os.getenv("ORACLE_APP_HOST", "0.0.0.0"),
         port=_read_positive_int("ORACLE_APP_PORT", 8501),
         debug=_read_bool("ORACLE_APP_DEBUG", False),
-        distributed_role=role if role else None,
-        distributed_split=_read_bool("ORACLE_DISTRIBUTED_SPLIT", False),
-        master_addr=os.getenv("ORACLE_MASTER_ADDR"),
-        slave_addrs=slave_addrs,
-        distributed_warmup=_read_bool("ORACLE_DISTRIBUTED_WARMUP", False),
     )
     return result
 
 
-def _load_llm_config(prefix: str, send_image_default: bool) -> LlmConfig:
+def _load_llm_config(prefix: str) -> LlmConfig:
     _load_dotenv()
     _validate_configured_local_llm_urls()
     base_url = os.getenv(
@@ -194,10 +170,6 @@ def _load_llm_config(prefix: str, send_image_default: bool) -> LlmConfig:
         temperature=_read_float(
             f"{prefix}_TEMPERATURE",
             _read_float("ORACLE_LLM_TEMPERATURE", 0.7),
-        ),
-        send_image=_read_bool(
-            f"{prefix}_SEND_IMAGE",
-            _read_bool("ORACLE_LLM_SEND_IMAGE", send_image_default),
         ),
         prompt_cache=_read_bool(
             f"{prefix}_PROMPT_CACHE",
@@ -260,11 +232,4 @@ def _read_detection_scale() -> float:
     result = _read_float("ORACLE_FACE_DETECTION_SCALE", 0.5)
     if result <= 0.0 or result > 1.0:
         raise ValueError("ORACLE_FACE_DETECTION_SCALE must be > 0.0 and <= 1.0.")
-    return result
-
-
-def _read_face_analysis_mode() -> int:
-    result = _read_int("ORACLE_FACE_ANALYSIS_MODE", 2)
-    if result not in (1, 2):
-        raise ValueError("ORACLE_FACE_ANALYSIS_MODE must be 1 or 2.")
     return result

@@ -8,7 +8,6 @@ from pathlib import Path
 
 from oracle_report.config import (
     load_capture_config,
-    load_face_llm_config,
     load_report_llm_config,
 )
 from oracle_report.llm import LlamaCppChatClient
@@ -93,7 +92,6 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="0.0.0.0")
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--debug", action="store_true")
-    serve.add_argument("--distributed-warmup", action="store_true")
     serve.add_argument("--temperature", type=float, help="LLM generation temperature")
 
     prompt = subparsers.add_parser("prompt", help="print workflow prompt inputs")
@@ -132,9 +130,6 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
         choices=(
-            "personal-face-analysis",
-            "compatibility-face-analysis",
-            "face-analysis-copule",
             "saju-reading",
             "saju-reading-couple",
             "personal-final",
@@ -150,9 +145,7 @@ def _add_prompt_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--right-birth-time", default="")
     parser.add_argument("--right-gender", default="")
     parser.add_argument("--mode", default="연인")
-    parser.add_argument("--person-label", default="첫 번째 사람")
     parser.add_argument("--target-gender", default="")
-    parser.add_argument("--image", type=Path)
     parser.add_argument("--manse-db", type=Path)
     parser.add_argument("--face-db", type=Path)
     parser.add_argument("--face-analysis", default="")
@@ -173,9 +166,6 @@ def _run_capture_command(args: argparse.Namespace) -> int:
 def _run_serve_command(args: argparse.Namespace) -> int:
     from oracle_report.web import create_app
 
-    if args.distributed_warmup:
-        os.environ["ORACLE_DISTRIBUTED_WARMUP"] = "1"
-
     app = create_app()
     app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
     result = 0
@@ -193,13 +183,6 @@ def _run_prompt_result_command(args: argparse.Namespace) -> int:
     prompt_text = _build_llm_prompt_text(args)
     output_text = prompt_text
     if args.target in (
-        "personal-face-analysis",
-        "compatibility-face-analysis",
-        "face-analysis-copule",
-    ):
-        # Landmark rules face analysis does not require LLM generation.
-        output_text = prompt_text
-    elif args.target in (
         "saju-reading",
         "saju-reading-couple",
         "personal-final",
@@ -368,39 +351,10 @@ def _override_capture_config(args: argparse.Namespace):
     return result
 
 
-def _run_landmark_analysis_on_image(image_path: Path | None) -> str:
-    if image_path is None or not image_path.exists():
-        return "## 관상정보\n- 오류: 이미지 경로가 지정되지 않았거나 파일이 존재하지 않습니다."
-    
-    import cv2
-    frame = cv2.imread(str(image_path))
-    if frame is None:
-        return "## 관상정보\n- 오류: 이미지를 로드할 수 없습니다."
-        
-    from oracle_report.config import load_capture_config
-    from oracle_report.vision.camera import build_capture_processors
-    
-    config = load_capture_config()
-    detector, analyzer = build_capture_processors(config)
-    
-    faces = detector.detect(frame)
-    if not faces:
-        return "## 관상정보\n- 오류: 얼굴을 감지하지 못했습니다."
-        
-    face = faces[0]
-    quality = analyzer.analyze(frame, face)
-    if not quality.ready:
-        return "## 관상정보\n- 오류: 랜드마크 분석을 위한 이미지 품질이 충분하지 않습니다."
-        
-    return quality.face_analysis
-
-
 def _build_prompt_text(args: argparse.Namespace) -> str:
     profile = _build_prompt_birth_profile(args)
     result = ""
-    if args.target in ("personal-face-analysis", "compatibility-face-analysis", "face-analysis-copule"):
-        result = _run_landmark_analysis_on_image(args.image)
-    elif args.target == "saju-reading":
+    if args.target == "saju-reading":
         result = _lookup_manse(args, profile).formatted_text
     elif args.target == "saju-reading-couple":
         result = _build_pair_manse_text(args, profile)

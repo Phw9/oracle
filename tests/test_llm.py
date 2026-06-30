@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from oracle_report.config import LlmConfig, load_face_llm_config, load_llm_config
+from oracle_report.config import LlmConfig, load_llm_config
 from oracle_report.llm import (
     LlamaCppChatClient,
     _extract_finish_reason,
@@ -34,20 +34,10 @@ def test_llm_config_enables_prompt_cache(monkeypatch) -> None:
     assert config.prompt_cache is True
 
 
-def test_default_face_llm_config_uses_text_mode(monkeypatch) -> None:
-    monkeypatch.setenv("ORACLE_LLM_SEND_IMAGE", "")
-    monkeypatch.setenv("ORACLE_FACE_LLM_SEND_IMAGE", "")
-
-    config = load_face_llm_config()
-
-    assert config.send_image is False
-
-
 @pytest.mark.parametrize(
     "env_name",
     (
         "ORACLE_LLM_BASE_URL",
-        "ORACLE_FACE_LLM_BASE_URL",
         "ORACLE_REPORT_LLM_BASE_URL",
     ),
 )
@@ -65,7 +55,6 @@ def test_llama_cpp_payload_uses_chat_completions_shape() -> None:
         timeout_seconds=60.0,
         max_output_tokens=512,
         temperature=0.7,
-        send_image=False,
     )
     client = LlamaCppChatClient(config)
 
@@ -84,7 +73,6 @@ def test_llama_cpp_payload_omits_prompt_cache_by_default() -> None:
         timeout_seconds=60.0,
         max_output_tokens=512,
         temperature=0.7,
-        send_image=False,
     )
     client = LlamaCppChatClient(config)
     prompt = RenderedPrompt(
@@ -112,7 +100,6 @@ def test_llama_cpp_payload_uses_prompt_cache_slot_when_enabled() -> None:
         timeout_seconds=60.0,
         max_output_tokens=512,
         temperature=0.7,
-        send_image=False,
         prompt_cache=True,
     )
     client = LlamaCppChatClient(config)

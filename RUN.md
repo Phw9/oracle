@@ -63,28 +63,9 @@ http://<raspberry-pi-ip>:8501
 
 개인 리포트 관상 분석 LLM 프롬프트 확인:
 
-```bash
-./run.sh prompt personal-face-analysis \
-  --name "홍길동" \
-  --birth-date 1995-03-15 \
-  --birth-time 14:30 \
-  --gender male
-```
 
 궁합 리포트 관상 분석 LLM 프롬프트 확인:
 
-```bash
-./run.sh prompt face-analysis-copule \
-  --name "홍길동" \
-  --birth-date 1995-03-15 \
-  --birth-time 14:30 \
-  --gender male \
-  --right-name "김영희" \
-  --right-birth-date 1997-05-20 \
-  --right-birth-time 09:00 \
-  --right-gender female \
-  --mode 연인
-```
 
 개인 사주/만세력 조회 결과가 리포트에 어떤 텍스트로 들어가는지 확인:
 
@@ -168,14 +149,6 @@ http://<raspberry-pi-ip>:8501
 
 이미 캡처한 이미지로 관상 프롬프트를 LLM에 보낼 때:
 
-```bash
-./run.sh prompt-run personal-face-analysis \
-  --name "홍길동" \
-  --birth-date 1995-03-15 \
-  --birth-time 14:30 \
-  --gender male \
-  --image runs/session-001/capture.jpg
-```
 
 ## 6. 프롬프트 토큰 확인
 
@@ -203,7 +176,6 @@ ORACLE_LLAMA_MODEL_SHA256=dd279a54c0c0dc9724ed11d7f73ad7fb4489a45f58fefe9447da24
 ORACLE_LLM_PROMPT_CACHE=0
 ORACLE_CAMERA_INDEX=0
 ORACLE_SHOW_PREVIEW=0
-ORACLE_FACE_ANALYSIS_MODE=2
 ORACLE_PROMPTS_PATH=configs/prompts.json
 ORACLE_DEBUG_PROMPTS_PATH=configs/prompts_debug.json
 ORACLE_FACE_DB_PATH=data/face_recommendations.sqlite
@@ -225,17 +197,11 @@ configs/prompts_debug.json
 
 - `saju_reading`: 런타임 만세력 계산 결과를 LLM에 보내는 사주 해설 프롬프트
 - `saju_reading_couple`: 두 사람의 만세력 계산 결과를 LLM에 보내는 궁합 사주 해설 프롬프트
-- `personal_face_analysis`: 캡처 이미지 기반 개인 관상 메모 프롬프트
-- `face_analysis_copule`: 두 사람의 결합 크롭 이미지 기반 궁합 관상 JSON 프롬프트
 - `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 - `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
 운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. 일반 `./run.sh` 실행은 이전 방식처럼 전체 프롬프트를 하나의 user message로 보냅니다. 고정 slot prompt cache를 테스트하려면 `./run.sh kvfix ...`로 실행합니다. 이 모드에서는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보내고, 별도 `--ctx-size`를 주지 않으면 llama.cpp context 기본값을 `20480`으로 올립니다.
 
-관상 모드:
-
-- `ORACLE_FACE_ANALYSIS_MODE=2`: MediaPipe 랜드마크 규칙 기반 분석(기본값)
-- `ORACLE_FACE_ANALYSIS_MODE=1`: 캡처 이미지 기반 LLM 관상 분석
 
 카메라 사용이 어렵거나 랜드마크 룰베이스를 재현 테스트해야 할 때는 mock capture를 켭니다.
 

@@ -12,7 +12,6 @@ from markupsafe import escape
 from oracle_report.config import (
     load_app_config,
     load_capture_config,
-    load_face_llm_config,
     load_report_llm_config,
 )
 from oracle_report.workflow import (
@@ -279,79 +278,6 @@ def create_app() -> Flask:
         result = "ok"
         return result
 
-    @app.post("/api/distributed/generate")
-    def distributed_generate():
-        payload = request.json or {}
-        prompt_name = payload.get("prompt_name")
-        target_category = payload.get("target_category")
-        is_metadata = payload.get("is_metadata", False)
-        values = payload.get("values", {})
-        image_base64 = payload.get("image_base64")
-
-        from oracle_report.prompt_templates import render_distributed_prompt_template
-        rendered = render_distributed_prompt_template(
-            name=prompt_name,
-            values=values,
-            target_category=target_category,
-            is_metadata=is_metadata,
-        )
-
-        temp_img_path = None
-        if image_base64:
-            import base64
-            img_data = base64.b64decode(image_base64)
-            temp_dir = Path("runs/temp")
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_img_path = temp_dir / f"distributed_temp_{uuid.uuid4().hex}.jpg"
-            temp_img_path.write_bytes(img_data)
-
-        from oracle_report.llm import LlamaCppChatClient
-        from oracle_report.config import load_face_llm_config, load_report_llm_config
-
-        is_face = "face" in prompt_name
-        llm_config = load_face_llm_config() if is_face else load_report_llm_config()
-        client = LlamaCppChatClient(llm_config)
-
-        try:
-            output = client.generate(rendered, image_path=temp_img_path)
-            result = jsonify({"status": "success", "output": output})
-        except Exception as exc:
-            result = jsonify({"status": "error", "error": str(exc)}), 500
-        finally:
-            if temp_img_path and temp_img_path.exists():
-                try:
-                    temp_img_path.unlink()
-                except Exception:
-                    pass
-        return result
-
-    @app.get("/api/distributed/status")
-    def distributed_status():
-        from oracle_report.llm import is_local_llm_running, LlamaCppChatClient
-        from oracle_report.config import load_llm_config
-        is_busy = _CAPTURE_LOCK.locked() or is_local_llm_running()
-        
-        llm_config = load_llm_config()
-        client = LlamaCppChatClient(llm_config)
-        
-        tps = 1.0
-        score = 2.0
-        model_name = llm_config.model
-        if not is_busy:
-            try:
-                tps = client.get_or_measure_tps()
-                score = client.get_compute_score()
-            except Exception:
-                pass
-                
-        result = jsonify({
-            "status": "busy" if is_busy else "idle",
-            "tps": tps,
-            "compute_score": score,
-            "model": model_name
-        })
-        return result
-
     @app.get("/favicon.ico")
     def favicon():
         result = ("", 204)
@@ -364,56 +290,12 @@ def create_app() -> Flask:
 def serve() -> None:
     config = load_app_config()
 
-    # Run distributed warmup in the background if enabled
-    if config.distributed_role in ("master", "hybrid") and config.distributed_warmup:
-        import threading
-        def run_warmup_background():
-            import time
-            time.sleep(5.0)  # Wait for slave servers to start fully
-            print("[Distributed] Starting LLM warmup for distributed nodes...", flush=True)
-            try:
-                from oracle_report.workflow import _generate_distributed
-                dummy_values = {
-                    "name": "더미",
-                    "gender": "남성",
-                    "birth_datetime": "1990-01-01 12:00",
-                    "birth_time_text": "오시(午時)",
-                    "quality_text": "정면 얼굴이 안정적으로 감지되었습니다.",
-                }
-                dummy_categories = [
-                    "눈과 눈썹",
-                    "얼굴 비율과 중심감",
-                    "표정과 소통 분위기",
-                    "첫인상 리듬",
-                    "관상 기반 생활 팁",
-                ]
-                _generate_distributed(
-                    prompt_name="personal_face_analysis",
-                    values=dummy_values,
-                    categories=dummy_categories,
-                    image_path=None,
-                    app_config=config,
-                )
-                print("[Distributed] LLM warmup complete. Prefix KV caches are now initialized.", flush=True)
-            except Exception as e:
-                print(f"[Distributed][Warn] Warmup failed: {e}", flush=True)
-
-        threading.Thread(target=run_warmup_background, daemon=True).start()
-
     app = create_app()
     app.run(host=config.host, port=config.port, debug=config.debug, threaded=True)
 
 
 def _form_value(name: str) -> str:
     result = request.form.get(name, "").strip()
-    return result
-
-
-def _form_int(name: str, default: int) -> int:
-    raw_value = _form_value(name)
-    result = default
-    if raw_value != "":
-        result = int(raw_value)
     return result
 
 
@@ -440,7 +322,6 @@ def _personal_workflow_input_from_form() -> PersonalWorkflowInput:
         birth_time=_form_value("birth_time"),
         gender=_form_value("gender"),
         target_gender=_form_value("target_gender"),
-        face_analysis_mode=_form_int("face_analysis_mode", 2),
         skip_face=_form_bool("skip_face", False),
     )
     return result
@@ -457,7 +338,6 @@ def _compatibility_workflow_input_from_form() -> CompatibilityWorkflowInput:
         right_birth_time=_form_value("right_birth_time"),
         right_gender=_form_value("right_gender"),
         mode=_form_value("mode"),
-        face_analysis_mode=_form_int("face_analysis_mode", 2),
     )
     return result
 
@@ -487,7 +367,6 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
         workflow_result = run_personal_workflow(
             workflow_input=workflow_input,
             capture_config=load_capture_config(),
-            face_llm_config=load_face_llm_config(),
             report_llm_config=load_report_llm_config(),
             manse_db_path=_manse_db_path(),
             recommendation_db_path=_face_db_path(),
@@ -547,7 +426,6 @@ def _start_compatibility_workflow_job(
         workflow_result = run_compatibility_workflow(
             workflow_input=workflow_input,
             capture_config=load_capture_config(),
-            face_llm_config=load_face_llm_config(),
             report_llm_config=load_report_llm_config(),
             manse_db_path=_manse_db_path(),
             capture_runner=capture_runner,
