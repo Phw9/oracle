@@ -29,7 +29,7 @@ from oracle_report.vision.landmarks import (
 )
 
 
-FrameCallback = Callable[[Any, Any], None]
+FrameCallback = Callable[..., None]
 
 
 def run_capture(
@@ -75,7 +75,7 @@ def run_capture(
                 latest_decision.landmark_points,
             )
             if frame_callback is not None:
-                frame_callback(cv2, preview_frame)
+                _publish_preview_frame(frame_callback, cv2, preview_frame, latest_decision)
             if config.show_preview:
                 cv2.imshow("oracle-report", preview_frame)
                 key = cv2.waitKey(1) & 0xFF
@@ -90,6 +90,18 @@ def run_capture(
 
     result = artifact
     return result
+
+
+def _publish_preview_frame(
+    frame_callback: FrameCallback,
+    cv2: Any,
+    preview_frame: Any,
+    decision: CaptureDecision,
+) -> None:
+    try:
+        frame_callback(cv2, preview_frame, decision)
+    except TypeError:
+        frame_callback(cv2, preview_frame)
 
 
 def _build_mock_capture_artifact(

@@ -43,13 +43,27 @@ class _WorkflowJob:
     download_filename: str = "oracle_report.html"
 
 
+def _empty_capture_debug_payload() -> dict[str, object]:
+    result: dict[str, object] = {
+        "state": "idle",
+        "message": "촬영을 시작하면 랜드마크 측정값이 표시됩니다.",
+        "ready": False,
+        "metrics_text": "- 측정 대기 중",
+        "observations_text": "- 관찰 컨텍스트 대기 중",
+        "rules_text": "- 룰 매칭 대기 중",
+        "warnings": [],
+    }
+    return result
+
+
 class _PreviewStream:
     def __init__(self) -> None:
         self._condition = threading.Condition()
         self._frame: bytes | None = None
         self._version = 0
+        self._debug_payload: dict[str, object] = _empty_capture_debug_payload()
 
-    def publish(self, cv2, frame) -> None:
+    def publish(self, cv2, frame, decision=None) -> None:
         ok, encoded = cv2.imencode(
             ".jpg",
             frame,
@@ -58,8 +72,21 @@ class _PreviewStream:
         if ok:
             with self._condition:
                 self._frame = encoded.tobytes()
+                self._debug_payload = _capture_debug_payload(decision)
                 self._version = self._version + 1
                 self._condition.notify_all()
+
+    def reset_debug(self) -> None:
+        with self._condition:
+            self._debug_payload = _empty_capture_debug_payload()
+            self._version = self._version + 1
+            self._condition.notify_all()
+
+    def debug_payload(self) -> dict[str, object]:
+        with self._condition:
+            result = dict(self._debug_payload)
+            result["version"] = self._version
+        return result
 
     def frames(self):
         last_version = -1
@@ -92,6 +119,8 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
+        if _compare_camera_enabled():
+            return redirect("/compare-camera", code=302)
         body = f"""
         <div class="oracle-home-shell">
           <section id="oracle-home" class="home-view" aria-label="홈">
@@ -353,6 +382,28 @@ def create_app() -> Flask:
                     ),
                 },
             )
+        return result
+
+    @app.get("/compare-camera")
+    def compare_camera():
+        body = _compare_camera_page()
+        result = _render_page(
+            "랜드마크 비교 카메라",
+            body,
+            page_class="result-page personal-result-page compare-camera-page",
+            show_heading=False,
+        )
+        return result
+
+    @app.post("/api/compare-camera/start")
+    def compare_camera_start():
+        job_id = _start_compare_camera_job()
+        result = jsonify({"job_id": job_id})
+        return result
+
+    @app.get("/api/capture-debug")
+    def capture_debug():
+        result = jsonify(_PREVIEW_STREAM.debug_payload())
         return result
 
     @app.get("/video-feed")
@@ -662,6 +713,32 @@ def _start_compatibility_workflow_job(
     return result
 
 
+def _start_compare_camera_job() -> str:
+    job_id = uuid.uuid4().hex
+    _PREVIEW_STREAM.reset_debug()
+
+    def run_job() -> _WorkflowJob:
+        artifact = _preview_capture_runner(load_capture_config())
+        result = _WorkflowJob(
+            status="complete",
+            phase="complete",
+            message="랜드마크 측정이 완료되었습니다",
+            html=_compare_camera_result(artifact),
+        )
+        return result
+
+    result = _start_workflow_job(
+        run_job,
+        job_id=job_id,
+        initial_job=_WorkflowJob(
+            status="running",
+            phase="capturing",
+            message="정면 얼굴을 카메라 중앙에 맞춰 주세요",
+        ),
+    )
+    return result
+
+
 def _personal_result_url(job_id: str, skip_face: bool) -> str:
     skip_value = "1" if skip_face else "0"
     result = f"/personal/result/{job_id}?skip_face={skip_value}"
@@ -679,6 +756,40 @@ def _preview_capture_runner(config, output_dir: Path | None = None):
         output_dir=output_dir,
         frame_callback=_PREVIEW_STREAM.publish,
     )
+    return result
+
+
+def _compare_camera_enabled() -> bool:
+    result = os.getenv("ORACLE_CAPTURE_COMPARE_CAMERA", "0") == "1"
+    return result
+
+
+def _capture_debug_payload(decision) -> dict[str, object]:
+    if decision is None:
+        return _empty_capture_debug_payload()
+    quality = getattr(decision, "quality", None)
+    result: dict[str, object] = {
+        "state": getattr(decision, "state", ""),
+        "message": getattr(decision, "message", ""),
+        "ready": False,
+        "metrics_text": "- 얼굴 랜드마크 측정값 없음",
+        "observations_text": "- 매칭된 관찰값 없음",
+        "rules_text": "- 룰 힌트 없음",
+        "warnings": [],
+    }
+    if quality is not None:
+        result.update(
+            {
+                "ready": bool(getattr(quality, "ready", False)),
+                "metrics_text": getattr(quality, "landmark_metrics_text", "")
+                or "- 얼굴 랜드마크 측정값 없음",
+                "observations_text": getattr(quality, "landmark_context_text", "")
+                or "- 매칭된 관찰값 없음",
+                "rules_text": getattr(quality, "landmark_rules_text", "")
+                or "- 룰 힌트 없음",
+                "warnings": list(getattr(quality, "warnings", ()) or ()),
+            },
+        )
     return result
 
 
@@ -1044,6 +1155,7 @@ def _capture_preview_panel(
     job_id: str = "",
     skip_face: bool = False,
     cute: bool = False,
+    compare_debug: bool = False,
 ) -> str:
     job_attr = f' data-workflow-result-job="{escape(job_id)}"' if job_id != "" else ""
     skip_attr = ' data-skip-face="1"' if skip_face else ' data-skip-face="0"'
@@ -1068,41 +1180,46 @@ def _capture_preview_panel(
         '<span class="loading-heart" aria-hidden="true">♡</span>' if cute else ""
     )
     if cute:
+        debug_panel = _capture_debug_panel() if compare_debug else ""
+        debug_class = " capture-stage-with-debug" if compare_debug else ""
         preview_content = f"""
       <h2><span class="capture-title-icon" aria-hidden="true">▣</span>실시간 촬영 상태</h2>
-      <div class="capture-stage">
-        <div class="capture-direction">
-          <span class="capture-heart" aria-hidden="true">♡</span>
-          <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
-          <strong>정면 얼굴을 <span>카메라 중앙</span>에 맞춰 주세요.</strong>
-          <span class="capture-heart" aria-hidden="true">♡</span>
-        </div>
-        <div class="capture-visual">
-          <img id="capture-preview-image" alt="실시간 촬영 상태">
-          <span class="camera-corner camera-corner-tl" aria-hidden="true"></span>
-          <span class="camera-corner camera-corner-tr" aria-hidden="true"></span>
-          <span class="camera-corner camera-corner-bl" aria-hidden="true"></span>
-          <span class="camera-corner camera-corner-br" aria-hidden="true"></span>
-          <span class="face-guide" aria-hidden="true"></span>
-          <div class="capture-side-note capture-side-note-left" aria-hidden="true">
-            <p>카메라를<br>눈높이에 맞추고<br>정면을 바라봐 주세요!</p>
-            <span>✧</span>
-            <img src="/static/assets/oracle-pair-card.png" alt="">
+      <div class="capture-debug-layout{debug_class}">
+        <div class="capture-stage">
+          <div class="capture-direction">
+            <span class="capture-heart" aria-hidden="true">♡</span>
+            <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+            <strong>정면 얼굴을 <span>카메라 중앙</span>에 맞춰 주세요.</strong>
+            <span class="capture-heart" aria-hidden="true">♡</span>
           </div>
-          <div class="capture-side-note capture-side-note-right" aria-hidden="true">
-            <p>밝은 곳에서<br>촬영하면 더<br>정확해요!</p>
-            <span>✧</span>
-            <img src="/static/assets/oracle-solo-card.png" alt="">
-          </div>
-          <div class="capture-privacy-veil" hidden>
-            <div class="veil-card">
-              <span class="veil-mark" aria-hidden="true">✦</span>
-              <strong>얼굴 인식 완료</strong>
-              <p>이제 리포트를 예쁘게 빚는 중이에요.</p>
+          <div class="capture-visual">
+            <img id="capture-preview-image" alt="실시간 촬영 상태">
+            <span class="camera-corner camera-corner-tl" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-tr" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-bl" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-br" aria-hidden="true"></span>
+            <span class="face-guide" aria-hidden="true"></span>
+            <div class="capture-side-note capture-side-note-left" aria-hidden="true">
+              <p>카메라를<br>눈높이에 맞추고<br>정면을 바라봐 주세요!</p>
+              <span>✧</span>
+              <img src="/static/assets/oracle-pair-card.png" alt="">
+            </div>
+            <div class="capture-side-note capture-side-note-right" aria-hidden="true">
+              <p>밝은 곳에서<br>촬영하면 더<br>정확해요!</p>
+              <span>✧</span>
+              <img src="/static/assets/oracle-solo-card.png" alt="">
+            </div>
+            <div class="capture-privacy-veil" hidden>
+              <div class="veil-card">
+                <span class="veil-mark" aria-hidden="true">✦</span>
+                <strong>얼굴 인식 완료</strong>
+                <p>이제 리포트를 예쁘게 빚는 중이에요.</p>
+              </div>
             </div>
           </div>
+          <p id="workflow-status" class="hint capture-tip"><span aria-hidden="true">✧</span>{status_text}<span aria-hidden="true">☆</span></p>
         </div>
-        <p id="workflow-status" class="hint capture-tip"><span aria-hidden="true">✧</span>{status_text}<span aria-hidden="true">☆</span></p>
+        {debug_panel}
       </div>
         """
     else:
@@ -1132,6 +1249,67 @@ def _capture_preview_panel(
       {preview_content}
     </section>
     <section id="workflow-result"></section>
+    """
+    return result
+
+
+def _capture_debug_panel() -> str:
+    result = """
+      <aside class="capture-debug-panel" aria-label="랜드마크 디버그 정보">
+        <div class="capture-debug-head">
+          <span>LIVE</span>
+          <strong>랜드마크 비교</strong>
+        </div>
+        <div class="capture-debug-status">
+          <b id="capture-debug-state">idle</b>
+          <p id="capture-debug-message">촬영을 시작하면 랜드마크 측정값이 표시됩니다.</p>
+        </div>
+        <section>
+          <h3>계산된 metric</h3>
+          <pre id="capture-debug-metrics">- 측정 대기 중</pre>
+        </section>
+        <section>
+          <h3>매칭 observations</h3>
+          <pre id="capture-debug-observations">- 관찰 컨텍스트 대기 중</pre>
+        </section>
+      </aside>
+    """
+    return result
+
+
+def _compare_camera_page() -> str:
+    result = f"""
+    <div class="oracle-result-shell personal-result-shell compare-camera-shell">
+      <header class="personal-result-brand">
+        <div class="logo">ORACLE<span class="stamp serif">運</span></div>
+        <div class="tag">랜드마크 룰베이스 실측 비교</div>
+        <div class="ornament" aria-hidden="true"><span></span></div>
+      </header>
+      <div class="result-actions">
+        <button id="compare-camera-start" class="result-action result-action-primary" type="button">카메라 측정 시작</button>
+        <a class="result-action" href="/">홈으로</a>
+      </div>
+      {_capture_preview_panel(job_id="", skip_face=False, cute=True, compare_debug=True)}
+    </div>
+    """
+    return result
+
+
+def _compare_camera_result(artifact) -> str:
+    quality = artifact.quality
+    result = f"""
+    <section class="panel compare-camera-complete">
+      <h2>측정 완료</h2>
+      <p class="hint">최종 캡처 이미지 기준으로 계산된 metric과 observations는 오른쪽 패널에 남아 있어요.</p>
+      <details open>
+        <summary>최종 metric</summary>
+        <pre>{escape(quality.landmark_metrics_text)}</pre>
+      </details>
+      <details>
+        <summary>최종 observations</summary>
+        <pre>{escape(quality.landmark_context_text)}</pre>
+      </details>
+    </section>
     """
     return result
 
@@ -3021,6 +3199,111 @@ def _render_page(
             border-radius: 8px;
             background: #fff9f9;
           }}
+          .personal-result-shell .capture-debug-layout {{
+            display: block;
+          }}
+          .personal-result-shell .capture-stage-with-debug {{
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+            gap: 16px;
+            align-items: stretch;
+          }}
+          .capture-debug-panel {{
+            max-height: 640px;
+            overflow: auto;
+            padding: 18px;
+            border: 1px solid #bdd8c3;
+            border-radius: 10px;
+            background: #fbfff9;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+          }}
+          .capture-debug-head {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+          }}
+          .capture-debug-head span {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            min-height: 24px;
+            border-radius: 999px;
+            background: #42b883;
+            color: #ffffff;
+            font-family: "Gowun Dodum", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0;
+          }}
+          .capture-debug-head strong {{
+            color: #3f211b;
+            font-family: "Gowun Batang", serif;
+            font-size: 20px;
+          }}
+          .capture-debug-status {{
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border: 1px solid #d8eadb;
+            border-radius: 8px;
+            background: #ffffff;
+          }}
+          .capture-debug-status b {{
+            display: block;
+            margin-bottom: 4px;
+            color: #2f7d57;
+            font-size: 13px;
+          }}
+          .capture-debug-status p {{
+            margin: 0;
+            color: #71564d;
+            font-size: 13px;
+            line-height: 1.45;
+          }}
+          .capture-debug-panel section {{
+            margin-top: 14px;
+          }}
+          .capture-debug-panel h3 {{
+            margin: 0 0 8px;
+            color: #4a2f26;
+            font-family: "Gowun Batang", serif;
+            font-size: 16px;
+          }}
+          .capture-debug-panel pre {{
+            max-height: 230px;
+            margin: 0;
+            padding: 12px;
+            border: 1px solid #eadfd5;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #3f332f;
+            font-size: 12px;
+            line-height: 1.5;
+          }}
+          .compare-camera-shell .workflow-loading[hidden] {{
+            display: none;
+          }}
+          .compare-camera-shell .capture-preview {{
+            margin-top: 12px;
+          }}
+          .compare-camera-complete {{
+            margin-top: 18px;
+          }}
+          .compare-camera-complete h2 {{
+            margin-top: 0;
+          }}
+          .compare-camera-complete details {{
+            margin-top: 12px;
+          }}
+          @media (max-width: 980px) {{
+            .personal-result-shell .capture-stage-with-debug {{
+              grid-template-columns: 1fr;
+            }}
+            .capture-debug-panel {{
+              max-height: none;
+            }}
+          }}
           .personal-result-shell .capture-direction {{
             min-height: 86px;
             display: flex;
@@ -3470,6 +3753,31 @@ def _render_page(
             pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading);
           }}
 
+          const compareCameraStart = document.getElementById("compare-camera-start");
+          if (compareCameraStart) {{
+            compareCameraStart.addEventListener("click", async () => {{
+              const ui = workflowUi();
+              if (!ui) {{
+                return;
+              }}
+              compareCameraStart.disabled = true;
+              prepareWorkflowUi(ui, false);
+              ui.loading.dataset.compareCamera = "1";
+              startCaptureDebugPolling(ui.loading);
+              try {{
+                const response = await fetch("/api/compare-camera/start", {{
+                  method: "POST",
+                }});
+                const payload = await response.json();
+                ui.loading.dataset.workflowResultJob = payload.job_id;
+                pollWorkflow(payload.job_id, ui.status, ui.result, ui.loading);
+              }} catch (error) {{
+                ui.status.textContent = "카메라 비교 모드를 시작하지 못했습니다";
+                compareCameraStart.disabled = false;
+              }}
+            }});
+          }}
+
           function workflowUi() {{
             const loading = document.getElementById("workflow-loading");
             const preview = document.querySelector(".capture-preview");
@@ -3506,9 +3814,10 @@ def _render_page(
           async function pollWorkflow(jobId, status, result, loading) {{
             const downloadLink = document.getElementById("download-report-link");
             const preview = document.querySelector(".capture-preview");
+            const keepPreview = loading.dataset.compareCamera === "1";
             let done = false;
             while (!done) {{
-              await new Promise((resolve) => setTimeout(resolve, 30000));
+              await new Promise((resolve) => setTimeout(resolve, keepPreview ? 800 : 30000));
               const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
               const payload = await response.json();
               if (payload.phase === "generating") {{
@@ -3520,7 +3829,7 @@ def _render_page(
                 status.textContent = "완료";
                 loading.hidden = true;
                 loading.setAttribute("aria-busy", "false");
-                if (preview) {{
+                if (preview && !keepPreview) {{
                   preview.hidden = true;
                 }}
                 if (downloadLink) {{
@@ -3532,7 +3841,7 @@ def _render_page(
                 status.textContent = "오류";
                 loading.hidden = true;
                 loading.setAttribute("aria-busy", "false");
-                if (preview) {{
+                if (preview && !keepPreview) {{
                   activatePrivacyVeil(preview);
                 }}
                 done = true;
@@ -3542,6 +3851,47 @@ def _render_page(
                 }}
               }}
             }}
+          }}
+
+          function startCaptureDebugPolling(loading) {{
+            const panel = document.querySelector(".capture-debug-panel");
+            if (!panel || panel.dataset.polling === "1") {{
+              return;
+            }}
+            panel.dataset.polling = "1";
+            const stateEl = document.getElementById("capture-debug-state");
+            const messageEl = document.getElementById("capture-debug-message");
+            const metricsEl = document.getElementById("capture-debug-metrics");
+            const observationsEl = document.getElementById("capture-debug-observations");
+            const tick = async () => {{
+              try {{
+                const response = await fetch("/api/capture-debug?ts=" + Date.now());
+                const payload = await response.json();
+                if (stateEl) {{
+                  stateEl.textContent = payload.state || "unknown";
+                }}
+                if (messageEl) {{
+                  messageEl.textContent = payload.message || "";
+                }}
+                if (metricsEl) {{
+                  metricsEl.textContent = payload.metrics_text || "- 측정값 없음";
+                }}
+                if (observationsEl) {{
+                  observationsEl.textContent = payload.observations_text || "- 관찰값 없음";
+                }}
+              }} catch (error) {{
+                if (messageEl) {{
+                  messageEl.textContent = "디버그 정보를 불러오지 못했습니다";
+                }}
+              }}
+              const jobDone = loading.getAttribute("aria-busy") === "false";
+              if (!jobDone) {{
+                window.setTimeout(tick, 500);
+              }} else {{
+                panel.dataset.polling = "0";
+              }}
+            }};
+            tick();
           }}
 
           function activatePrivacyVeil(preview) {{

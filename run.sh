@@ -186,6 +186,7 @@ Commands:
   debug <cmd> [args...]    Run in debug mode (saves outputs to runs/debug/)
   kvfix <cmd> [args...]    Run with fixed prompt cache slots enabled (ctx default: 20480)
   release <cmd> [args...]  Run in release mode (temp output dir, deleted after run)
+  compare_camera           Start camera landmark comparison UI
   capture                  Run capture only
   prompt <args...>         Debug prompt generation
   prompt-run <args...>     Run prompt generation with LLM call
@@ -940,6 +941,9 @@ needs_llm_server() {
       capture | prompt | --help | -h)
         result=1
         ;;
+      compare_camera)
+        result=1
+        ;;
       prompt-run)
         case "${2:-}" in
           saju-reading | --help | -h | "")
@@ -973,7 +977,7 @@ needs_camera_device() {
     return 0
   fi
   case "$1" in
-    capture | serve)
+    capture | serve | compare_camera)
       return 0
       ;;
     debug | release)
@@ -1034,6 +1038,11 @@ main() {
         release_args=("serve")
       fi
       run_release_mode "${release_args[@]}"
+      ;;
+    compare_camera)
+      export ORACLE_CAPTURE_COMPARE_CAMERA=1
+      log "starting camera landmark comparison UI at http://${ORACLE_APP_HOST}:${ORACLE_APP_PORT}/compare-camera"
+      run_oracle serve
       ;;
     *)
       if needs_llm_server "${POSITIONAL_ARGS[@]}"; then
