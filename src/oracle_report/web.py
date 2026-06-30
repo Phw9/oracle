@@ -90,7 +90,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        body = """
+        body = f"""
         <div class="oracle-home-shell">
           <section id="oracle-home" class="home-view" aria-label="홈">
             <header class="home-nav">
@@ -215,24 +215,7 @@ def create_app() -> Flask:
             </div>
           </section>
 
-          <footer class="home-foot" aria-label="하단 메뉴">
-            <a class="foot-item foot-item-home foot-item-active" href="#oracle-home" data-home-tab="home">
-              <span class="foot-icon">⌂</span>
-              <span>홈</span>
-            </a>
-            <a class="foot-item" href="/personal">
-              <span class="foot-icon">▤</span>
-              <span>운세 리포트</span>
-            </a>
-            <a class="foot-item" href="/compatibility">
-              <span class="foot-icon">♡</span>
-              <span>궁합 리포트</span>
-            </a>
-            <a class="foot-item foot-item-more" href="#oracle-more" data-home-tab="more">
-              <span class="foot-icon">•••</span>
-              <span>더보기</span>
-            </a>
-          </footer>
+          {_bottom_nav("home", home_tabs=True)}
         </div>
         """
         result = _render_page("Oracle", body, page_class="home-page", show_heading=False)
@@ -298,7 +281,12 @@ def create_app() -> Flask:
                 return result
             except Exception as exc:
                 body = _error_panel(exc) + _compatibility_form()
-        result = _render_page("두 사람 궁합", body)
+        result = _render_page(
+            "두 사람 궁합",
+            body,
+            page_class="input-page",
+            show_heading=False,
+        )
         return result
 
     @app.post("/api/compatibility")
@@ -657,6 +645,38 @@ def _face_db_path() -> Path:
     return result
 
 
+def _bottom_nav(active: str, *, home_tabs: bool = False) -> str:
+    home_href = "#oracle-home" if home_tabs else "/#oracle-home"
+    more_href = "#oracle-more" if home_tabs else "/#oracle-more"
+    home_tab = ' data-home-tab="home"' if home_tabs else ""
+    more_tab = ' data-home-tab="more"' if home_tabs else ""
+    home_active = " foot-item-active" if active == "home" else ""
+    personal_active = " foot-item-active" if active == "personal" else ""
+    compatibility_active = " foot-item-active" if active == "compatibility" else ""
+    more_active = " foot-item-active" if active == "more" else ""
+    result = f"""
+    <footer class="home-foot" aria-label="하단 메뉴">
+      <a class="foot-item foot-item-home{home_active}" href="{home_href}"{home_tab}>
+        <span class="foot-icon">⌂</span>
+        <span>홈</span>
+      </a>
+      <a class="foot-item{personal_active}" href="/personal">
+        <span class="foot-icon">▤</span>
+        <span>운세 리포트</span>
+      </a>
+      <a class="foot-item{compatibility_active}" href="/compatibility">
+        <span class="foot-icon">♡</span>
+        <span>궁합 리포트</span>
+      </a>
+      <a class="foot-item foot-item-more{more_active}" href="{more_href}"{more_tab}>
+        <span class="foot-icon">•••</span>
+        <span>더보기</span>
+      </a>
+    </footer>
+    """
+    return result
+
+
 def _personal_form() -> str:
     mode_options = _face_analysis_mode_options()
     gender_options = _gender_options(required=True)
@@ -713,6 +733,7 @@ def _personal_form() -> str:
         <p class="footnote">입력한 정보와 촬영 이미지는 기기 안에서만 처리돼요.<br>Oracle은 재미를 위한 콘텐츠예요.</p>
       </div>
     </div>
+    {_bottom_nav("personal")}
     """
     return result
 
@@ -749,6 +770,7 @@ def _compatibility_form() -> str:
       <p class="hint">두 사람 정보를 먼저 입력한 뒤 첫 번째 사람을 촬영하고, 3초 후 두 번째 사람을 촬영합니다.</p>
       <button type="submit">두 사람 궁합 촬영 시작</button>
     </form>
+    {_bottom_nav("compatibility")}
     """
     return result
 
@@ -955,7 +977,7 @@ def _render_page(
           }}
           main.input-page {{
             width: min(860px, calc(100vw - 48px));
-            padding: 24px 0;
+            padding: 24px 0 112px;
           }}
           main.home-page {{
             width: min(1180px, calc(100vw - 48px));
