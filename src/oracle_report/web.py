@@ -219,10 +219,10 @@ def create_app() -> Flask:
                   <span class="more-kicker">ORACLE은 이렇게 달라요</span>
                   <h3>전통 지혜와 AI 기술의 완벽한 만남</h3>
                   <ul>
-                    <li><span>◎</span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
-                    <li><span>▤</span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
-                    <li><span>♡</span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
-                    <li><span>▣</span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
+                    <li><span><img src="/static/assets/target.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
+                    <li><span><img src="/static/assets/book.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
+                    <li><span><img src="/static/assets/love.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
+                    <li><span><img src="/static/assets/privacy.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
                   </ul>
                   <div class="more-note">
                     <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
@@ -231,7 +231,7 @@ def create_app() -> Flask:
                 </div>
               </article>
 
-              <article class="more-card">
+              <article class="more-card process-card">
                 <div class="more-copy">
                   <span class="more-kicker">분석 진행 과정</span>
                   <h3>오라와 함께 운명을 분석하는 과정</h3>
@@ -1981,9 +1981,9 @@ def _render_page(
             margin: 0 -12px -14px 0;
           }}
           .mode .mode-art-pair {{
-            width: 136px;
-            height: 156px;
-            margin-right: -12px;
+            width: 226px;
+            height: 154px;
+            margin: 0 -20px -10px 0;
           }}
           .feature-row {{
             display: grid;
@@ -2170,6 +2170,99 @@ def _render_page(
             font-size: 13px;
             font-style: normal;
             line-height: 1.55;
+          }}
+          .process-card .more-copy {{
+            max-width: 760px;
+            margin: 0 auto;
+          }}
+          .process-card .more-kicker,
+          .process-card .more-copy h3 {{
+            display: flex;
+            justify-content: center;
+            width: max-content;
+            margin-left: auto;
+            margin-right: auto;
+          }}
+          .process-card .more-copy h3 {{
+            width: auto;
+            text-align: center;
+          }}
+          .process-card .more-copy ol {{
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            max-width: 640px;
+            margin: 22px auto 0;
+          }}
+          .process-card .more-copy ol::before {{
+            content: "";
+            position: absolute;
+            top: 30px;
+            bottom: 30px;
+            left: 82px;
+            width: 2px;
+            background: repeating-linear-gradient(
+              to bottom,
+              #ffd0d9 0 8px,
+              transparent 8px 15px
+            );
+          }}
+          .process-card .more-copy li {{
+            position: relative;
+            grid-template-columns: 92px 1fr;
+            column-gap: 22px;
+            min-height: 104px;
+            padding: 18px 24px;
+            border-color: #ffe0d8;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: 0 12px 28px -24px rgba(74, 47, 38, 0.36);
+          }}
+          .process-card .more-copy li::after {{
+            content: "→";
+            position: absolute;
+            left: 106px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #d9c7bf;
+            font-family: "Gowun Batang", serif;
+            font-size: 21px;
+          }}
+          .process-card .more-copy li > span {{
+            width: 72px;
+            height: 72px;
+            background: #fff7f0;
+            color: #e6a25d;
+            font-size: 22px;
+            z-index: 1;
+          }}
+          .process-card .more-copy li strong,
+          .process-card .more-copy li em {{
+            margin-left: 18px;
+          }}
+          .process-card .more-copy li strong {{
+            font-size: 20px;
+          }}
+          .process-card .more-copy li em {{
+            font-size: 15px;
+            line-height: 1.7;
+          }}
+          .process-card .more-note {{
+            max-width: 760px;
+            min-height: 120px;
+            margin: 28px auto 0;
+            padding: 20px 28px;
+            border: 1px solid #ffe0d8;
+            border-radius: 22px;
+            background: linear-gradient(90deg, #fff2f6, rgba(255, 255, 255, 0.78));
+          }}
+          .process-card .more-note img {{
+            width: 96px;
+            height: 96px;
+          }}
+          .process-card .more-note strong {{
+            font-size: 21px;
           }}
           .faq-list {{
             display: grid;
