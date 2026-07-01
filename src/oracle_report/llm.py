@@ -51,9 +51,9 @@ class LlamaCppChatClient:
         payload = {
             "model": self._config.model,
             "messages": [
-                {"role": "user", "content": "1"}
+                {"role": "user", "content": "Explain what computer programming is in two short sentences."}
             ],
-            "max_tokens": 5,
+            "max_tokens": 40,
             "temperature": 0.1,
             "stream": False,
             "cache_prompt": False  # 프롬프트 캐시 기능 절대 미사용 (캐시 오염 방지)
@@ -65,7 +65,7 @@ class LlamaCppChatClient:
                 self._chat_completions_url(),
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=10.0
+                timeout=30.0
             )
             t1 = time.perf_counter()
             if response.status_code == 200:
