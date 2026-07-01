@@ -1,3 +1,8 @@
+# ==============================================================================
+# WARNING: Do NOT modify or break the distributed inference (TPS profiling, 
+# token generation speed caching, and model parameter size heuristic) 
+# implemented in this file. These mechanisms are highly sensitive to modification.
+# ==============================================================================
 from __future__ import annotations
 
 import json

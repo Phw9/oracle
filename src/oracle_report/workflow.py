@@ -1,3 +1,9 @@
+# ==============================================================================
+# WARNING: Do NOT modify or break the distributed inference (Priority Queue, 
+# speculative work stealing, dynamic compute score feedback, and relative 
+# yielding thresholds) implemented in this file. 
+# These mechanisms are highly sensitive to modification.
+# ==============================================================================
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor

@@ -1,3 +1,8 @@
+# ==============================================================================
+# WARNING: Do NOT modify or break the distributed inference (HTTP endpoints, 
+# status reporting, real-time score feedback, and frontend polling timeouts) 
+# implemented in this file. These mechanisms are highly sensitive to modification.
+# ==============================================================================
 from __future__ import annotations
 
 import json
