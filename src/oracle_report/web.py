@@ -219,10 +219,10 @@ def create_app() -> Flask:
                   <span class="more-kicker">ORACLE은 이렇게 달라요</span>
                   <h3>전통 지혜와 AI 기술의 완벽한 만남</h3>
                   <ul>
-                    <li><span>◎</span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
-                    <li><span>▤</span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
-                    <li><span>♡</span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
-                    <li><span>▣</span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
+                    <li><span><img src="/static/assets/target.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>정확하고 신뢰할 수 있는 AI 분석</strong><em>전통 명리학과 AI 기술을 결합해 분석해요.</em></li>
+                    <li><span><img src="/static/assets/book.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>전통 명리학 기반의 깊이 있는 해석</strong><em>오랜 지식을 AI가 체계적으로 풀어줘요.</em></li>
+                    <li><span><img src="/static/assets/love.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>쉽고 귀여운 UI</strong><em>복잡한 내용을 누구나 즐겁게 이해할 수 있어요.</em></li>
+                    <li><span><img src="/static/assets/privacy.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>완벽한 프라이버시 보호</strong><em>모든 데이터는 기기 안에서 안전하게 처리돼요.</em></li>
                   </ul>
                   <div class="more-note">
                     <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
