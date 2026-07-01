@@ -91,7 +91,20 @@ def test_compatibility_report_html_uses_structured_layout() -> None:
         repository.lookup(left),
         repository.lookup(right),
         "얼굴 관찰 fixture",
-        '{"essence":"궁합 핵심","action_title":"행동 제목","action_body":"행동 본문"}',
+        json.dumps(
+            {
+                "essence": "궁합 핵심",
+                "action_title": "행동 제목",
+                "action_body": "행동 본문",
+                "compatibility_score": 84,
+                "compatibility_score_label": "찰떡 보완형",
+                "compatibility_score_summary": "설렘과 안정감이 같이 살아나는 조합이에요.",
+                "compatibility_saju_score": 82,
+                "compatibility_face_score": 86,
+                "compatibility_mode_bonus": 8,
+            },
+            ensure_ascii=False,
+        ),
     )
 
     assert html.startswith("<!DOCTYPE html>")
@@ -99,6 +112,13 @@ def test_compatibility_report_html_uses_structured_layout() -> None:
     assert "궁합 핵심" in html
     assert "행동 제목" in html
     assert "left 님과 right 님" in html
+    assert "궁합 점수" in html
+    assert "compat-score-heart-card" in html
+    assert ">84</div>" in html
+    assert "/100" in html
+    assert "한 줄 평가" in html
+    assert "설렘과 안정감이 같이 살아나는 조합이에요." in html
+    assert html.index("궁합 점수") < html.index("관계를 채워주는 키워드")
 
 
 def test_compatibility_report_html_hides_synthesis_but_keeps_action_and_keywords() -> None:
@@ -146,6 +166,7 @@ def test_compatibility_report_html_hides_synthesis_but_keeps_action_and_keywords
     assert "액션 본문" in html
     assert "궁합 키워드" in html
     assert "cute-keyword-card" in html
+    assert "궁합 점수" in html
     assert html.index("궁합 키워드") < html.index("두 사람의 관계 분위기")
 
 

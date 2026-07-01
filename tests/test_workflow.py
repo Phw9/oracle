@@ -544,6 +544,7 @@ def test_compatibility_workflow_runs_without_real_camera_or_llm(tmp_path: Path) 
     assert "oracle-report" in result.report_fragment_html
     assert "두 사람 궁합 핵심 문장" in result.report_html
     assert "궁합 행동 제목" in result.report_html
+    assert "궁합 점수" in result.report_html
     assert result.left_capture_path.parent.name == "person_1"
     assert result.right_capture_path.parent.name == "person_2"
 
@@ -580,6 +581,7 @@ def test_compatibility_workflow_rulebase_mode_skips_face_llm(
     assert len(payload["pair_blocks"]) == 4
     assert "연인 관계에서는" in payload["pair_blocks"][0]["summary"]
     assert "두 사람의 관계 분위기" in result.report_html
+    assert "궁합 점수" in result.report_html
 
 
 def test_pair_rulebase_payload_reflects_compatibility_mode() -> None:

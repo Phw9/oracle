@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Generic, Protocol, TypeVar
 
 from oracle_report import prompt_templates
+from oracle_report.compatibility_score import build_compatibility_score_payload
 from oracle_report.config import CaptureConfig, LlmConfig
 from oracle_report.llm import LlamaCppChatClient
 from oracle_report.models import (
@@ -405,11 +406,20 @@ def run_compatibility_workflow(
         left_manse,
         right_manse,
     )
+    compatibility_score = timing_recorder.run(
+        "compatibility_score",
+        _build_compatibility_score_payload,
+        mode,
+        left_manse,
+        right_manse,
+        capture_artifact,
+    )
     markdown = timing_recorder.run(
         "final_report",
         _build_compatibility_report_json,
         face_analysis.text,
         saju_analysis.text,
+        compatibility_score,
     )
     report_html = timing_recorder.run(
         "render_report_html",
@@ -579,6 +589,22 @@ def _build_pair_rule_based_face_analysis(
     )
     text = json.dumps(payload, ensure_ascii=False)
     result = _GeneratedText(text=text, error="")
+    return result
+
+
+def _build_compatibility_score_payload(
+    mode: str,
+    left_manse: ManseLookupResult,
+    right_manse: ManseLookupResult,
+    artifact: SequentialPairCaptureArtifact,
+) -> dict[str, object]:
+    result = build_compatibility_score_payload(
+        mode,
+        left_manse,
+        right_manse,
+        _quality_rule_matches(artifact.left.quality),
+        _quality_rule_matches(artifact.right.quality),
+    )
     return result
 
 
@@ -777,6 +803,7 @@ def _build_personal_report_json(
 def _build_compatibility_report_json(
     face_analysis: str,
     saju_analysis: str,
+    compatibility_score: dict[str, object] | None = None,
 ) -> str:
     face_payload, face_error = _load_json_payload_or_error(
         face_analysis,
@@ -797,6 +824,8 @@ def _build_compatibility_report_json(
             f"renderer will fill missing saju fields. reason={saju_error}",
         )
     payload = _merge_compatibility_payloads(face_payload, saju_payload)
+    if compatibility_score is not None:
+        payload.update(compatibility_score)
     payload = _normalize_payload_text(payload)
     result = json.dumps(payload, ensure_ascii=False)
     return result
