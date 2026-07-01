@@ -1606,7 +1606,7 @@ def _generate_distributed(
             for worker_url, assigned_task in active_assignments.items():
                 if assigned_task is None:
                     continue
-                is_other_local = (worker_url == "local")
+                is_other_local = (worker_url == "local" or worker_url.startswith("local_"))
                 if is_my_local and not is_other_local:
                     if not is_task_done(assigned_task):
                         return copy.deepcopy(assigned_task)
@@ -1876,7 +1876,7 @@ def _generate_distributed(
                 speculative = True
 
             with assignments_lock:
-                active_assignments["local"] = task
+                active_assignments[threading.current_thread().name] = task
 
             is_meta = task["is_metadata"]
             cat = task["target_category"]
@@ -1935,7 +1935,7 @@ def _generate_distributed(
             elapsed = time.perf_counter() - start_time
 
             with assignments_lock:
-                active_assignments["local"] = None
+                active_assignments[threading.current_thread().name] = None
 
             local_updated_score = scheduler.slave_metadata.get("local", {}).get("compute_score", 5.0)
 
@@ -1968,8 +1968,12 @@ def _generate_distributed(
 
     for url in worker_urls:
         if url == "local":
-            for _ in range(2):
-                t = threading.Thread(target=local_worker_loop, daemon=True)
+            for i in range(2):
+                t = threading.Thread(
+                    target=local_worker_loop,
+                    name=f"local_{i}",
+                    daemon=True
+                )
                 t.start()
                 threads.append(t)
         else:
