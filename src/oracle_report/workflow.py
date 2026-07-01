@@ -1697,7 +1697,8 @@ def _generate_distributed(
             if not is_local:
                 now = time.time()
                 last_check = _LAST_STATUS_CHECK_TIMES.get(slave_url, 0.0)
-                if now - last_check >= 3.0:
+                cached_status = scheduler.slave_metadata.get(slave_url, {}).get("status", "idle")
+                if now - last_check >= 3.0 or cached_status == "busy":
                     _LAST_STATUS_CHECK_TIMES[slave_url] = now
                     try:
                         status_url = f"{slave_url.rstrip('/')}/api/distributed/status"
