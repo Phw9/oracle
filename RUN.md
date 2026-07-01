@@ -61,6 +61,13 @@ http://<raspberry-pi-ip>:8501
 
 ## 4. 프롬프트 확인
 
+실행 중 어떤 운영 프롬프트 파일이 사용되는지는 터미널 stderr의 `[PROMPT]` 로그에서 확인할 수 있습니다.
+
+```text
+[PROMPT] name=saju_reading source=configs/prompts_personal.json id_slot=1 prefix_chars=... body_chars=...
+[PROMPT] name=saju_reading_couple source=configs/prompts_compatibility.json id_slot=3 prefix_chars=... body_chars=...
+```
+
 개인 리포트 관상 분석 LLM 프롬프트 확인:
 
 
@@ -109,7 +116,7 @@ http://<raspberry-pi-ip>:8501
 
 `llm`은 프롬프트를 로컬 LLM에 보내고 LLM 응답만 출력합니다.
 
-개인 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
+개인 사주/만세력 조회 결과를 `configs/prompts_personal.json`의 `saju_reading` 프롬프트에 넣고 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm saju-reading \
@@ -119,7 +126,7 @@ http://<raspberry-pi-ip>:8501
   --gender male
 ```
 
-궁합 사주/만세력 조회 결과를 `configs/prompts.json`의 `saju_reading_couple` 프롬프트에 넣고 LLM 결과만 확인:
+궁합 사주/만세력 조회 결과를 `configs/prompts_compatibility.json`의 `saju_reading_couple` 프롬프트에 넣고 LLM 결과만 확인:
 
 ```bash
 ./run.sh llm saju-reading-couple \
@@ -152,7 +159,7 @@ http://<raspberry-pi-ip>:8501
 
 ## 6. 프롬프트 토큰 확인
 
-`token`은 현재 `configs/prompts.json`의 각 프롬프트 prefix/body 템플릿 토큰 크기를 출력합니다. 기본 실행은 로컬 llama.cpp `/tokenize`를 사용하므로 실제 모델 기준에 가깝습니다.
+`token`은 현재 운영 프롬프트 manifest가 include하는 각 프롬프트 prefix/body 템플릿 토큰 크기를 출력합니다. 기본 실행은 로컬 llama.cpp `/tokenize`를 사용하므로 실제 모델 기준에 가깝습니다.
 
 ```bash
 ./run.sh token
@@ -181,10 +188,12 @@ ORACLE_DEBUG_PROMPTS_PATH=configs/prompts_debug.json
 ORACLE_FACE_DB_PATH=data/face_recommendations.sqlite
 ```
 
-운영 프롬프트 템플릿은 다음 파일을 수정합니다.
+운영 프롬프트 템플릿은 개인/궁합 파일을 분리해서 수정합니다. `configs/prompts.json`은 두 파일을 include하는 manifest이므로 직접 문구를 넣지 않습니다.
 
 ```text
-configs/prompts.json
+configs/prompts_personal.json        # 개인 리포트 사주 프롬프트
+configs/prompts_compatibility.json  # 궁합 리포트 사주 프롬프트
+configs/prompts.json                # include manifest
 ```
 
 legacy/debug 프롬프트는 다음 파일을 수정합니다.
@@ -195,12 +204,12 @@ configs/prompts_debug.json
 
 주요 템플릿 키:
 
-- `saju_reading`: 런타임 만세력 계산 결과를 LLM에 보내는 사주 해설 프롬프트
-- `saju_reading_couple`: 두 사람의 만세력 계산 결과를 LLM에 보내는 궁합 사주 해설 프롬프트
+- `saju_reading`: `configs/prompts_personal.json`에 있는 개인 사주 해설 프롬프트
+- `saju_reading_couple`: `configs/prompts_compatibility.json`에 있는 궁합 사주 해설 프롬프트
 - `personal_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 - `compatibility_final`: `configs/prompts_debug.json`에만 있는 legacy/debug 프롬프트
 
-운영 프롬프트는 `configs/prompts.json`의 각 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. 일반 `./run.sh` 실행은 이전 방식처럼 전체 프롬프트를 하나의 user message로 보냅니다. 고정 slot prompt cache를 테스트하려면 `./run.sh kvfix ...`로 실행합니다. 이 모드에서는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보내고, 별도 `--ctx-size`를 주지 않으면 llama.cpp context 기본값을 `20480`으로 올립니다.
+운영 프롬프트는 각 분리 파일의 항목 안에서 `id_slot`, `prefix`, `body`로 명시적으로 관리합니다. 기본 manifest인 `configs/prompts.json`을 통해 두 파일을 병합해서 읽으므로 런타임과 분산추론에서 사용하는 프롬프트 이름과 `id_slot`은 기존과 같습니다. 일반 `./run.sh` 실행은 이전 방식처럼 전체 프롬프트를 하나의 user message로 보냅니다. 고정 slot prompt cache를 테스트하려면 `./run.sh kvfix ...`로 실행합니다. 이 모드에서는 `prefix`를 system message로, `body`를 user message로 보내며 프롬프트별 고정 `id_slot`과 `cache_prompt=true`를 함께 보내고, 별도 `--ctx-size`를 주지 않으면 llama.cpp context 기본값을 `20480`으로 올립니다.
 
 
 카메라 사용이 어렵거나 랜드마크 룰베이스를 재현 테스트해야 할 때는 mock capture를 켭니다.
@@ -264,6 +273,6 @@ test-results/pytest-latest.txt
 
 1. `requirements.txt` 또는 `./build.sh`로 라이브러리 설치
 2. `.env`의 `ORACLE_LLAMA_MODEL_PATH`와 `models/*.gguf` 확인
-3. `configs/prompts.json` 프롬프트 확인
+3. `configs/prompts_personal.json`, `configs/prompts_compatibility.json` 프롬프트 확인
 4. `python -m pytest` 실행
 5. `./run.sh`로 웹 UI 실행

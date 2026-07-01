@@ -847,7 +847,7 @@ def _render_saju_only_report_body(view: _PersonalReportView) -> str:
 
   <header class="saju-hero fade">
     <div class="saju-brand"><span>✧</span>ORACLE<span>✧</span></div>
-    <div class="saju-brand-sub">관상 &amp; 사주 리포트</div>
+    <div class="saju-brand-sub">사주 리포트</div>
     <div class="saju-brand-line">※</div>
     <span class="saju-cloud saju-cloud-left" aria-hidden="true"></span>
     <span class="saju-spark saju-spark-left" aria-hidden="true">✧</span>

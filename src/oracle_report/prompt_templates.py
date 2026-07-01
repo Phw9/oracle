@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass
 from collections.abc import Mapping
 from pathlib import Path
@@ -66,7 +67,7 @@ class PromptTemplateInfo:
 
 
 def render_prompt_template(name: str, values: Mapping[str, object]) -> RenderedPrompt:
-    templates = _load_prompt_templates(_prompt_templates_path())
+    templates, sources = _load_prompt_templates_with_sources(_prompt_templates_path())
     template_parts = _template_parts(templates, name)
     string_values = {key: str(value) for key, value in values.items()}
     prefix = Template(template_parts.prefix).substitute(string_values).strip()
@@ -77,6 +78,7 @@ def render_prompt_template(name: str, values: Mapping[str, object]) -> RenderedP
         body=body,
         slot_id=template_parts.slot_id,
     )
+    _log_prompt_render(name, template_parts, sources.get(name), result)
     return result
 
 
@@ -118,12 +120,90 @@ def _configured_prompt_path(env_name: str, default_path: Path) -> Path:
 
 
 def _load_prompt_templates(path: Path) -> dict[str, Any]:
+    result, _sources = _load_prompt_templates_with_sources(path)
+    return result
+
+
+def _load_prompt_templates_with_sources(path: Path) -> tuple[dict[str, Any], dict[str, Path]]:
     with path.open(encoding="utf-8") as prompt_file:
         root = json.load(prompt_file)
     if not isinstance(root, dict):
         raise ValueError(f"prompt template file must contain a JSON object: {path}")
-    result = root
+    result = _resolve_prompt_template_root(root, path)
     return result
+
+
+def _resolve_prompt_template_root(
+    root: Mapping[str, Any],
+    path: Path,
+) -> tuple[dict[str, Any], dict[str, Path]]:
+    include_value = root.get("include")
+    if include_value is None:
+        result = dict(root)
+        sources = {name: path for name in result}
+        return result, sources
+    if not isinstance(include_value, list) or not all(
+        isinstance(item, str) for item in include_value
+    ):
+        raise ValueError(
+            "prompt template include must be a list of file paths: "
+            f"{path}",
+        )
+    result: dict[str, Any] = {}
+    sources: dict[str, Path] = {}
+    for include_path_text in include_value:
+        include_path = Path(include_path_text)
+        if not include_path.is_absolute():
+            include_path = path.parent / include_path
+        included_templates, included_sources = _load_prompt_templates_with_sources(
+            include_path,
+        )
+        duplicate_names = set(result).intersection(included_templates)
+        if duplicate_names:
+            duplicate_list = ", ".join(sorted(duplicate_names))
+            raise ValueError(
+                "duplicate prompt template names across included files: "
+                f"{duplicate_list}",
+            )
+        result.update(included_templates)
+        sources.update(included_sources)
+    inline_templates = {
+        key: value
+        for key, value in root.items()
+        if key != "include"
+    }
+    duplicate_names = set(result).intersection(inline_templates)
+    if duplicate_names:
+        duplicate_list = ", ".join(sorted(duplicate_names))
+        raise ValueError(
+            "duplicate prompt template names between include and manifest: "
+            f"{duplicate_list}",
+        )
+    result.update(inline_templates)
+    sources.update({name: path for name in inline_templates})
+    return result, sources
+
+
+def _log_prompt_render(
+    name: str,
+    template_parts: PromptTemplateInfo,
+    source_path: Path | None,
+    rendered: RenderedPrompt,
+) -> None:
+    source_text = "unknown"
+    if source_path is not None:
+        source_text = source_path.as_posix()
+    slot_text = "none" if template_parts.slot_id is None else str(template_parts.slot_id)
+    print(
+        "[PROMPT] "
+        f"name={name} "
+        f"source={source_text} "
+        f"id_slot={slot_text} "
+        f"prefix_chars={len(rendered.prefix)} "
+        f"body_chars={len(rendered.body)}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _template_text(templates: Mapping[str, Any], name: str) -> str:

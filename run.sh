@@ -190,7 +190,7 @@ Commands:
   capture                  Run capture only
   prompt <args...>         Debug prompt generation
   prompt-run <args...>     Run prompt generation with LLM call
-  token                    Print prompts.json prefix token sizes
+  token                    Print runtime prompt prefix token sizes
   (empty)                  Start Flask web server (default)
 
 Wrapper Options:

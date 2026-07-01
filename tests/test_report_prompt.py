@@ -21,9 +21,24 @@ _PROMPT_TEMPLATE_NAMES = (
 def test_runtime_prompts_define_explicit_cache_prefixes() -> None:
     prompt_path = Path("configs/prompts.json")
     root = json.loads(prompt_path.read_text(encoding="utf-8"))
+    assert root == {
+        "include": [
+            "prompts_personal.json",
+            "prompts_compatibility.json",
+        ],
+    }
 
+    template_info = {
+        info.name: info for info in prompt_templates.list_prompt_template_info()
+    }
     for prompt_name in _PROMPT_TEMPLATE_NAMES:
-        prompt_config = root[prompt_name]
+        prompt_config = json.loads(
+            Path(
+                "configs/prompts_personal.json"
+                if prompt_name == "saju_reading"
+                else "configs/prompts_compatibility.json",
+            ).read_text(encoding="utf-8"),
+        )[prompt_name]
 
         assert isinstance(prompt_config, dict)
         assert isinstance(prompt_config["id_slot"], int)
@@ -33,6 +48,80 @@ def test_runtime_prompts_define_explicit_cache_prefixes() -> None:
         assert prompt_config["body"]
         assert "${" not in "\n".join(prompt_config["prefix"])
         assert "${" in "\n".join(prompt_config["body"])
+        assert prompt_name in template_info
+        assert template_info[prompt_name].slot_id == prompt_config["id_slot"]
+
+
+def test_prompt_template_manifest_can_include_split_files(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    personal_path = tmp_path / "personal.json"
+    compatibility_path = tmp_path / "compatibility.json"
+    manifest_path = tmp_path / "manifest.json"
+    personal_path.write_text(
+        json.dumps(
+            {
+                "saju_reading": {
+                    "id_slot": 11,
+                    "prefix": ["PERSONAL ${name}"],
+                    "body": ["${saju_text}"],
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    compatibility_path.write_text(
+        json.dumps(
+            {
+                "saju_reading_couple": {
+                    "id_slot": 12,
+                    "prefix": ["COUPLE ${left_name} ${right_name}"],
+                    "body": ["${left_saju_text} ${right_saju_text}"],
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "include": [
+                    personal_path.name,
+                    compatibility_path.name,
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ORACLE_PROMPTS_PATH", str(manifest_path))
+
+    profile = BirthProfile(name="tester", birth_datetime=datetime(1995, 3, 15, 14, 30))
+    personal_prompt = build_saju_reading_prompt(profile, "SAJU")
+    couple_prompt = build_couple_saju_reading_prompt(
+        profile,
+        profile,
+        "친구",
+        "LEFT",
+        "RIGHT",
+    )
+
+    assert personal_prompt.prefix == "PERSONAL tester"
+    assert personal_prompt.body == "SAJU"
+    assert personal_prompt.slot_id == 11
+    assert couple_prompt.prefix == "COUPLE tester tester"
+    assert couple_prompt.body == "LEFT RIGHT"
+    assert couple_prompt.slot_id == 12
+    stderr = capsys.readouterr().err
+    assert "[PROMPT] name=saju_reading" in stderr
+    assert "source=" in stderr
+    assert personal_path.as_posix() in stderr
+    assert "[PROMPT] name=saju_reading_couple" in stderr
+    assert compatibility_path.as_posix() in stderr
 
 
 def test_saju_reading_prompt_omits_face_and_recommendation_schema() -> None:
