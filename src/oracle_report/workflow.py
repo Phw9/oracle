@@ -1722,29 +1722,7 @@ def _generate_distributed(
                 except Exception:
                     compute_score = 5.0
 
-            # Task Routing based on performance
-            if not speculative:
-                is_core_category = cat in (
-                    "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
-                    "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
-                    "첫인상과 분위기", "관계 강점",
-                    "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
-                )
-                if is_core_category:
-                    has_idle_faster_remote_slave = any(
-                        (addr != "local" and meta.get("status") == "idle" and get_virtual_score(addr, meta.get("compute_score", 0.0)) > get_virtual_score(slave_url, compute_score) and addr != slave_url)
-                        for addr, meta in scheduler.slave_metadata.items()
-                    )
-                    has_strictly_faster_slave = any(
-                        (addr != "local" and get_virtual_score(addr, meta.get("compute_score", 0.0)) > get_virtual_score(slave_url, compute_score) and addr != slave_url)
-                        for addr, meta in scheduler.slave_metadata.items()
-                    )
-                    yield_task = has_idle_faster_remote_slave or has_strictly_faster_slave
-                    if yield_task:
-                        put_task(task)
-                        task_queue.task_done()
-                        time.sleep(0.5)
-                        continue
+            # Direct processing without yielding
 
             rendered = None
             if is_local or app_config.debug:
