@@ -1818,6 +1818,8 @@ def _generate_distributed(
                 consecutive_failures += 1
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on {device_name} in {elapsed:.2f}s. Error: {error_msg} (Worker Score: {my_updated_score:.2f}, Master Score: {local_updated_score:.2f})")
                 if not speculative:
+                    if is_task_done(task):
+                        continue
                     task["retries"] += 1
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Task {cat or 'metadata'} failed on {slave_url} (Error: {error_msg}). Retrying ({task['retries']}/3)...")
@@ -1918,6 +1920,8 @@ def _generate_distributed(
             else:
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on local (127.0.0.1) in {elapsed:.2f}s. Error: {error_msg} (Local Score: {local_updated_score:.2f})")
                 if not speculative:
+                    if is_task_done(task):
+                        continue
                     task["retries"] += 1
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Local task {cat or 'metadata'} failed (Error: {error_msg}). Retrying ({task['retries']}/3)...")
