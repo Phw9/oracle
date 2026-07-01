@@ -512,7 +512,7 @@ def _default_compatibility_saju_blocks(
     right_summary = " ".join(right_manse.reading.summary_lines)
     result = (
         {
-            "category": "사주 기반 관계 구조",
+            "category": "관계 구조",
             "title": "두 사람의 기본 기운",
             "summary": "각자의 일간과 오행 분포를 비교해 관계의 큰 흐름을 봅니다.",
             "body": f"첫 번째 사람은 {left_summary} 두 번째 사람은 {right_summary} 이 차이는 {mode} 관계에서 서로가 어떤 속도로 움직이는지 참고하는 기준이 됩니다.",

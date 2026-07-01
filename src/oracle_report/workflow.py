@@ -719,7 +719,7 @@ def _build_compatibility_saju_analysis(
     distributed_app_config = _load_active_distributed_app_config()
     if distributed_app_config is not None:
         from oracle_report.saju.repository import birth_time_display_from_profile
-        categories = ("관계 구조", "상호 보완", "갈등 관리", "실천 제안")
+        categories = ("관계 구조", "상호 보완", "갈등 관리", "현재 관계 흐름", "실천 제안", "총평 및 조언")
         values = {
             "mode": mode,
             "left_name": left_profile.name,
