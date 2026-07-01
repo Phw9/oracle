@@ -1804,6 +1804,11 @@ def _generate_distributed(
                 with _COMPLETED_TIMES_LOCK:
                     _LAST_COMPLETED_TIMES[slave_url] = time.time()
                 print(f"[Distributed] Task '{cat or 'metadata'}' completed on {device_name} in {elapsed:.2f}s (Worker Score: {my_updated_score:.2f}, Master Score: {local_updated_score:.2f})")
+                if app_config.debug:
+                    print(f"\n--- [DEBUG: Distributed Response from {device_name}] ---")
+                    print(f"Category: {cat or 'metadata'}")
+                    print(f"Output:\n{output}")
+                    print("-" * 50 + "\n", flush=True)
                 already_done = is_task_done(task)
                 if not already_done:
                     mark_task_done(task)
@@ -1900,6 +1905,11 @@ def _generate_distributed(
                 with _COMPLETED_TIMES_LOCK:
                     _LAST_COMPLETED_TIMES["local"] = time.time()
                 print(f"[Distributed] Task '{cat or 'metadata'}' completed on local (127.0.0.1) in {elapsed:.2f}s (Local Score: {local_updated_score:.2f})")
+                if app_config.debug:
+                    print(f"\n--- [DEBUG: Distributed Local Response] ---")
+                    print(f"Category: {cat or 'metadata'}")
+                    print(f"Output:\n{output}")
+                    print("-" * 50 + "\n", flush=True)
                 already_done = is_task_done(task)
                 if not already_done:
                     mark_task_done(task)
