@@ -3827,7 +3827,7 @@ def _render_page(
             const skipFace = loading.dataset.skipFace === "1";
             let done = false;
             while (!done) {{
-              await new Promise((resolve) => setTimeout(resolve, keepPreview ? 800 : 30000));
+              await new Promise((resolve) => setTimeout(resolve, 30000)); /* 로그 주기 수정하지 말 것 */
               const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
               const payload = await response.json();
               if (payload.phase === "generating") {{
