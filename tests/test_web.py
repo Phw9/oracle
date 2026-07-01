@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 
@@ -177,6 +179,56 @@ def test_compare_camera_start_returns_live_status(monkeypatch) -> None:
     assert response.status_code == 200
     assert payload == {"status": "running", "message": "ok"}
     assert "job_id" not in payload
+
+
+def test_capture_debug_payload_shows_only_judgement_item_and_tag() -> None:
+    from oracle_report.models import CaptureDecision, FaceQuality
+    from oracle_report.web import _capture_debug_payload
+
+    quality = FaceQuality(
+        ready=True,
+        landmark_metrics_text="third_balance_error=0.123",
+        landmark_context_text=(
+            "- 항목: 삼정균형 | 판정: 삼정 편차 강조형 | 근거: 샘플 | 관찰: 샘플 | 측정값: 0.123"
+        ),
+        landmark_matches_json=json.dumps(
+            [
+                {
+                    "title": "삼정균형",
+                    "tag": "삼정 편차 강조형",
+                    "basis": "샘플",
+                    "observation": "샘플",
+                    "value": 0.123,
+                },
+                {
+                    "title": "눈 비율",
+                    "tag": "눈매 강조형",
+                    "basis": "샘플",
+                    "observation": "샘플",
+                    "value": 0.456,
+                },
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    decision = CaptureDecision(
+        state="tracking",
+        elapsed_seconds=0.0,
+        face=None,
+        quality=quality,
+        should_capture=False,
+        message="측정 중",
+    )
+
+    payload = _capture_debug_payload(decision, live=True)
+
+    assert payload["observations_text"] == (
+        "항목: 삼정균형 | 판정: 삼정 편차 강조형\n"
+        "항목: 눈 비율 | 판정: 눈매 강조형"
+    )
+    assert "근거" not in payload["observations_text"]
+    assert "관찰" not in payload["observations_text"]
+    assert "측정값" not in payload["observations_text"]
 
 
 def test_compatibility_api_returns_result_url(monkeypatch) -> None:

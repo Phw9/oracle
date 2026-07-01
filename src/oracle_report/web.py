@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
@@ -864,13 +865,34 @@ def _capture_debug_payload(decision, *, live: bool = False) -> dict[str, object]
                 "ready": bool(getattr(quality, "ready", False)),
                 "metrics_text": getattr(quality, "landmark_metrics_text", "")
                 or "- 얼굴 랜드마크 측정값 없음",
-                "observations_text": getattr(quality, "landmark_context_text", "")
-                or "- 매칭된 관찰값 없음",
+                "observations_text": _format_compare_judgement_text(quality),
                 "rules_text": getattr(quality, "landmark_rules_text", "")
                 or "- 룰 힌트 없음",
                 "warnings": list(getattr(quality, "warnings", ()) or ()),
             },
         )
+    return result
+
+
+def _format_compare_judgement_text(quality) -> str:
+    raw_text = getattr(quality, "landmark_matches_json", "").strip()
+    if not raw_text:
+        return "- 판정 결과 없음"
+    try:
+        matches = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return "- 판정 결과 없음"
+    if not isinstance(matches, list):
+        return "- 판정 결과 없음"
+    lines: list[str] = []
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        title = str(match.get("title", "")).strip()
+        tag = str(match.get("tag", "")).strip()
+        if title and tag:
+            lines.append(f"항목: {title} | 판정: {tag}")
+    result = "\n".join(lines) if lines else "- 판정 결과 없음"
     return result
 
 
