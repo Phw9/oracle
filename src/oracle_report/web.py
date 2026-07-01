@@ -254,10 +254,10 @@ def create_app() -> Flask:
                   <span class="more-kicker">오라가 도와줄게요</span>
                   <h3>궁금할 때 바로 확인하는 도움말</h3>
                   <div class="faq-list">
-                    <div><span>▣</span><strong>얼굴 사진은 어떻게 찍어야 하나요?</strong><em>정면을 바라보고 밝은 곳에서 찍어주세요.</em></div>
-                    <div><span>▦</span><strong>사주 정보는 어떻게 입력하나요?</strong><em>정확한 생년월일시를 입력해주시면 돼요.</em></div>
-                    <div><span>▤</span><strong>분석 결과는 어디서 확인하나요?</strong><em>운세 리포트에서 언제든 확인할 수 있어요.</em></div>
-                    <div><span>▣</span><strong>개인 정보는 안전한가요?</strong><em>100% 온디바이스 처리로 안전해요.</em></div>
+                    <div><span><img src="/static/assets/camera.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>얼굴 사진은 어떻게 찍어야 하나요?</strong><em>정면을 바라보고 밝은 곳에서 찍어주세요.</em></div>
+                    <div><span><img src="/static/assets/calendar.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>사주 정보는 어떻게 입력하나요?</strong><em>정확한 생년월일시를 입력해주시면 돼요.</em></div>
+                    <div><span><img src="/static/assets/report.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>분석 결과는 어디서 확인하나요?</strong><em>운세 리포트에서 언제든 확인할 수 있어요.</em></div>
+                    <div><span><img src="/static/assets/privacy.png" width="35" height="35" alt="" aria-hidden="true"></span><strong>개인 정보는 안전한가요?</strong><em>100% 온디바이스 처리로 안전해요.</em></div>
                   </div>
                   <div class="more-note">
                     <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
