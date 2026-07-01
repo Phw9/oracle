@@ -6,9 +6,9 @@ from oracle_report.models import FaceBox
 
 
 _CENTER_REGION_RATIO = 1.0 / 3.0
-_HEAD_WIDTH_MIN_DIMENSION_RATIO = 0.58
+_HEAD_WIDTH_MIN_DIMENSION_RATIO = 0.435
 _HEAD_HEIGHT_TO_WIDTH_RATIO = 1.14
-_HEAD_TOP_FRAME_RATIO = 0.20
+_HEAD_CENTER_Y_RATIO = 0.50
 _HEAD_CENTER_TOLERANCE_RATIO = 0.26
 _HEAD_SIZE_TOLERANCE_RATIO = 0.32
 _SHOULDER_WIDTH_TO_HEAD_RATIO = 2.35
@@ -39,7 +39,8 @@ def build_capture_guide(frame_width: int, frame_height: int) -> CaptureGuide:
     head_width = int(round(min_dimension * _HEAD_WIDTH_MIN_DIMENSION_RATIO))
     head_height = int(round(head_width * _HEAD_HEIGHT_TO_WIDTH_RATIO))
     head_x = int(round((frame_width - head_width) * 0.5))
-    head_y = int(round(frame_height * _HEAD_TOP_FRAME_RATIO))
+    head_center_y = frame_height * _HEAD_CENTER_Y_RATIO
+    head_y = int(round(head_center_y - (head_height * 0.5)))
     head_box = FaceBox(head_x, head_y, head_width, head_height)
     result = CaptureGuide(
         center_region=FaceBox(

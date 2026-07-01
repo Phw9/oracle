@@ -39,10 +39,10 @@ class FakeAnalyzer:
         return result
 
 
-def test_capture_guide_places_larger_head_box_near_center() -> None:
+def test_capture_guide_places_smaller_head_box_at_frame_center() -> None:
     guide = build_capture_guide(640, 480)
 
-    assert guide.head_box == FaceBox(181, 96, 278, 317)
+    assert guide.head_box == FaceBox(216, 121, 209, 238)
 
 
 def test_capture_requires_two_seconds_of_stable_face() -> None:

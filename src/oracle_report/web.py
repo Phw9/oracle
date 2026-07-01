@@ -3785,13 +3785,13 @@ def _render_page(
             position: absolute;
             z-index: 4;
             left: 50%;
-            top: 19.6%;
-            height: 66%;
+            top: 50%;
+            height: 49.5%;
             aspect-ratio: 0.879;
             border: 3px dashed #ffb0c0;
             border-radius: 10px;
             box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.54);
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
           }}
           .personal-result-shell .face-guide::before,
           .personal-result-shell .face-guide::after {{
