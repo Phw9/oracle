@@ -1716,11 +1716,6 @@ def _generate_distributed(
                 
                 meta_info = scheduler.slave_metadata.get(slave_url, {})
                 compute_score = meta_info.get("compute_score", 5.0)
-                if meta_info.get("status") == "busy" and not speculative:
-                    put_task(task)
-                    task_queue.task_done()
-                    time.sleep(0.5)
-                    continue
             else:
                 try:
                     compute_score = local_client.get_compute_score()
