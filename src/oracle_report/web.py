@@ -1214,7 +1214,7 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
 
 def _compatibility_result_page(job_id: str) -> str:
     result = f"""
-    <div class="oracle-result-shell">
+    <div class="oracle-result-shell compatibility-result-shell">
       <div class="brand">
         <div class="logo">ORACLE</div>
         <div class="tag">두 사람 궁합 결과</div>
@@ -3018,12 +3018,17 @@ def _render_page(
             width: min(1120px, calc(100vw - 56px));
             padding: 24px 0 112px;
           }}
+          body.saju-report-ready main.result-page {{
+            width: min(1120px, calc(100vw - 56px));
+            padding-top: 0;
+          }}
           body.saju-report-ready main.personal-result-page {{
             padding-top: 0;
           }}
           body.saju-report-ready .personal-result-shell > .result-topbar,
           body.saju-report-ready .personal-result-shell > .personal-result-brand,
-          body.saju-report-ready .personal-result-shell > .result-sky {{
+          body.saju-report-ready .personal-result-shell > .result-sky,
+          body.saju-report-ready .compatibility-result-shell > .brand {{
             display: none;
           }}
           .personal-result-shell {{
@@ -3949,7 +3954,7 @@ def _render_page(
               }}
               if (payload.status === "complete") {{
                 result.innerHTML = payload.html;
-                if (skipFace || result.querySelector(".cute-personal-report")) {{
+                if (skipFace || result.querySelector(".cute-personal-report, .cute-compatibility-report")) {{
                   document.body.classList.add("saju-report-ready");
                 }}
                 status.textContent = "완료";

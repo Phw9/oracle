@@ -908,31 +908,174 @@ def _render_saju_only_report_body(view: _PersonalReportView) -> str:
 
 def _render_compatibility_report_body(view: _CompatibilityReportView) -> str:
     result = f"""
-<div class="oracle-report compatibility-report">
-<div class="wrap">
-  <header class="fade">
-    <div class="eyebrow">Oracle · 두 사람 궁합 리포트</div>
-    <div class="pair-mark">
-      {_render_person_mark(view.left)}
-      <span class="pair-x">×</span>
-      {_render_person_mark(view.right)}
-    </div>
-    <div class="name">{escape(view.left.name)} 님과 {escape(view.right.name)} 님</div>
-    <div class="meta">{escape(view.mode)} 궁합 리포트</div>
-    <p class="essence serif">{escape(view.essence)}</p>
+<div class="oracle-report saju-only-report cute-compatibility-report">
+<div class="saju-wrap compat-cute-wrap">
+  <div class="saju-page-nav">
+    <a class="saju-round" href="/compatibility" aria-label="입력 화면으로 돌아가기">‹</a>
+    <a class="saju-round" href="/" aria-label="처음으로">♡</a>
+  </div>
+
+  <header class="saju-hero compat-cute-hero fade">
+    <div class="saju-brand"><span>✧</span>ORACLE<span>✧</span></div>
+    <div class="saju-brand-sub">우리 궁합 리포트</div>
+    <div class="saju-brand-line">×</div>
+    <span class="saju-cloud saju-cloud-left" aria-hidden="true"></span>
+    <span class="saju-spark saju-spark-left" aria-hidden="true">✧</span>
+    <span class="saju-spark saju-spark-right" aria-hidden="true">✧</span>
   </header>
-  {_render_pair_profiles(view)}
-  {_render_part("pair", "01", "두 사람의 관계 분위기", view.pair_subtitle, view.pair_blocks)}
-  {_render_part("saju", "02", "사주로 보는 상호 보완", view.saju_subtitle, view.saju_blocks)}
-  {_render_compatibility_synthesis(view)}
-  {_render_action_panel(view)}
-  {_render_tags(view.tags)}
-  <footer>
-    <div class="logo">ORACLE</div>
-    <p class="disc">{escape(view.disclaimer)}</p>
-  </footer>
+
+  <section class="compat-hero-card fade">
+    <img class="compat-hero-left" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+    <div class="compat-hero-main">
+      <div class="compat-day-pair">
+        {_render_cute_compat_mark(view.left)}
+        <span aria-hidden="true">×</span>
+        {_render_cute_compat_mark(view.right)}
+      </div>
+      <h1>{escape(view.left.name)} 님과 {escape(view.right.name)} 님</h1>
+      <div class="compat-mode">{escape(view.mode)} 궁합 리포트</div>
+      <p>{escape(view.essence)}</p>
+    </div>
+    <img class="compat-hero-right" src="/static/assets/oracle-character.png" alt="" aria-hidden="true">
+    <span class="compat-heart-float one" aria-hidden="true">♡</span>
+    <span class="compat-heart-float two" aria-hidden="true">♡</span>
+  </section>
+
+  <section class="compat-profile-card fade">
+    {_render_cute_compat_profile(view.left, "첫 번째 사람")}
+    <div class="compat-profile-heart" aria-hidden="true">♡</div>
+    {_render_cute_compat_profile(view.right, "두 번째 사람")}
+  </section>
+
+  {_render_cute_compat_section("01", "두 사람의 관계 분위기", view.pair_subtitle, view.pair_blocks, "/static/assets/oracle-pair-card.png")}
+  {_render_cute_compat_section("02", "사주로 보는 상호 보완", view.saju_subtitle, view.saju_blocks, "/static/assets/oracle-character.png")}
+  {_render_cute_compat_action(view)}
+  {_render_cute_compat_summary(view)}
+
+  <section class="saju-disclaimer compat-disclaimer fade">
+    <div class="saju-disclaimer-icon">💡</div>
+    <p>{escape(view.disclaimer)}</p>
+    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+  </section>
 </div>
 </div>
+"""
+    return result
+
+
+def _render_cute_compat_mark(person: _CompatibilityPersonView) -> str:
+    result = f"""
+      <span class="saju-day-mark compat-day-mark {escape(person.day_master_class)}">
+        <span class="saju-day-hanja">{escape(person.day_master_hanja)}</span>
+        <span class="saju-day-label">{escape(person.day_master_label)}</span>
+      </span>
+"""
+    return result
+
+
+def _render_cute_compat_profile(person: _CompatibilityPersonView, label: str) -> str:
+    result = f"""
+    <article class="compat-person-cute">
+      <div class="compat-person-label">♡ {escape(label)} ♡</div>
+      <h2>{escape(person.name)} 님</h2>
+      <div class="compat-person-meta">{escape(person.meta)}</div>
+      {_render_cute_compat_mark(person)}
+      <p>{escape(person.element_note)}</p>
+      <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+    </article>
+"""
+    return result
+
+
+def _render_cute_compat_section(
+    number: str,
+    title: str,
+    subtitle: str,
+    blocks: tuple[_ReportBlock, ...],
+    image: str,
+) -> str:
+    block_html = "\n".join(
+        _render_cute_compat_block(block, index)
+        for index, block in enumerate(blocks)
+    )
+    result = f"""
+  <section class="compat-cute-section fade">
+    <div class="compat-section-head">
+      <h2><span>{escape(number)}</span>{escape(title)} <b aria-hidden="true">♡</b></h2>
+      <p>{escape(subtitle)}</p>
+    </div>
+    <div class="compat-section-body">
+      <img class="compat-section-ora" src="{image}" alt="" aria-hidden="true">
+      <div class="compat-block-list">
+        {block_html}
+      </div>
+    </div>
+  </section>
+"""
+    return result
+
+
+def _render_cute_compat_block(block: _ReportBlock, index: int) -> str:
+    icons = ("♡", "✧", "☘", "☆")
+    icon = icons[index % len(icons)]
+    result = f"""
+        <article class="compat-cute-block">
+          <span class="compat-block-icon" aria-hidden="true">{icon}</span>
+          <div>
+            <div class="saju-block-cat">{escape(block.category)}</div>
+            <h3>{escape(block.title)}</h3>
+            <p class="saju-block-summary">{escape(block.summary)}</p>
+            <p>{_paragraphs(block.body)}</p>
+          </div>
+        </article>
+"""
+    return result
+
+
+def _render_cute_compat_action(view: _CompatibilityReportView) -> str:
+    result = f"""
+  <section class="compat-cute-section compat-action-cute fade">
+    <div class="compat-section-head">
+      <h2><span>03</span>{escape(view.action_title)} <b aria-hidden="true">♡</b></h2>
+      <p>적절한 거리로 더 오래 가는 관계</p>
+    </div>
+    <div class="compat-action-body">
+      <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+      <p>{_paragraphs(view.action_body)}</p>
+    </div>
+  </section>
+"""
+    return result
+
+
+def _render_cute_compat_summary(view: _CompatibilityReportView) -> str:
+    chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
+    convergence = "\n".join(
+        f"""
+        <div class="cute-convergence-row">
+          <span>{escape(item.face)}</span>
+          <b aria-hidden="true">×</b>
+          <span>{escape(item.saju)}</span>
+        </div>
+"""
+        for item in view.convergence
+    )
+    result = f"""
+  <section class="saju-card saju-summary-card compat-summary-cute fade">
+    <div class="saju-summary-copy">
+      <h2><span aria-hidden="true">♡</span>{escape(view.synth_title)}<span aria-hidden="true">♡</span></h2>
+      <p>{_paragraphs(view.synth_body)}</p>
+      <div class="cute-convergence">
+        <h3>두 사람의 흐름이 만나는 지점</h3>
+        {convergence}
+      </div>
+    </div>
+    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+    <div class="saju-keyword-band">
+      <h3>♡ 나를 채워주는 키워드 ♡</h3>
+      <div>{chips}</div>
+    </div>
+  </section>
 """
     return result
 
@@ -1344,6 +1487,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:"Gowun Dodum"
 .saju-summary-card{display:grid;grid-template-columns:1fr 178px;gap:20px;align-items:center;padding-bottom:0}.saju-summary-copy{text-align:center}.saju-summary-copy h2{font-family:"Gowun Batang",serif;font-size:24px;color:var(--cute-ink)}.saju-summary-copy h2 span{margin-right:10px;color:#ff8fab}.saju-summary-copy p{margin-top:18px;color:#5f504b;font-size:15px;line-height:1.75;text-align:left}.saju-summary-card>img{width:168px;height:168px;object-fit:contain;align-self:end}.saju-keyword-band{grid-column:1/-1;margin:24px -40px 0;padding:24px 34px;border-top:1px solid var(--cute-line-soft);background:rgba(255,246,248,.76);text-align:center}.saju-keyword-band h3{color:#7e6259;font-family:"Gowun Batang",serif;font-size:15px;font-weight:700}.saju-keyword-band>div{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}.saju-keyword{min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.74);color:#5b3b34;font-family:"Gowun Batang",serif;font-size:15px}
 .saju-disclaimer{display:grid;grid-template-columns:90px 1fr 190px;align-items:center;gap:22px;margin-top:22px;padding:22px 34px;background:linear-gradient(90deg,#fff5f7,#fffafa)}.saju-disclaimer-icon{color:#f5b45f;font-size:42px;text-align:center}.saju-disclaimer p{color:#6b544d;font-size:15px;line-height:1.75}.saju-disclaimer img{width:180px;height:130px;object-fit:contain;justify-self:center}
 .cute-personal-report .saju-brand-sub{color:#9a6647}.cute-personal-report .saju-profile-card{background:radial-gradient(circle at 88% 24%,rgba(255,239,242,.92),transparent 31%),radial-gradient(circle at 18% 58%,rgba(255,249,238,.9),transparent 34%),rgba(255,255,255,.82)}.cute-personal-report .saju-elements{margin-top:22px}.cute-face-story{background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(255,250,251,.78))}.cute-face-story .saju-section-head h2 span{color:#ff8fab}.cute-face-block{background:linear-gradient(90deg,rgba(255,245,247,.86),rgba(255,255,255,.74));border-color:#ffd8df}.cute-face-block .saju-block-cat{color:#d96f83}.cute-face-block .saju-block-summary{color:#b96a7a}.cute-total-card{background:radial-gradient(circle at 92% 18%,rgba(255,238,243,.9),transparent 26%),rgba(255,255,255,.8)}.cute-convergence{margin:22px 0 4px;padding:18px 20px;border:1px solid var(--cute-line-soft);border-radius:14px;background:rgba(255,250,250,.74)}.cute-convergence h3{margin-bottom:12px;color:#d7835b;font-family:"Gowun Batang",serif;font-size:15px;text-align:center}.cute-convergence-row{display:grid;grid-template-columns:1fr 34px 1fr;align-items:center;gap:12px;padding:10px 0;border-top:1px dashed #f4dcd4;color:#5f504b;font-size:14px;line-height:1.62;text-align:left}.cute-convergence-row:first-of-type{border-top:0}.cute-convergence-row span:first-child{text-align:right;color:#9d6c74}.cute-convergence-row b{color:#f5b45f;font-family:"Gowun Batang",serif;text-align:center}.cute-convergence-row span:last-child{color:#5d7164}
+.cute-compatibility-report{background:linear-gradient(180deg,#fffaf4 0%,#fff5ef 52%,#ffeef2 100%)}.compat-cute-wrap{max-width:1120px}.compat-cute-hero .saju-brand-sub{color:#8f5d3e}.compat-cute-hero .saju-brand-line{color:#ffb1c0}.compat-hero-card{position:relative;min-height:340px;display:grid;grid-template-columns:220px 1fr 220px;align-items:center;gap:16px;padding:34px 38px;border:1px solid var(--cute-line);border-radius:14px;background:radial-gradient(circle at 15% 24%,rgba(255,244,247,.9),transparent 28%),radial-gradient(circle at 85% 28%,rgba(255,249,239,.92),transparent 30%),rgba(255,255,255,.82);box-shadow:0 18px 42px -34px rgba(74,47,38,.42);overflow:hidden}.compat-hero-left,.compat-hero-right{width:190px;height:210px;object-fit:contain;justify-self:center}.compat-hero-main{text-align:center}.compat-day-pair{display:flex;align-items:center;justify-content:center;gap:28px}.compat-day-pair>span{color:#ff9fad;font-size:46px;font-family:"Gowun Batang",serif}.compat-day-mark{width:116px;height:116px;border-width:1.5px}.compat-day-mark .saju-day-hanja{font-size:62px}.compat-day-mark .saju-day-label{font-size:12px}.compat-hero-main h1{margin-top:22px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:34px;line-height:1.25}.compat-mode{margin-top:10px;color:#8f5d3e;font-family:"Gowun Batang",serif;font-size:15px}.compat-hero-main p{max-width:720px;margin:22px auto 0;color:#5f504b;font-size:16px;line-height:1.8}.compat-heart-float{position:absolute;color:#ffb1c0;font-size:28px}.compat-heart-float.one{left:132px;top:46px}.compat-heart-float.two{right:146px;bottom:78px}.compat-profile-card{position:relative;display:grid;grid-template-columns:1fr 110px 1fr;align-items:center;gap:22px;margin-top:22px;padding:24px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.8);box-shadow:0 18px 42px -34px rgba(74,47,38,.42)}.compat-person-cute{position:relative;min-height:318px;padding:28px 28px 22px;border:1px solid var(--cute-line);border-radius:14px;background:linear-gradient(180deg,rgba(255,250,251,.86),rgba(255,255,255,.74));text-align:center;overflow:hidden}.compat-person-cute:nth-of-type(2){background:linear-gradient(180deg,rgba(248,255,250,.86),rgba(255,255,255,.74));border-color:#dcecdf}.compat-person-label{color:#ff8fab;font-family:"Gowun Batang",serif;font-size:14px;font-weight:700}.compat-person-cute h2{margin-top:16px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:26px}.compat-person-meta{margin-top:10px;color:#7e6259;font-size:14px}.compat-person-cute .compat-day-mark{margin:22px auto 0}.compat-person-cute p{max-width:28ch;margin:18px auto 0;color:#5f504b;font-size:14px;line-height:1.7}.compat-person-cute>img{position:absolute;right:18px;bottom:8px;width:86px;height:86px;object-fit:contain}.compat-profile-heart{width:62px;height:62px;display:flex;align-items:center;justify-content:center;justify-self:center;border:2px solid #ffb7c4;border-radius:999px;background:#fff4f7;color:#ff7890;font-size:42px;box-shadow:0 12px 28px -22px rgba(255,111,130,.8)}.compat-cute-section{position:relative;margin-top:22px;padding:30px 34px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.8);box-shadow:0 18px 42px -34px rgba(74,47,38,.42);overflow:hidden}.compat-section-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}.compat-section-head h2{display:flex;align-items:center;gap:14px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:27px}.compat-section-head h2 span{color:#ff7890;font-family:"Song Myung",serif;font-size:34px}.compat-section-head h2 b{color:#ffb1c0;font-family:"Gowun Dodum",sans-serif;font-size:18px}.compat-section-head p{padding:8px 16px;border-radius:999px;background:#fff2f6;color:#d36472;font-family:"Gowun Batang",serif;font-size:13px}.compat-section-body{display:grid;grid-template-columns:130px 1fr;gap:24px;align-items:start}.compat-section-ora{width:118px;height:118px;object-fit:contain}.compat-block-list{display:grid;gap:14px}.compat-cute-block{display:grid;grid-template-columns:54px 1fr;gap:16px;padding:16px 18px;border:1px solid var(--cute-line-soft);border-radius:12px;background:rgba(255,250,250,.75)}.compat-block-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:#fff5f7;color:#ff8fab;font-size:26px}.compat-cute-block h3{margin-top:4px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:20px}.compat-cute-block p{margin-top:8px;color:#5f504b;font-size:14.5px;line-height:1.72}.compat-cute-block .saju-block-summary{color:#d36472;font-family:"Gowun Batang",serif;font-weight:700}.compat-action-cute{background:radial-gradient(circle at 86% 70%,rgba(255,238,243,.9),transparent 28%),rgba(255,255,255,.8)}.compat-action-body{display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:center}.compat-action-body img{width:140px;height:130px;object-fit:contain}.compat-action-body p{color:#5f504b;font-size:15px;line-height:1.8}.compat-summary-cute{background:linear-gradient(180deg,rgba(255,246,248,.86),rgba(255,255,255,.8))}.compat-summary-cute .saju-summary-copy h2 span:last-child{margin-left:10px;margin-right:0}.compat-disclaimer{background:linear-gradient(90deg,#fff7f2,#fff5f8)}
 header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--line)}
 .eyebrow{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;margin-bottom:26px}
 .ilgan-wrap{margin:18px 0;display:flex;justify-content:center}
