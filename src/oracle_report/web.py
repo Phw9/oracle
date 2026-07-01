@@ -3430,8 +3430,65 @@ def _render_page(
           .compare-camera-shell .workflow-loading[hidden] {{
             display: none;
           }}
+          .compare-camera-shell {{
+            max-width: min(1760px, calc(100vw - 40px));
+          }}
           .compare-camera-shell .capture-preview {{
             margin-top: 12px;
+          }}
+          .compare-camera-shell .capture-preview h2 {{
+            margin-bottom: 14px;
+            font-size: 24px;
+          }}
+          .compare-camera-shell .capture-stage-with-debug {{
+            grid-template-columns: minmax(520px, 0.95fr) minmax(560px, 1.05fr);
+            gap: 20px;
+            align-items: start;
+          }}
+          .compare-camera-shell .capture-stage {{
+            align-self: start;
+          }}
+          .compare-camera-shell .capture-visual {{
+            min-height: 420px;
+          }}
+          .compare-camera-shell #capture-preview-image {{
+            height: 420px;
+          }}
+          .compare-camera-shell .capture-debug-panel {{
+            max-height: none;
+            overflow: visible;
+            padding: 22px;
+          }}
+          .compare-camera-shell .capture-debug-head {{
+            margin-bottom: 16px;
+          }}
+          .compare-camera-shell .capture-debug-head strong {{
+            font-size: 24px;
+          }}
+          .compare-camera-shell .capture-debug-status {{
+            margin-bottom: 16px;
+            padding: 14px 16px;
+          }}
+          .compare-camera-shell .capture-debug-status b {{
+            font-size: 16px;
+          }}
+          .compare-camera-shell .capture-debug-status p {{
+            font-size: 15px;
+          }}
+          .compare-camera-shell .capture-debug-panel section {{
+            margin-top: 16px;
+          }}
+          .compare-camera-shell .capture-debug-panel h3 {{
+            font-size: 19px;
+          }}
+          .compare-camera-shell .capture-debug-panel pre {{
+            max-height: none;
+            overflow: visible;
+            padding: 16px;
+            white-space: pre-wrap;
+            word-break: keep-all;
+            font-size: 15px;
+            line-height: 1.62;
           }}
           .compare-camera-complete {{
             margin-top: 18px;
@@ -3446,8 +3503,14 @@ def _render_page(
             .personal-result-shell .capture-stage-with-debug {{
               grid-template-columns: 1fr;
             }}
+            .compare-camera-shell {{
+              max-width: min(100%, calc(100vw - 24px));
+            }}
             .capture-debug-panel {{
               max-height: none;
+            }}
+            .compare-camera-shell .capture-stage-with-debug {{
+              grid-template-columns: 1fr;
             }}
           }}
           .personal-result-shell .capture-direction {{

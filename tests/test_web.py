@@ -158,6 +158,9 @@ def test_compare_camera_page_uses_live_metric_dashboard() -> None:
     assert "실시간 랜드마크 측정" in html
     assert "실시간 metric" in html
     assert "판정 결과" in html
+    assert ".compare-camera-shell .capture-debug-panel" in html
+    assert "max-height: none;" in html
+    assert "font-size: 15px;" in html
     assert "oracle-solo-card.png" not in html
     assert "oracle-pair-card.png" not in html
     assert "pollWorkflow(payload.job_id" not in html
