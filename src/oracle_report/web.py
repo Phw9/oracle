@@ -10,9 +10,11 @@ import os
 os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+import tempfile
 import threading
+import time
 import uuid
 
 from flask import Flask, Response, jsonify, redirect, request
@@ -55,6 +57,7 @@ class _WorkflowJob:
     message: str = ""
     download_html: str = ""
     download_filename: str = "oracle_report.html"
+    created_at: float = field(default_factory=time.time)
 
 
 def _empty_capture_debug_payload() -> dict[str, object]:
@@ -455,6 +458,9 @@ def create_app() -> Flask:
         values = payload.get("values", {})
         image_base64 = payload.get("image_base64")
 
+        if image_base64 and len(image_base64) > 50 * 1024 * 1024:  # 50MB limit
+            return jsonify({"status": "error", "error": "Image too large"}), 400
+
         from oracle_report.prompt_templates import render_distributed_prompt_template
         rendered = render_distributed_prompt_template(
             name=prompt_name,
@@ -467,9 +473,9 @@ def create_app() -> Flask:
         if image_base64:
             import base64
             img_data = base64.b64decode(image_base64)
-            temp_dir = Path("runs/temp")
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_img_path = temp_dir / f"distributed_temp_{uuid.uuid4().hex}.jpg"
+            temp_fd, temp_path_str = tempfile.mkstemp(suffix='.jpg')
+            os.close(temp_fd)
+            temp_img_path = Path(temp_path_str)
             temp_img_path.write_bytes(img_data)
 
         from oracle_report.config import load_app_config
@@ -536,10 +542,10 @@ def create_app() -> Flask:
                 cached_tps = getattr(LlamaCppChatClient, "_measured_tps", None)
                 if cached_tps is not None:
                     tps = cached_tps
+                try:
                     score = client.get_compute_score()
-                elif not is_busy:
-                    tps = client.get_or_measure_tps()
-                    score = client.get_compute_score()
+                except Exception:
+                    score = 5.0
             except Exception:
                 pass
                 
@@ -1008,6 +1014,12 @@ def _run_workflow_job(job_id: str, run_job) -> None:
 
 def _set_job(job_id: str, job: _WorkflowJob) -> None:
     with _JOBS_LOCK:
+        now = time.time()
+        expired = [
+            k for k, v in _JOBS.items() if now - v.created_at > 3600
+        ]
+        for k in expired:
+            del _JOBS[k]
         _JOBS[job_id] = job
 
 

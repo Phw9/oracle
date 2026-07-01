@@ -308,7 +308,7 @@ def render_distributed_prompt_template(
         return rendered
     if name not in (
         "personal_face_analysis",
-        "face_analysis_copule",
+        "face_analysis_couple",
         "saju_reading",
         "saju_reading_couple",
     ):
@@ -333,7 +333,7 @@ def render_distributed_prompt_template(
             suffix_instructions = """[출력 JSON 스키마]
 너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. saju_blocks 필드는 절대 포함하지 마라.
 {
-  "essence": "이 사주의 전체적인 흐름และ 삶의 방향성을 3~4문장의 풍부한 해설 단락(약 150~200자)으로 요약한 내용",
+  "essence": "이 사주의 전체적인 흐름과 삶의 방향성을 3~4문장의 풍부한 해설 단락(약 150~200자)으로 요약한 내용",
   "element_note": "[오행 분포]의 강한 기운과 보완이 필요한 기운이 생활 리듬에 어떻게 드러나는지 1-2문장으로 설명",
   "saju_subtitle": "사주 섹션 핵심을 8-16자 안팎의 짧은 문구",
   "tags": ["태그1", "태그2", "태그3", "태그4"],
@@ -357,15 +357,14 @@ def render_distributed_prompt_template(
   "tags": ["태그1", "태그2", "태그3", "태그4"],
   "disclaimer": "참고용 엔터테인먼트 리포트라는 짧은 고지"
 }"""
-        elif name == "face_analysis_copule":
+        elif name == "face_analysis_couple":
             suffix_instructions = """[출력 JSON 스키마]
 너는 오직 아래의 요약 정보와 메타데이터 필드들만 포함하는 단일 JSON 객체로 응답해야 한다. pair_blocks 필드는 절대 포함하지 마라.
 {
   "pair_subtitle": "관상 기반 관계 분위기 부제",
   "face_summary": "두 사람의 관상 관찰을 1문장으로 요약"
 }"""
-        else:
-            raise ValueError(f"unsupported distributed prompt template: {name}")
+
     else:
         body_instruction = "이 분석에 대한 간결하고 현실적인 설명 본문 (반드시 최대 5줄 이하의 분량으로 줄바꿈 없이 하나의 단락으로만 간결하게 작성하세요)"
 
