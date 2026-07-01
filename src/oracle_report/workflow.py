@@ -1561,7 +1561,7 @@ def _generate_distributed(
     for slave_url in app_config.slave_addrs:
         scheduler.slave_metadata[slave_url] = {
             "status": "idle",
-            "compute_score": 5.0,
+            "compute_score": 50.0,
             "tps": 1.0,
         }
         try:
@@ -1706,15 +1706,16 @@ def _generate_distributed(
                     res = requests.get(status_url, timeout=2.0)
                     if res.status_code == 200:
                         status_data = res.json()
+                        score = status_data.get("compute_score")
+                        if score is not None:
+                            scheduler.slave_metadata[slave_url]["compute_score"] = float(score)
+                            compute_score = float(score)
+                        
                         if status_data.get("status") == "busy" and not speculative:
                             task_queue.put(task)
                             task_queue.task_done()
                             time.sleep(5.0)
                             continue
-                        score = status_data.get("compute_score")
-                        if score is not None:
-                            scheduler.slave_metadata[slave_url]["compute_score"] = float(score)
-                            compute_score = float(score)
                 except Exception:
                     compute_score = scheduler.slave_metadata.get(slave_url, {}).get("compute_score", 5.0)
             else:
