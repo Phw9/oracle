@@ -545,12 +545,23 @@ def create_app() -> Flask:
 def serve() -> None:
     config = load_app_config()
 
-    if config.distributed_role in ("master", "hybrid") and config.distributed_warmup:
-        import threading
-        def run_warmup_background():
-            import time
-            time.sleep(5.0)
-            print("[Distributed] Starting LLM warmup for distributed nodes...", flush=True)
+    if config.distributed_warmup:
+        print("[Distributed] Starting initial LLM warmup and benchmarking...", flush=True)
+        # 1. Warm up local engine
+        try:
+            from oracle_report.llm import LlamaCppChatClient
+            from oracle_report.config import load_report_llm_config
+            llm_config = load_report_llm_config()
+            client = LlamaCppChatClient(llm_config)
+            print("[Distributed] Benchmarking local LLM instance...", flush=True)
+            tps = client.get_or_measure_tps()
+            print(f"[Distributed] Local LLM benchmark complete. Measured TPS: {tps:.2f}", flush=True)
+        except Exception as e:
+            print(f"[Distributed][Warning] Local LLM benchmarking failed: {e}", flush=True)
+
+        # 2. Warm up distributed network if master or hybrid
+        if config.distributed_role in ("master", "hybrid"):
+            print("[Distributed] Executing distributed dummy generation for warmups...", flush=True)
             try:
                 from oracle_report.workflow import _generate_distributed
                 dummy_values = {
@@ -574,12 +585,11 @@ def serve() -> None:
                     image_path=None,
                     app_config=config,
                 )
-                print("[Distributed] LLM warmup complete.", flush=True)
+                print("[Distributed] Distributed LLM warmup complete.", flush=True)
             except Exception as e:
-                print(f"[Distributed][Error] LLM warmup failed: {e}", flush=True)
+                print(f"[Distributed][Error] Distributed LLM warmup failed: {e}", flush=True)
 
-        t = threading.Thread(target=run_warmup_background, daemon=True)
-        t.start()
+        print("[Distributed] Warmup and benchmarking sequence completed successfully.", flush=True)
 
     app = create_app()
     app.run(host=config.host, port=config.port, debug=config.debug, threaded=True)
