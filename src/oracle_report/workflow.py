@@ -1546,6 +1546,13 @@ def _generate_distributed(
             key = (task["is_metadata"], task["target_category"])
             return key in completed_tasks
 
+    def is_metadata_completed():
+        for t in tasks:
+            if t.get("is_metadata", False):
+                if not is_task_done(t):
+                    return False
+        return True
+
     def mark_task_done(task):
         with completed_lock:
             key = (task["is_metadata"], task["target_category"])
@@ -1643,6 +1650,11 @@ def _generate_distributed(
                 _, _, task = task_queue.get(block=True, timeout=0.5)
                 if is_task_done(task):
                     task_queue.task_done()
+                    continue
+                if not task.get("is_metadata", False) and not is_metadata_completed():
+                    put_task(task)
+                    task_queue.task_done()
+                    time.sleep(0.5)
                     continue
             except queue.Empty:
                 task = find_unfinished_speculative_task(slave_url, is_local)
@@ -1828,6 +1840,11 @@ def _generate_distributed(
                 _, _, task = task_queue.get(block=True, timeout=0.5)
                 if is_task_done(task):
                     task_queue.task_done()
+                    continue
+                if not task.get("is_metadata", False) and not is_metadata_completed():
+                    put_task(task)
+                    task_queue.task_done()
+                    time.sleep(0.5)
                     continue
             except queue.Empty:
                 task = find_unfinished_speculative_task("local", True)
