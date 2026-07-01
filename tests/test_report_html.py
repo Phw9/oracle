@@ -33,7 +33,7 @@ def test_report_html_fallback_face_blocks_explain_terms() -> None:
     assert "삼정은 얼굴을 위" in html
 
 
-def test_personal_report_keeps_synthesis_without_face_saju_comparison() -> None:
+def test_personal_report_hides_face_saju_synthesis_but_keeps_keywords() -> None:
     profile = BirthProfile(
         name="tester",
         birth_datetime=datetime(1995, 3, 15, 12, 0),
@@ -48,6 +48,7 @@ def test_personal_report_keeps_synthesis_without_face_saju_comparison() -> None:
             "convergence": [
                 {"face": "개인 관상 비교 근거", "saju": "개인 사주 비교 근거"},
             ],
+            "tags": ["균형 키워드"],
         },
         ensure_ascii=False,
     )
@@ -59,12 +60,14 @@ def test_personal_report_keeps_synthesis_without_face_saju_comparison() -> None:
         generated_text,
     )
 
-    assert "전체 흐름을 정리하면" in html
-    assert "사주 흐름을 중심으로 정리한 본문" in html
-    assert "강점은 살리고 부족한 리듬은 보완하세요." in html
-    assert "개인 관상 비교 근거" in html
-    assert "개인 사주 비교 근거" in html
-    assert "×" in html
+    assert "전체 흐름을 정리하면" not in html
+    assert "사주 흐름을 중심으로 정리한 본문" not in html
+    assert "강점은 살리고 부족한 리듬은 보완하세요." not in html
+    assert "개인 관상 비교 근거" not in html
+    assert "개인 사주 비교 근거" not in html
+    assert "균형 키워드" in html
+    assert "cute-keyword-card" in html
+    assert "관상과 사주가 만나는 지점" not in html
 
 
 def test_compatibility_report_html_uses_structured_layout() -> None:
@@ -97,7 +100,7 @@ def test_compatibility_report_html_uses_structured_layout() -> None:
     assert "left 님과 right 님" in html
 
 
-def test_compatibility_report_html_shows_face_saju_comparison() -> None:
+def test_compatibility_report_html_hides_synthesis_but_keeps_action_and_keywords() -> None:
     repository = ManseRepository()
     left = BirthProfile(
         name="left",
@@ -117,6 +120,9 @@ def test_compatibility_report_html_shows_face_saju_comparison() -> None:
             "convergence": [
                 {"face": "궁합 관상 근거", "saju": "궁합 사주 근거"},
             ],
+            "action_title": "액션 제목",
+            "action_body": "액션 본문",
+            "tags": ["궁합 키워드"],
         },
         ensure_ascii=False,
     )
@@ -131,11 +137,14 @@ def test_compatibility_report_html_shows_face_saju_comparison() -> None:
         generated_text,
     )
 
-    assert "사주 총정리" in html
-    assert "사주 흐름만 정리한 본문" in html
-    assert "궁합 관상 근거" in html
-    assert "궁합 사주 근거" in html
-    assert "×" in html
+    assert "사주 총정리" not in html
+    assert "사주 흐름만 정리한 본문" not in html
+    assert "궁합 관상 근거" not in html
+    assert "궁합 사주 근거" not in html
+    assert "액션 제목" in html
+    assert "액션 본문" in html
+    assert "궁합 키워드" in html
+    assert "cute-keyword-card" in html
 
 
 def test_report_profile_shows_unknown_birth_time_without_helper_basis() -> None:
@@ -156,6 +165,39 @@ def test_report_profile_shows_unknown_birth_time_without_helper_basis() -> None:
 
     assert "시간 미상" in html
     assert "오시(午時) 보조 기준" not in html
+
+
+def test_saju_only_report_hides_synthesis_but_keeps_keywords() -> None:
+    profile = BirthProfile(
+        name="tester",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    generated_text = json.dumps(
+        {
+            "essence": "사주 핵심",
+            "synthesis_title": "전체 흐름을 정리하면",
+            "synthesis_body": "사주-only 총정리 본문",
+            "synthesis_summary": "사주-only 총정리 요약",
+            "tags": ["사주 키워드"],
+        },
+        ensure_ascii=False,
+    )
+
+    html = render_personal_report_html(
+        profile,
+        ManseRepository().lookup(profile),
+        "",
+        generated_text,
+        skip_face=True,
+    )
+
+    assert "전체 흐름을 정리하면" not in html
+    assert "사주-only 총정리 본문" not in html
+    assert "사주-only 총정리 요약" not in html
+    assert "나를 채워주는 키워드" in html
+    assert "사주 키워드" in html
+    assert "cute-keyword-card" in html
 
 
 def test_report_html_uses_auto_wrapping_for_block_bodies() -> None:

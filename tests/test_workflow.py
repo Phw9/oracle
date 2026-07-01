@@ -116,7 +116,7 @@ class FakeLlmClient:
                 },
                 ensure_ascii=False,
             )
-        elif "\"synthesis_title\"" in prompt and "\"action_title\"" in prompt:
+        elif "\"action_title\"" in prompt and "두 사람의 사주 궁합 핵심 요약" in prompt:
             result = json.dumps(
                 {
                     "essence": "두 사람 궁합 핵심 문장",
@@ -137,11 +137,6 @@ class FakeLlmClient:
                             "summary": "궁합 사주 요약",
                             "body": _block_body("궁합 사주", 1),
                         },
-                    ],
-                    "synthesis_title": "궁합 종합 제목",
-                    "synthesis_body": "궁합 종합 본문",
-                    "convergence": [
-                        {"face": "궁합 관상 근거", "saju": "궁합 사주 근거"},
                     ],
                     "action_title": "궁합 행동 제목",
                     "action_body": "궁합 행동 본문",
@@ -167,7 +162,13 @@ class FakeLlmClient:
                 cat = "사주"
                 num = 1
                 saju_cats = ["종합 형국", "타고난 성향과 심리 패턴", "재물운과 적성", "연애운과 인간관계", "올해의 운세", "총평 및 인생의 조언"]
+                compat_cats = ["관계 구조", "상호 보완", "갈등 관리", "현재 관계 흐름", "실천 제안", "총평 및 조언"]
                 for i, c in enumerate(saju_cats):
+                    if c in prompt:
+                        cat = c
+                        num = i + 1
+                        break
+                for i, c in enumerate(compat_cats):
                     if c in prompt:
                         cat = c
                         num = i + 1
@@ -201,12 +202,6 @@ class FakeLlmClient:
                     "face_blocks": _report_blocks("관상", 5),
                     "saju_subtitle": "테스트 사주 소제목",
                     "saju_blocks": _report_blocks("사주", 6),
-                    "synthesis_title": "종합 제목",
-                    "synthesis_body": "종합 본문",
-                    "convergence": [
-                        {"face": "관상 수렴", "saju": "사주 수렴"},
-                    ],
-                    "synthesis_summary": "종합 요약",
                     "tags": ["테스트 태그"],
                     "recommendation_title": "추천 제목",
                     "recommendation_lead": "추천 리드",
@@ -290,8 +285,6 @@ class RecordingPairSajuClient:
                 "essence": "PAIR SAJU ESSENCE",
                 "saju_subtitle": "PAIR SAJU SUBTITLE",
                 "saju_blocks": _report_blocks("PAIR SAJU", 6),
-                "synthesis_title": "PAIR SYNTHESIS TITLE",
-                "synthesis_body": "PAIR SYNTHESIS BODY",
                 "action_title": "PAIR ACTION TITLE",
                 "action_body": "PAIR ACTION BODY",
                 "tags": ["PAIR TAG"],
@@ -975,7 +968,9 @@ def test_personal_workflow_keeps_partial_saju_json_without_full_ui_fallback(
 
     assert "부분 제목" in result.report_html
     assert "오행 분포는" in result.report_html
-    assert "사주 데이터는 강점과 보완점을 함께 보여주는 참고 지도입니다." in result.report_html
+    assert "전체 흐름을 정리하면" not in result.report_html
+    assert "사주/만세력 데이터에 나타난 오행 분포와 생활 리듬" not in result.report_html
+    assert "나를 채워주는 키워드" in result.report_html
     assert "final report JSON field saju_blocks has 1 blocks" not in result.markdown
 def test_personal_saju_follows_main_when_distributed_split_enabled(
     tmp_path: Path,

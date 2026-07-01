@@ -352,8 +352,6 @@ def render_distributed_prompt_template(
 {
   "essence": "두 사람의 사주 궁합 핵심 요약",
   "saju_subtitle": "사주 섹션 짧은 부제",
-  "synthesis_title": "사주 궁합 종합 제목",
-  "synthesis_body": "두 사람의 사주 흐름을 종합한 설명",
   "action_title": "관계를 좋게 만드는 행동 제안 제목",
   "action_body": "실천 가능한 행동 제안",
   "tags": ["태그1", "태그2", "태그3", "태그4"],

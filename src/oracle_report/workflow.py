@@ -799,8 +799,6 @@ def _merge_compatibility_payloads(
         "essence",
         "saju_subtitle",
         "saju_blocks",
-        "synthesis_title",
-        "synthesis_body",
         "action_title",
         "action_body",
         "tags",
@@ -828,9 +826,7 @@ def _merge_personal_payloads(
     saju_payload: dict[str, Any],
     skip_face: bool,
 ) -> dict[str, Any]:
-    reading = manse_lookup.reading
-    strongest = _dominant_element(reading.element_counts, strongest=True)
-    weakest = _dominant_element(reading.element_counts, strongest=False)
+    del manse_lookup
     payload: dict[str, Any] = {}
     for key in (
         "essence",
@@ -848,72 +844,7 @@ def _merge_personal_payloads(
             value = face_payload.get(key)
             if value:
                 payload[key] = value
-        payload["convergence"] = _combined_convergence(face_payload, saju_payload)
-    payload["synthesis_title"] = _synthesis_title(skip_face)
-    payload["synthesis_body"] = _synthesis_body(
-        face_payload,
-        saju_payload,
-        strongest,
-        weakest,
-        skip_face,
-    )
-    payload["synthesis_summary"] = (
-        "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 "
-        "보완하세요."
-    )
     result = payload
-    return result
-
-
-def _combined_convergence(
-    face_payload: dict[str, Any],
-    saju_payload: dict[str, Any],
-) -> list[dict[str, str]]:
-    result = []
-    for index in range(3):
-        result.append(
-            {
-                "face": _block_summary(
-                    face_payload,
-                    "face_blocks",
-                    index,
-                    "얼굴 관찰에서 보이는 표현 리듬",
-                ),
-                "saju": _block_summary(
-                    saju_payload,
-                    "saju_blocks",
-                    index,
-                    "사주 데이터에서 보이는 생활 리듬",
-                ),
-            },
-        )
-    return result
-
-
-def _block_summary(
-    payload: dict[str, Any],
-    key: str,
-    index: int,
-    default: str,
-) -> str:
-    blocks = payload.get(key)
-    result = default
-    if isinstance(blocks, list) and index < len(blocks):
-        block = blocks[index]
-        if isinstance(block, dict):
-            result = _text_from_payload(
-                block,
-                "summary",
-                _text_from_payload(block, "title", default),
-            )
-    return result
-
-
-def _text_from_payload(payload: dict[str, Any], key: str, default: str) -> str:
-    value = payload.get(key)
-    result = default
-    if isinstance(value, str) and value.strip():
-        result = value.strip()
     return result
 
 
@@ -981,27 +912,6 @@ def _normalize_inline_text(text: str) -> str:
     result = " ".join(normalized_text.split())
     return result
 
-
-
-def _synthesis_title(skip_face: bool) -> str:
-    result = "전체 흐름을 정리하면"
-    return result
-
-
-def _synthesis_body(
-    face_payload: dict[str, Any],
-    saju_payload: dict[str, Any],
-    strongest: str,
-    weakest: str,
-    skip_face: bool,
-) -> str:
-    saju_line = _text_from_payload(
-        saju_payload,
-        "essence",
-        f"{strongest} 기운을 살리고 {weakest} 기운을 보완하는 흐름이 보여요.",
-    )
-    result = saju_line
-    return result
 
 
 def _dominant_element(counts: dict[str, int], strongest: bool) -> str:

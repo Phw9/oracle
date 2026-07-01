@@ -115,12 +115,6 @@ class _ReportBlock:
 
 
 @dataclass(frozen=True)
-class _Convergence:
-    face: str
-    saju: str
-
-
-@dataclass(frozen=True)
 class _CompatibilityPersonView:
     name: str
     meta: str
@@ -145,10 +139,6 @@ class _PersonalReportView:
     face_blocks: tuple[_ReportBlock, ...]
     saju_subtitle: str
     saju_blocks: tuple[_ReportBlock, ...]
-    synth_title: str
-    synth_body: str
-    convergence: tuple[_Convergence, ...]
-    synth_summary: str
     tags: tuple[str, ...]
     disclaimer: str
     skip_face: bool = False
@@ -164,9 +154,6 @@ class _CompatibilityReportView:
     pair_blocks: tuple[_ReportBlock, ...]
     saju_subtitle: str
     saju_blocks: tuple[_ReportBlock, ...]
-    synth_title: str
-    synth_body: str
-    convergence: tuple[_Convergence, ...]
     action_title: str
     action_body: str
     tags: tuple[str, ...]
@@ -304,27 +291,11 @@ def _build_personal_report_view(
         "element_note",
         f"가장 강한 오행은 {strongest}, 보완하면 좋은 오행은 {weakest}입니다.",
     )
-    synth_title_fallback = "전체 흐름을 정리하면"
-    synth_body_fallback = (
-        "사주 데이터에 나타난 강점과 보완할 리듬을 중심으로 현재 흐름을 정리합니다."
-    )
-    synth_summary_fallback = (
-        "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 "
-        "보완하세요."
-    )
     disclaimer_fallback = (
         "이 리포트는 얼굴 관찰과 사주/만세력 데이터를 바탕으로 생성된 재미용 "
         "콘텐츠입니다. 운명을 단정하지 않으며 참고로만 즐겨 주세요."
     )
     if skip_face:
-        synth_title_fallback = "전체 흐름을 정리하면"
-        synth_body_fallback = (
-            "사주/만세력 데이터에 나타난 오행 분포와 생활 리듬을 중심으로 해석합니다."
-        )
-        synth_summary_fallback = (
-            "결론은 단정이 아니라 참고입니다. 강점은 살리고 부족한 리듬은 생활에서 "
-            "보완하세요."
-        )
         disclaimer_fallback = (
             "이 리포트는 사주/만세력 데이터를 바탕으로 생성된 재미용 콘텐츠입니다. "
             "운명을 단정하지 않으며 참고로만 즐겨 주세요."
@@ -347,22 +318,6 @@ def _build_personal_report_view(
             f"{chart.day.stem}{day_element} · {strongest}강 · {weakest}보완",
         ),
         saju_blocks=_payload_blocks(payload, "saju_blocks", _default_saju_blocks(reading)),
-        synth_title=_payload_text(
-            payload,
-            "synthesis_title",
-            synth_title_fallback,
-        ),
-        synth_body=_payload_text(
-            payload,
-            "synthesis_body",
-            synth_body_fallback,
-        ),
-        convergence=_payload_convergence(payload, face_analysis, reading.interpretation),
-        synth_summary=_payload_text(
-            payload,
-            "synthesis_summary",
-            synth_summary_fallback,
-        ),
         tags=_payload_tags(payload, (f"{weakest} 보완", "균형", "휴식", "표현")),
         disclaimer=_payload_text(
             payload,
@@ -386,12 +341,6 @@ def _build_compatibility_report_view(
     payload = _load_generated_payload(generated_text)
     left_view = _compatibility_person_view(left_profile, left_manse)
     right_view = _compatibility_person_view(right_profile, right_manse)
-    saju_text = "\n".join(
-        (
-            left_manse.reading.interpretation,
-            right_manse.reading.interpretation,
-        ),
-    )
     result = _CompatibilityReportView(
         left=left_view,
         right=right_view,
@@ -421,17 +370,6 @@ def _build_compatibility_report_view(
             "saju_blocks",
             _default_compatibility_saju_blocks(mode, left_manse, right_manse),
         ),
-        synth_title=_payload_text(
-            payload,
-            "synthesis_title",
-            f"{mode} 관계에서 함께 살아나는 지점",
-        ),
-        synth_body=_payload_text(
-            payload,
-            "synthesis_body",
-            "두 사람의 사주 흐름과 얼굴 관찰 메모가 만나는 지점을 중심으로 관계의 분위기를 읽습니다.",
-        ),
-        convergence=_payload_convergence(payload, face_analysis, saju_text),
         action_title=_payload_text(
             payload,
             "action_title",
@@ -644,34 +582,6 @@ def _payload_blocks(
     return result
 
 
-def _payload_convergence(
-    payload: Mapping[str, Any],
-    face_analysis: str,
-    saju_text: str,
-) -> tuple[_Convergence, ...]:
-    raw_items = payload.get("convergence")
-    items: list[_Convergence] = []
-    if isinstance(raw_items, list):
-        for raw_item in raw_items:
-            if isinstance(raw_item, dict):
-                items.append(
-                    _Convergence(
-                        face=_payload_text(raw_item, "face", "얼굴 관찰 정보"),
-                        saju=_payload_text(raw_item, "saju", "사주 데이터"),
-                    ),
-                )
-    if not items:
-        face_line = _first_nonempty_line(face_analysis, "얼굴 관찰 정보")
-        saju_line = _first_nonempty_line(saju_text, "사주 데이터")
-        items = (
-            _Convergence(face=face_line, saju=saju_line),
-            _Convergence(face="얼굴 비율의 균형", saju="오행 균형의 보완점"),
-            _Convergence(face="현재 표정의 안정감", saju="생활 리듬의 조절"),
-        )
-    result = tuple(items[:4])
-    return result
-
-
 def _payload_tags(
     payload: Mapping[str, Any],
     defaults: tuple[str, ...],
@@ -844,7 +754,7 @@ def _render_cute_personal_report_body(view: _PersonalReportView) -> str:
   {_render_saju_only_element_cards(view)}
   {_render_cute_face_blocks(view)}
   {_render_saju_only_blocks(view)}
-  {_render_cute_personal_synthesis(view)}
+  {_render_cute_personal_keywords(view)}
 
   <section class="saju-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -893,7 +803,7 @@ def _render_saju_only_report_body(view: _PersonalReportView) -> str:
 
   {_render_saju_only_element_cards(view)}
   {_render_saju_only_blocks(view)}
-  {_render_saju_only_synthesis(view)}
+  {_render_cute_personal_keywords(view)}
 
   <section class="saju-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -950,7 +860,7 @@ def _render_compatibility_report_body(view: _CompatibilityReportView) -> str:
   {_render_cute_compat_section("01", "두 사람의 관계 분위기", view.pair_subtitle, view.pair_blocks, "/static/assets/oracle-pair-card.png")}
   {_render_cute_compat_section("02", "사주로 보는 상호 보완", view.saju_subtitle, view.saju_blocks, "/static/assets/oracle-character.png")}
   {_render_cute_compat_action(view)}
-  {_render_cute_compat_summary(view)}
+  {_render_cute_compat_keywords(view)}
 
   <section class="saju-disclaimer compat-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -1048,31 +958,12 @@ def _render_cute_compat_action(view: _CompatibilityReportView) -> str:
     return result
 
 
-def _render_cute_compat_summary(view: _CompatibilityReportView) -> str:
+def _render_cute_compat_keywords(view: _CompatibilityReportView) -> str:
     chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
-    convergence = "\n".join(
-        f"""
-        <div class="cute-convergence-row">
-          <span>{escape(item.face)}</span>
-          <b aria-hidden="true">×</b>
-          <span>{escape(item.saju)}</span>
-        </div>
-"""
-        for item in view.convergence
-    )
     result = f"""
-  <section class="saju-card saju-summary-card compat-summary-cute fade">
-    <div class="saju-summary-copy">
-      <h2><span aria-hidden="true">♡</span>{escape(view.synth_title)}<span aria-hidden="true">♡</span></h2>
-      <p>{_paragraphs(view.synth_body)}</p>
-      <div class="cute-convergence">
-        <h3>두 사람의 흐름이 만나는 지점</h3>
-        {convergence}
-      </div>
-    </div>
-    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+  <section class="saju-card saju-summary-card cute-keyword-card compat-summary-cute fade">
     <div class="saju-keyword-band">
-      <h3>♡ 나를 채워주는 키워드 ♡</h3>
+      <h3>♡ 관계를 채워주는 키워드 ♡</h3>
       <div>{chips}</div>
     </div>
   </section>
@@ -1110,23 +1001,6 @@ def _render_pair_profile(person: _CompatibilityPersonView, label: str) -> str:
       <div class="person-label">{escape(person.day_master_label)}</div>
       <p>{escape(person.element_note)}</p>
     </div>
-"""
-    return result
-
-
-def _render_compatibility_synthesis(view: _CompatibilityReportView) -> str:
-    convergence = "\n".join(
-        f"""      <div class="cv"><span class="g">{escape(item.face)}</span><span class="eq">↔</span><span class="s">{escape(item.saju)}</span></div>"""
-        for item in view.convergence
-    )
-    result = f"""
-  <section class="synth fade">
-    <div class="b-title serif">{escape(view.synth_title)}</div>
-    <div class="b-body">{_paragraphs(view.synth_body)}</div>
-    <div class="converge">
-{convergence}
-    </div>
-  </section>
 """
     return result
 
@@ -1254,49 +1128,10 @@ def _render_cute_face_blocks(view: _PersonalReportView) -> str:
     return result
 
 
-def _render_cute_personal_synthesis(view: _PersonalReportView) -> str:
-    chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
-    convergence = "\n".join(
-        f"""
-        <div class="cute-convergence-row">
-          <span>{escape(item.face)}</span>
-          <b aria-hidden="true">×</b>
-          <span>{escape(item.saju)}</span>
-        </div>
-"""
-        for item in view.convergence
-    )
-    result = f"""
-  <section class="saju-card saju-summary-card cute-total-card fade">
-    <div class="saju-summary-copy">
-      <h2><span aria-hidden="true">♡</span>{escape(view.synth_title)}</h2>
-      <p>{_paragraphs(view.synth_body)}</p>
-      <div class="cute-convergence">
-        <h3>관상과 사주가 만나는 지점</h3>
-        {convergence}
-      </div>
-      <p>{_paragraphs(view.synth_summary)}</p>
-    </div>
-    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
-    <div class="saju-keyword-band">
-      <h3>✧ 나를 채워주는 키워드 ✧</h3>
-      <div>{chips}</div>
-    </div>
-  </section>
-"""
-    return result
-
-
-def _render_saju_only_synthesis(view: _PersonalReportView) -> str:
+def _render_cute_personal_keywords(view: _PersonalReportView) -> str:
     chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
     result = f"""
-  <section class="saju-card saju-summary-card fade">
-    <div class="saju-summary-copy">
-      <h2><span aria-hidden="true">♡</span>{escape(view.synth_title)}</h2>
-      <p>{_paragraphs(view.synth_body)}</p>
-      <p>{_paragraphs(view.synth_summary)}</p>
-    </div>
-    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+  <section class="saju-card saju-summary-card cute-total-card cute-keyword-card fade">
     <div class="saju-keyword-band">
       <h3>✧ 나를 채워주는 키워드 ✧</h3>
       <div>{chips}</div>
@@ -1391,17 +1226,6 @@ def _render_block(block: _ReportBlock) -> str:
     return result
 
 
-def _render_synthesis(view: _PersonalReportView) -> str:
-    result = f"""
-  <section class="synth fade">
-    <div class="b-title serif">{escape(view.synth_title)}</div>
-    <div class="b-body">{_paragraphs(view.synth_body)}</div>
-    <div class="b-body synth-summary">{_paragraphs(view.synth_summary)}</div>
-  </section>
-"""
-    return result
-
-
 def _render_tags(tags: tuple[str, ...]) -> str:
     chips = "".join(f'<span class="chip">{escape(tag)}</span>' for tag in tags)
     result = f"""
@@ -1484,9 +1308,9 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:"Gowun Dodum"
 .saju-element-card.c-mok .saju-element-hanja{color:var(--mok)}.saju-element-card.c-hwa .saju-element-hanja{color:var(--hwa)}.saju-element-card.c-to .saju-element-hanja{color:var(--to)}.saju-element-card.c-geum .saju-element-hanja{color:#555}.saju-element-card.c-su .saju-element-hanja{color:#4e83ad}
 .saju-element-note{position:relative;min-height:96px;display:grid;grid-template-columns:104px 1fr 36px;align-items:center;gap:16px;margin-top:30px;padding:16px 28px;border:1px solid var(--cute-line-soft);border-radius:16px;background:linear-gradient(90deg,#fff5f7,#fffafa);text-align:center}.saju-element-note img{width:92px;height:92px;object-fit:contain}.saju-element-note p{color:#5e4a43;font-family:"Gowun Batang",serif;font-size:15px;line-height:1.7}.saju-element-note span{color:#ffb1c0;font-size:28px}
 .saju-story-list{display:grid;gap:16px}.saju-story-block{display:grid;grid-template-columns:112px 1fr;gap:22px;align-items:center;min-height:146px;padding:18px 22px;border:1px solid var(--cute-line-soft);border-radius:12px;background:rgba(255,250,250,.76)}.saju-story-block img{width:104px;height:104px;object-fit:contain}.saju-block-cat{color:#d7835b;font-family:"Gowun Batang",serif;font-size:12px;font-weight:700;letter-spacing:.04em}.saju-story-block h3{margin-top:4px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:21px}.saju-story-block p{margin-top:8px;color:#5f504b;font-size:14.5px;line-height:1.72}.saju-story-block .saju-block-summary{color:#d36472;font-family:"Gowun Batang",serif;font-weight:700}
-.saju-summary-card{display:grid;grid-template-columns:1fr 178px;gap:20px;align-items:center;padding-bottom:0}.saju-summary-copy{text-align:center}.saju-summary-copy h2{font-family:"Gowun Batang",serif;font-size:24px;color:var(--cute-ink)}.saju-summary-copy h2 span{margin-right:10px;color:#ff8fab}.saju-summary-copy p{margin-top:18px;color:#5f504b;font-size:15px;line-height:1.75;text-align:left}.saju-summary-card>img{width:168px;height:168px;object-fit:contain;align-self:end}.saju-keyword-band{grid-column:1/-1;margin:24px -40px 0;padding:24px 34px;border-top:1px solid var(--cute-line-soft);background:rgba(255,246,248,.76);text-align:center}.saju-keyword-band h3{color:#7e6259;font-family:"Gowun Batang",serif;font-size:15px;font-weight:700}.saju-keyword-band>div{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}.saju-keyword{min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.74);color:#5b3b34;font-family:"Gowun Batang",serif;font-size:15px}
+.saju-summary-card{display:grid;grid-template-columns:1fr 178px;gap:20px;align-items:center;padding-bottom:0}.saju-summary-copy{text-align:center}.saju-summary-copy h2{font-family:"Gowun Batang",serif;font-size:24px;color:var(--cute-ink)}.saju-summary-copy h2 span{margin-right:10px;color:#ff8fab}.saju-summary-copy p{margin-top:18px;color:#5f504b;font-size:15px;line-height:1.75;text-align:left}.saju-summary-card>img{width:168px;height:168px;object-fit:contain;align-self:end}.saju-keyword-band{grid-column:1/-1;margin:24px -40px 0;padding:24px 34px;border-top:1px solid var(--cute-line-soft);background:rgba(255,246,248,.76);text-align:center}.saju-keyword-band h3{color:#7e6259;font-family:"Gowun Batang",serif;font-size:15px;font-weight:700}.saju-keyword-band>div{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}.saju-keyword{min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.74);color:#5b3b34;font-family:"Gowun Batang",serif;font-size:15px}.cute-keyword-card{display:block;padding:30px 40px}.cute-keyword-card .saju-keyword-band{grid-column:auto;margin:0;padding:4px 0 0;border-top:0;background:transparent}.cute-keyword-card .saju-keyword-band h3{font-size:18px}.cute-keyword-card .saju-keyword-band>div{margin-top:18px}.cute-keyword-card .saju-keyword{min-height:64px;font-size:16px}
 .saju-disclaimer{display:grid;grid-template-columns:90px 1fr 190px;align-items:center;gap:22px;margin-top:22px;padding:22px 34px;background:linear-gradient(90deg,#fff5f7,#fffafa)}.saju-disclaimer-icon{color:#f5b45f;font-size:42px;text-align:center}.saju-disclaimer p{color:#6b544d;font-size:15px;line-height:1.75}.saju-disclaimer img{width:180px;height:130px;object-fit:contain;justify-self:center}
-.cute-personal-report .saju-brand-sub{color:#9a6647}.cute-personal-report .saju-profile-card{background:radial-gradient(circle at 88% 24%,rgba(255,239,242,.92),transparent 31%),radial-gradient(circle at 18% 58%,rgba(255,249,238,.9),transparent 34%),rgba(255,255,255,.82)}.cute-personal-report .saju-elements{margin-top:22px}.cute-face-story{background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(255,250,251,.78))}.cute-face-story .saju-section-head h2 span{color:#ff8fab}.cute-face-block{background:linear-gradient(90deg,rgba(255,245,247,.86),rgba(255,255,255,.74));border-color:#ffd8df}.cute-face-block .saju-block-cat{color:#d96f83}.cute-face-block .saju-block-summary{color:#b96a7a}.cute-total-card{background:radial-gradient(circle at 92% 18%,rgba(255,238,243,.9),transparent 26%),rgba(255,255,255,.8)}.cute-convergence{margin:22px 0 4px;padding:18px 20px;border:1px solid var(--cute-line-soft);border-radius:14px;background:rgba(255,250,250,.74)}.cute-convergence h3{margin-bottom:12px;color:#d7835b;font-family:"Gowun Batang",serif;font-size:15px;text-align:center}.cute-convergence-row{display:grid;grid-template-columns:1fr 34px 1fr;align-items:center;gap:12px;padding:10px 0;border-top:1px dashed #f4dcd4;color:#5f504b;font-size:14px;line-height:1.62;text-align:left}.cute-convergence-row:first-of-type{border-top:0}.cute-convergence-row span:first-child{text-align:right;color:#9d6c74}.cute-convergence-row b{color:#f5b45f;font-family:"Gowun Batang",serif;text-align:center}.cute-convergence-row span:last-child{color:#5d7164}
+.cute-personal-report .saju-brand-sub{color:#9a6647}.cute-personal-report .saju-profile-card{background:radial-gradient(circle at 88% 24%,rgba(255,239,242,.92),transparent 31%),radial-gradient(circle at 18% 58%,rgba(255,249,238,.9),transparent 34%),rgba(255,255,255,.82)}.cute-personal-report .saju-elements{margin-top:22px}.cute-face-story{background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(255,250,251,.78))}.cute-face-story .saju-section-head h2 span{color:#ff8fab}.cute-face-block{background:linear-gradient(90deg,rgba(255,245,247,.86),rgba(255,255,255,.74));border-color:#ffd8df}.cute-face-block .saju-block-cat{color:#d96f83}.cute-face-block .saju-block-summary{color:#b96a7a}.cute-total-card{background:radial-gradient(circle at 92% 18%,rgba(255,238,243,.9),transparent 26%),rgba(255,255,255,.8)}
 .cute-compatibility-report{background:linear-gradient(180deg,#fffaf4 0%,#fff5ef 52%,#ffeef2 100%)}.compat-cute-wrap{max-width:1120px}.compat-cute-hero .saju-brand-sub{color:#8f5d3e}.compat-cute-hero .saju-brand-line{color:#ffb1c0}.compat-hero-card{position:relative;min-height:340px;display:grid;grid-template-columns:220px 1fr 220px;align-items:center;gap:16px;padding:34px 38px;border:1px solid var(--cute-line);border-radius:14px;background:radial-gradient(circle at 15% 24%,rgba(255,244,247,.9),transparent 28%),radial-gradient(circle at 85% 28%,rgba(255,249,239,.92),transparent 30%),rgba(255,255,255,.82);box-shadow:0 18px 42px -34px rgba(74,47,38,.42);overflow:hidden}.compat-hero-left,.compat-hero-right{width:190px;height:210px;object-fit:contain;justify-self:center}.compat-hero-main{text-align:center}.compat-day-pair{display:flex;align-items:center;justify-content:center;gap:28px}.compat-day-pair>span{color:#ff9fad;font-size:46px;font-family:"Gowun Batang",serif}.compat-day-mark{width:116px;height:116px;border-width:1.5px}.compat-day-mark .saju-day-hanja{font-size:62px}.compat-day-mark .saju-day-label{font-size:12px}.compat-hero-main h1{margin-top:22px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:34px;line-height:1.25}.compat-mode{margin-top:10px;color:#8f5d3e;font-family:"Gowun Batang",serif;font-size:15px}.compat-hero-main p{max-width:720px;margin:22px auto 0;color:#5f504b;font-size:16px;line-height:1.8}.compat-heart-float{position:absolute;color:#ffb1c0;font-size:28px}.compat-heart-float.one{left:132px;top:46px}.compat-heart-float.two{right:146px;bottom:78px}.compat-profile-card{position:relative;display:grid;grid-template-columns:1fr 110px 1fr;align-items:center;gap:22px;margin-top:22px;padding:24px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.8);box-shadow:0 18px 42px -34px rgba(74,47,38,.42)}.compat-person-cute{position:relative;min-height:318px;padding:28px 28px 22px;border:1px solid var(--cute-line);border-radius:14px;background:linear-gradient(180deg,rgba(255,250,251,.86),rgba(255,255,255,.74));text-align:center;overflow:hidden}.compat-person-cute:nth-of-type(2){background:linear-gradient(180deg,rgba(248,255,250,.86),rgba(255,255,255,.74));border-color:#dcecdf}.compat-person-label{color:#ff8fab;font-family:"Gowun Batang",serif;font-size:14px;font-weight:700}.compat-person-cute h2{margin-top:16px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:26px}.compat-person-meta{margin-top:10px;color:#7e6259;font-size:14px}.compat-person-cute .compat-day-mark{margin:22px auto 0}.compat-person-cute p{max-width:28ch;margin:18px auto 0;color:#5f504b;font-size:14px;line-height:1.7}.compat-person-cute>img{position:absolute;right:18px;bottom:8px;width:86px;height:86px;object-fit:contain}.compat-profile-heart{width:62px;height:62px;display:flex;align-items:center;justify-content:center;justify-self:center;border:2px solid #ffb7c4;border-radius:999px;background:#fff4f7;color:#ff7890;font-size:42px;box-shadow:0 12px 28px -22px rgba(255,111,130,.8)}.compat-cute-section{position:relative;margin-top:22px;padding:30px 34px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.8);box-shadow:0 18px 42px -34px rgba(74,47,38,.42);overflow:hidden}.compat-section-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}.compat-section-head h2{display:flex;align-items:center;gap:14px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:27px}.compat-section-head h2 span{color:#ff7890;font-family:"Song Myung",serif;font-size:34px}.compat-section-head h2 b{color:#ffb1c0;font-family:"Gowun Dodum",sans-serif;font-size:18px}.compat-section-head p{padding:8px 16px;border-radius:999px;background:#fff2f6;color:#d36472;font-family:"Gowun Batang",serif;font-size:13px}.compat-section-body{display:grid;grid-template-columns:130px 1fr;gap:24px;align-items:start}.compat-section-ora{width:118px;height:118px;object-fit:contain}.compat-block-list{display:grid;gap:14px}.compat-cute-block{display:grid;grid-template-columns:54px 1fr;gap:16px;padding:16px 18px;border:1px solid var(--cute-line-soft);border-radius:12px;background:rgba(255,250,250,.75)}.compat-block-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:#fff5f7;color:#ff8fab;font-size:26px}.compat-cute-block h3{margin-top:4px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:20px}.compat-cute-block p{margin-top:8px;color:#5f504b;font-size:14.5px;line-height:1.72}.compat-cute-block .saju-block-summary{color:#d36472;font-family:"Gowun Batang",serif;font-weight:700}.compat-action-cute{background:radial-gradient(circle at 86% 70%,rgba(255,238,243,.9),transparent 28%),rgba(255,255,255,.8)}.compat-action-body{display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:center}.compat-action-body img{width:140px;height:130px;object-fit:contain}.compat-action-body p{color:#5f504b;font-size:15px;line-height:1.8}.compat-summary-cute{background:linear-gradient(180deg,rgba(255,246,248,.86),rgba(255,255,255,.8))}.compat-summary-cute .saju-summary-copy h2 span:last-child{margin-left:10px;margin-right:0}.compat-disclaimer{background:linear-gradient(90deg,#fff7f2,#fff5f8)}
 header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--line)}
 .eyebrow{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;margin-bottom:26px}
