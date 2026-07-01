@@ -28,11 +28,14 @@ from oracle_report.workflow import (
     CompatibilityWorkflowInput,
     PersonalWorkflowResult,
     PersonalWorkflowInput,
+    _build_birth_profile,
     run_compatibility_workflow,
     run_personal_workflow,
 )
+from oracle_report.saju.engine import ELEMENTS
 from oracle_report.saju.repository import (
     MANSE_TIME_BRANCH_LABELS,
+    ManseRepository,
     time_branch_range_display_from_index,
 )
 from oracle_report.vision.capture import FaceCaptureHarness
@@ -53,6 +56,7 @@ class _WorkflowJob:
     error: str = ""
     phase: str = ""
     message: str = ""
+    element_preview: dict[str, object] | None = None
     download_html: str = ""
     download_filename: str = "oracle_report.html"
 
@@ -375,6 +379,7 @@ def create_app() -> Flask:
             "error": "job not found",
             "phase": "",
             "message": "",
+            "element_preview": None,
         }
         if job is not None:
             payload = {
@@ -383,6 +388,7 @@ def create_app() -> Flask:
                 "error": job.error,
                 "phase": job.phase,
                 "message": job.message,
+                "element_preview": job.element_preview,
             }
         else:
             status_code = 404
@@ -663,6 +669,62 @@ def _compatibility_workflow_input_from_form() -> CompatibilityWorkflowInput:
     return result
 
 
+def _build_personal_element_preview(
+    workflow_input: PersonalWorkflowInput,
+) -> dict[str, object] | None:
+    try:
+        profile = _build_birth_profile(
+            workflow_input.name,
+            workflow_input.birth_date,
+            workflow_input.birth_time,
+            workflow_input.gender,
+        )
+        manse_lookup = ManseRepository().lookup(profile)
+    except Exception:
+        return None
+
+    counts = manse_lookup.reading.element_counts
+    strongest = _element_by_strength(counts, strongest=True)
+    weakest = _element_by_strength(counts, strongest=False)
+    count_items = [
+        {"element": element, "count": int(counts[element])}
+        for element in ELEMENTS
+    ]
+    counts_text = ", ".join(
+        f"{item['element']} {item['count']}" for item in count_items
+    )
+    result: dict[str, object] = {
+        "title": "오행 미리보기",
+        "summary": (
+            f"{profile.name}님의 오행은 {counts_text}로 나타나요. "
+            f"지금은 {strongest} 기운이 가장 두드러지고, "
+            f"{weakest} 기운을 생활 속에서 천천히 보완하면 좋아요."
+        ),
+        "strongest": strongest,
+        "weakest": weakest,
+        "counts": count_items,
+    }
+    return result
+
+
+def _element_by_strength(
+    counts: dict[str, int],
+    *,
+    strongest: bool,
+) -> str:
+    if strongest:
+        result = max(
+            ELEMENTS,
+            key=lambda element: (counts[element], -ELEMENTS.index(element)),
+        )
+    else:
+        result = min(
+            ELEMENTS,
+            key=lambda element: (counts[element], ELEMENTS.index(element)),
+        )
+    return result
+
+
 def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
     job_id = uuid.uuid4().hex
     initial_phase = "generating" if workflow_input.skip_face else "capturing"
@@ -671,6 +733,7 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
         if workflow_input.skip_face
         else "얼굴을 카메라 중앙에 맞춰 주세요"
     )
+    element_preview = _build_personal_element_preview(workflow_input)
 
     def capture_runner(config, output_dir: Path | None = None):
         capture_artifact = _preview_capture_runner(config, output_dir)
@@ -680,6 +743,7 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
                 status="running",
                 phase="generating",
                 message="얼굴 인식이 완료되어 리포트를 생성하고 있습니다",
+                element_preview=element_preview,
             ),
         )
         return capture_artifact
@@ -695,6 +759,7 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
         result = _WorkflowJob(
             status="complete",
             html=_personal_result(workflow_result),
+            element_preview=element_preview,
             download_html=workflow_result.report_html,
             download_filename=workflow_result.output_path.name,
         )
@@ -707,6 +772,7 @@ def _start_personal_workflow_job(workflow_input: PersonalWorkflowInput) -> str:
             status="running",
             phase=initial_phase,
             message=initial_message,
+            element_preview=element_preview,
         ),
     )
     return result
@@ -1264,6 +1330,8 @@ def _face_analysis_mode_options() -> str:
 
 
 def _personal_result_page(job_id: str, skip_face: bool) -> str:
+    job = _get_job(job_id)
+    element_preview = job.element_preview if job is not None else None
     result = f"""
     <div class="oracle-result-shell personal-result-shell">
       <div class="input-topbar result-topbar" aria-label="페이지 이동">
@@ -1289,7 +1357,7 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
-      {_capture_preview_panel(job_id=job_id, skip_face=skip_face, cute=True)}
+      {_capture_preview_panel(job_id=job_id, skip_face=skip_face, cute=True, element_preview=element_preview)}
     </div>
     """
     return result
@@ -1334,6 +1402,7 @@ def _capture_preview_panel(
     cute: bool = False,
     compare_debug: bool = False,
     compare_live: bool = False,
+    element_preview: dict[str, object] | None = None,
 ) -> str:
     job_attr = f' data-workflow-result-job="{escape(job_id)}"' if job_id != "" else ""
     skip_attr = ' data-skip-face="1"' if skip_face else ' data-skip-face="0"'
@@ -1359,6 +1428,7 @@ def _capture_preview_panel(
     loading_heart = (
         '<span class="loading-heart" aria-hidden="true">♡</span>' if cute else ""
     )
+    element_preview_html = _loading_element_preview_html(element_preview)
     if compare_live:
         debug_panel = _capture_debug_panel()
         preview_content = f"""
@@ -1441,6 +1511,7 @@ def _capture_preview_panel(
       <div>
         <strong id="workflow-loading-title">{loading_title}</strong>
         <p id="workflow-loading-message" class="hint">{loading_message}</p>
+        {element_preview_html}
       </div>
       {loading_heart}
     </section>
@@ -1449,6 +1520,71 @@ def _capture_preview_panel(
     </section>
     <section id="workflow-result"></section>
     """
+    return result
+
+
+def _loading_element_preview_html(
+    element_preview: dict[str, object] | None,
+) -> str:
+    hidden_attr = " hidden" if not element_preview else ""
+    summary = ""
+    counts_html = ""
+    if element_preview:
+        summary_value = element_preview.get("summary", "")
+        summary = str(summary_value)
+        raw_counts = element_preview.get("counts", [])
+        count_items = raw_counts if isinstance(raw_counts, list) else []
+        max_count = 1
+        numeric_counts: list[tuple[str, int]] = []
+        for item in count_items:
+            if isinstance(item, dict):
+                element = str(item.get("element", ""))
+                try:
+                    count = int(item.get("count", 0))
+                except (TypeError, ValueError):
+                    count = 0
+                if element in ELEMENTS:
+                    numeric_counts.append((element, count))
+                    max_count = max(max_count, count)
+        counts_html = "".join(
+            _loading_element_bar_html(element, count, max_count)
+            for element, count in numeric_counts
+        )
+    result = f"""
+          <div id="loading-element-preview" class="loading-element-preview"{hidden_attr}>
+            <span class="loading-element-kicker">오행 미리보기</span>
+            <p id="loading-element-summary">{escape(summary)}</p>
+            <div id="loading-element-bars" class="loading-element-bars" aria-label="오행 분포">
+              {counts_html}
+            </div>
+          </div>
+    """
+    return result
+
+
+def _loading_element_bar_html(element: str, count: int, max_count: int) -> str:
+    ratio = count / max_count if max_count > 0 else 0
+    result = f"""
+              <div class="loading-element-item loading-element-{_element_css_suffix(element)}">
+                <span>{escape(element)}</span>
+                <div class="loading-element-track" aria-hidden="true">
+                  <span class="loading-element-fill" style="--element-ratio: {ratio:.3f};"></span>
+                </div>
+                <b>{count}</b>
+              </div>
+    """
+    return result
+
+
+def _element_css_suffix(element: str) -> str:
+    mapping = {
+        "목": "mok",
+        "화": "hwa",
+        "토": "to",
+        "금": "geum",
+        "수": "su",
+    }
+    result = mapping.get(element, "unknown")
     return result
 
 
@@ -3544,6 +3680,78 @@ def _render_page(
             color: #8b6f64;
             font-size: 14px;
           }}
+          .loading-element-preview {{
+            display: grid;
+            gap: 10px;
+            width: min(520px, 100%);
+            margin-top: 14px;
+            padding: 13px 14px;
+            border: 1px solid #e6d7bd;
+            border-radius: 8px;
+            background: rgba(255, 252, 246, 0.86);
+          }}
+          .loading-element-preview[hidden] {{
+            display: none;
+          }}
+          .loading-element-kicker {{
+            color: #8f6a3a;
+            font-family: "Gowun Batang", serif;
+            font-size: 13px;
+            font-weight: 700;
+          }}
+          .personal-result-shell .loading-element-preview p {{
+            color: #5f504b;
+            font-size: 13.5px;
+            line-height: 1.65;
+          }}
+          .loading-element-bars {{
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+          }}
+          .loading-element-item {{
+            display: grid;
+            grid-template-rows: auto 42px auto;
+            gap: 6px;
+            min-width: 0;
+            text-align: center;
+          }}
+          .loading-element-item span,
+          .loading-element-item b {{
+            color: #6b544d;
+            font-size: 12px;
+            line-height: 1.2;
+          }}
+          .loading-element-track {{
+            position: relative;
+            align-self: stretch;
+            width: 100%;
+            min-height: 42px;
+            overflow: hidden;
+            border-radius: 7px;
+            background: #f3eadf;
+          }}
+          .loading-element-fill {{
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: calc(var(--element-ratio, 0) * 100%);
+            border-radius: 7px 7px 0 0;
+            background: #42b883;
+          }}
+          .loading-element-hwa .loading-element-fill {{
+            background: #ff7f8d;
+          }}
+          .loading-element-to .loading-element-fill {{
+            background: #d8a24b;
+          }}
+          .loading-element-geum .loading-element-fill {{
+            background: #a9b5bd;
+          }}
+          .loading-element-su .loading-element-fill {{
+            background: #5b91d9;
+          }}
           .loading-spinner {{
             width: 24px;
             height: 24px;
@@ -4420,6 +4628,7 @@ def _render_page(
               await new Promise((resolve) => setTimeout(resolve, 30000)); /* 로그 주기 수정하지 말 것 */
               const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
               const payload = await response.json();
+              renderElementPreview(payload.element_preview);
               if (payload.phase === "generating") {{
                 activatePrivacyVeil(preview);
                 status.textContent = payload.message || "얼굴 인식 완료, 리포트를 생성하고 있습니다";
@@ -4454,6 +4663,61 @@ def _render_page(
                 }}
               }}
             }}
+          }}
+
+          function renderElementPreview(elementPreview) {{
+            const preview = document.getElementById("loading-element-preview");
+            const summary = document.getElementById("loading-element-summary");
+            const bars = document.getElementById("loading-element-bars");
+            if (!preview || !summary || !bars) {{
+              return;
+            }}
+            const counts = elementPreview && Array.isArray(elementPreview.counts)
+              ? elementPreview.counts
+              : [];
+            if (!elementPreview || counts.length === 0) {{
+              preview.hidden = true;
+              return;
+            }}
+            preview.hidden = false;
+            summary.textContent = elementPreview.summary || "";
+            bars.textContent = "";
+            const maxCount = Math.max(1, ...counts.map((item) => Number(item.count) || 0));
+            counts.forEach((item) => {{
+              const element = String(item.element || "");
+              const count = Number(item.count) || 0;
+              const row = document.createElement("div");
+              row.className = "loading-element-item loading-element-" + elementCssSuffix(element);
+
+              const label = document.createElement("span");
+              label.textContent = element;
+              row.appendChild(label);
+
+              const track = document.createElement("div");
+              track.className = "loading-element-track";
+              track.setAttribute("aria-hidden", "true");
+              const fill = document.createElement("span");
+              fill.className = "loading-element-fill";
+              fill.style.setProperty("--element-ratio", String(count / maxCount));
+              track.appendChild(fill);
+              row.appendChild(track);
+
+              const value = document.createElement("b");
+              value.textContent = String(count);
+              row.appendChild(value);
+              bars.appendChild(row);
+            }});
+          }}
+
+          function elementCssSuffix(element) {{
+            const suffixes = {{
+              "목": "mok",
+              "화": "hwa",
+              "토": "to",
+              "금": "geum",
+              "수": "su",
+            }};
+            return suffixes[element] || "unknown";
           }}
 
           function startCaptureDebugPolling(loading, options) {{
