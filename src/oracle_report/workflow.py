@@ -1729,7 +1729,8 @@ def _generate_distributed(
             # Get current score of target worker and master
             my_curr_score = scheduler.slave_metadata.get(slave_url, {}).get("compute_score", 5.0)
             local_curr_score = scheduler.slave_metadata.get("local", {}).get("compute_score", 5.0)
-            device_name = "local" if is_local else slave_url
+            from urllib.parse import urlparse
+            device_name = "local (127.0.0.1)" if is_local else f"{slave_url} ({urlparse(slave_url).hostname or ''})"
 
             prefix_tag = "SPECULATIVE" if speculative else "NORMAL"
             print(f"[Distributed][Start] Task '{cat or 'metadata'}' dispatched to {device_name} (Worker Score: {my_curr_score:.2f}, Master Score: {local_curr_score:.2f})")
@@ -1858,7 +1859,7 @@ def _generate_distributed(
 
             local_curr_score = scheduler.slave_metadata.get("local", {}).get("compute_score", 5.0)
             prefix_tag = "SPECULATIVE" if speculative else "NORMAL"
-            print(f"[Distributed][Start] Local Task '{cat or 'metadata'}' dispatched (Local Score: {local_curr_score:.2f})")
+            print(f"[Distributed][Start] Local Task '{cat or 'metadata'}' dispatched to local (127.0.0.1) (Local Score: {local_curr_score:.2f})")
 
             success = False
             output = None
@@ -1880,14 +1881,14 @@ def _generate_distributed(
             if success:
                 with _COMPLETED_TIMES_LOCK:
                     _LAST_COMPLETED_TIMES["local"] = time.time()
-                print(f"[Distributed] Task '{cat or 'metadata'}' completed on local in {elapsed:.2f}s (Local Score: {local_updated_score:.2f})")
+                print(f"[Distributed] Task '{cat or 'metadata'}' completed on local (127.0.0.1) in {elapsed:.2f}s (Local Score: {local_updated_score:.2f})")
                 already_done = is_task_done(task)
                 if not already_done:
                     mark_task_done(task)
                     with results_lock:
                         results.append({"task": task, "success": True, "output": output})
             else:
-                print(f"[Distributed] Task '{cat or 'metadata'}' failed on local in {elapsed:.2f}s. Error: {error_msg} (Local Score: {local_updated_score:.2f})")
+                print(f"[Distributed] Task '{cat or 'metadata'}' failed on local (127.0.0.1) in {elapsed:.2f}s. Error: {error_msg} (Local Score: {local_updated_score:.2f})")
                 if not speculative:
                     task["retries"] += 1
                     if task["retries"] <= 3:
