@@ -29,6 +29,12 @@ from oracle_report.saju.repository import (
     MANSE_TIME_BRANCH_LABELS,
     time_branch_range_display_from_index,
 )
+from oracle_report.vision.capture import FaceCaptureHarness
+from oracle_report.vision.camera import (
+    build_capture_processors,
+    draw_overlay,
+    open_camera,
+)
 from oracle_report.vision.runtime import run_capture
 
 
@@ -49,7 +55,7 @@ def _empty_capture_debug_payload() -> dict[str, object]:
         "message": "촬영을 시작하면 랜드마크 측정값이 표시됩니다.",
         "ready": False,
         "metrics_text": "- 측정 대기 중",
-        "observations_text": "- 관찰 컨텍스트 대기 중",
+        "observations_text": "- 판정 결과 대기 중",
         "rules_text": "- 룰 매칭 대기 중",
         "warnings": [],
     }
@@ -63,7 +69,7 @@ class _PreviewStream:
         self._version = 0
         self._debug_payload: dict[str, object] = _empty_capture_debug_payload()
 
-    def publish(self, cv2, frame, decision=None) -> None:
+    def publish(self, cv2, frame, decision=None, *, live: bool = False) -> None:
         ok, encoded = cv2.imencode(
             ".jpg",
             frame,
@@ -72,9 +78,15 @@ class _PreviewStream:
         if ok:
             with self._condition:
                 self._frame = encoded.tobytes()
-                self._debug_payload = _capture_debug_payload(decision)
+                self._debug_payload = _capture_debug_payload(decision, live=live)
                 self._version = self._version + 1
                 self._condition.notify_all()
+
+    def publish_debug(self, payload: dict[str, object]) -> None:
+        with self._condition:
+            self._debug_payload = payload
+            self._version = self._version + 1
+            self._condition.notify_all()
 
     def reset_debug(self) -> None:
         with self._condition:
@@ -110,6 +122,8 @@ class _PreviewStream:
 
 _PREVIEW_STREAM = _PreviewStream()
 _CAPTURE_LOCK = threading.Lock()
+_COMPARE_CAMERA_LOCK = threading.Lock()
+_COMPARE_CAMERA_THREAD: threading.Thread | None = None
 _JOBS_LOCK = threading.Lock()
 _JOBS: dict[str, _WorkflowJob] = {}
 
@@ -397,8 +411,8 @@ def create_app() -> Flask:
 
     @app.post("/api/compare-camera/start")
     def compare_camera_start():
-        job_id = _start_compare_camera_job()
-        result = jsonify({"job_id": job_id})
+        payload = _start_compare_camera_stream()
+        result = jsonify(payload)
         return result
 
     @app.get("/api/capture-debug")
@@ -713,30 +727,92 @@ def _start_compatibility_workflow_job(
     return result
 
 
-def _start_compare_camera_job() -> str:
-    job_id = uuid.uuid4().hex
-    _PREVIEW_STREAM.reset_debug()
-
-    def run_job() -> _WorkflowJob:
-        artifact = _preview_capture_runner(load_capture_config())
-        result = _WorkflowJob(
-            status="complete",
-            phase="complete",
-            message="랜드마크 측정이 완료되었습니다",
-            html=_compare_camera_result(artifact),
-        )
-        return result
-
-    result = _start_workflow_job(
-        run_job,
-        job_id=job_id,
-        initial_job=_WorkflowJob(
-            status="running",
-            phase="capturing",
-            message="정면 얼굴을 카메라 중앙에 맞춰 주세요",
-        ),
-    )
+def _start_compare_camera_stream() -> dict[str, object]:
+    global _COMPARE_CAMERA_THREAD
+    with _COMPARE_CAMERA_LOCK:
+        if (
+            _COMPARE_CAMERA_THREAD is not None
+            and _COMPARE_CAMERA_THREAD.is_alive()
+        ):
+            return {
+                "status": "running",
+                "message": "실시간 랜드마크 측정이 이미 진행 중입니다.",
+            }
+        _PREVIEW_STREAM.reset_debug()
+        thread = threading.Thread(target=_run_compare_camera_stream, daemon=True)
+        _COMPARE_CAMERA_THREAD = thread
+        thread.start()
+    result: dict[str, object] = {
+        "status": "running",
+        "message": "실시간 랜드마크 측정을 시작했습니다.",
+    }
     return result
+
+
+def _run_compare_camera_stream() -> None:
+    acquired = _CAPTURE_LOCK.acquire(blocking=False)
+    if not acquired:
+        _PREVIEW_STREAM.publish_debug(
+            {
+                "state": "error",
+                "message": "다른 촬영 작업이 진행 중입니다.",
+                "ready": False,
+                "metrics_text": "- 측정값 없음",
+                "observations_text": "- 관찰값 없음",
+                "rules_text": "- 판정 결과 없음",
+                "warnings": [],
+            },
+        )
+        return
+
+    capture = None
+    try:
+        config = load_capture_config()
+        cv2, capture = open_camera(config)
+        detector, analyzer = build_capture_processors(config)
+        harness = FaceCaptureHarness(
+            detector=detector,
+            quality_analyzer=analyzer,
+            min_face_seconds=config.min_face_seconds,
+            face_min_size_px=config.face_min_size_px,
+        )
+        while True:
+            ok, raw_frame = capture.read()
+            if not ok:
+                raise RuntimeError("failed to read camera frame")
+            decision = harness.observe(raw_frame)
+            faces = [] if decision.face is None else [decision.face]
+            preview_frame = raw_frame.copy()
+            message = decision.message
+            if decision.quality is not None and decision.quality.ready:
+                message = (
+                    "실시간 측정 중입니다. 얼굴 변화에 따라 metric과 판정이 갱신됩니다."
+                )
+            draw_overlay(
+                cv2,
+                preview_frame,
+                message,
+                faces,
+                decision.state == "warning",
+                decision.landmark_points,
+            )
+            _PREVIEW_STREAM.publish(cv2, preview_frame, decision, live=True)
+    except Exception as exc:
+        _PREVIEW_STREAM.publish_debug(
+            {
+                "state": "error",
+                "message": str(exc),
+                "ready": False,
+                "metrics_text": "- 측정값 없음",
+                "observations_text": "- 관찰값 없음",
+                "rules_text": "- 판정 결과 없음",
+                "warnings": [],
+            },
+        )
+    finally:
+        if capture is not None:
+            capture.release()
+        _CAPTURE_LOCK.release()
 
 
 def _personal_result_url(job_id: str, skip_face: bool) -> str:
@@ -764,13 +840,18 @@ def _compare_camera_enabled() -> bool:
     return result
 
 
-def _capture_debug_payload(decision) -> dict[str, object]:
+def _capture_debug_payload(decision, *, live: bool = False) -> dict[str, object]:
     if decision is None:
         return _empty_capture_debug_payload()
     quality = getattr(decision, "quality", None)
+    state = getattr(decision, "state", "")
+    message = getattr(decision, "message", "")
+    if live and quality is not None and getattr(quality, "ready", False):
+        state = "tracking"
+        message = "실시간 측정 중입니다. 얼굴 변화에 따라 metric과 판정이 갱신됩니다."
     result: dict[str, object] = {
-        "state": getattr(decision, "state", ""),
-        "message": getattr(decision, "message", ""),
+        "state": state,
+        "message": message,
         "ready": False,
         "metrics_text": "- 얼굴 랜드마크 측정값 없음",
         "observations_text": "- 매칭된 관찰값 없음",
@@ -1156,11 +1237,12 @@ def _capture_preview_panel(
     skip_face: bool = False,
     cute: bool = False,
     compare_debug: bool = False,
+    compare_live: bool = False,
 ) -> str:
     job_attr = f' data-workflow-result-job="{escape(job_id)}"' if job_id != "" else ""
     skip_attr = ' data-skip-face="1"' if skip_face else ' data-skip-face="0"'
-    loading_hidden = "" if job_id != "" else " hidden"
-    preview_hidden = " hidden" if skip_face or job_id == "" else ""
+    loading_hidden = "" if job_id != "" and not compare_live else " hidden"
+    preview_hidden = " hidden" if skip_face or (job_id == "" and not compare_live) else ""
     loading_title = (
         "사주 리포트 생성 중입니다"
         if skip_face
@@ -1176,10 +1258,31 @@ def _capture_preview_panel(
         if skip_face
         else "정면 얼굴을 카메라 중앙에 맞춰 주세요."
     )
+    if compare_live:
+        status_text = "실시간 측정 시작을 눌러 주세요."
     loading_heart = (
         '<span class="loading-heart" aria-hidden="true">♡</span>' if cute else ""
     )
-    if cute:
+    if compare_live:
+        debug_panel = _capture_debug_panel()
+        preview_content = f"""
+      <h2>실시간 랜드마크 측정</h2>
+      <div class="capture-debug-layout capture-stage-with-debug">
+        <div class="capture-stage">
+          <div class="capture-visual">
+            <img id="capture-preview-image" alt="실시간 랜드마크 측정 화면">
+            <span class="camera-corner camera-corner-tl" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-tr" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-bl" aria-hidden="true"></span>
+            <span class="camera-corner camera-corner-br" aria-hidden="true"></span>
+            <span class="face-guide" aria-hidden="true"></span>
+          </div>
+          <p id="workflow-status" class="hint capture-tip">{status_text}</p>
+        </div>
+        {debug_panel}
+      </div>
+        """
+    elif cute:
         debug_panel = _capture_debug_panel() if compare_debug else ""
         debug_class = " capture-stage-with-debug" if compare_debug else ""
         preview_content = f"""
@@ -1258,19 +1361,19 @@ def _capture_debug_panel() -> str:
       <aside class="capture-debug-panel" aria-label="랜드마크 디버그 정보">
         <div class="capture-debug-head">
           <span>LIVE</span>
-          <strong>랜드마크 비교</strong>
+          <strong>측정값 / 판정</strong>
         </div>
         <div class="capture-debug-status">
           <b id="capture-debug-state">idle</b>
-          <p id="capture-debug-message">촬영을 시작하면 랜드마크 측정값이 표시됩니다.</p>
+          <p id="capture-debug-message">측정을 시작하면 랜드마크 metric과 판정 결과가 표시됩니다.</p>
         </div>
         <section>
-          <h3>계산된 metric</h3>
+          <h3>실시간 metric</h3>
           <pre id="capture-debug-metrics">- 측정 대기 중</pre>
         </section>
         <section>
-          <h3>매칭 observations</h3>
-          <pre id="capture-debug-observations">- 관찰 컨텍스트 대기 중</pre>
+          <h3>판정 결과</h3>
+          <pre id="capture-debug-observations">- 판정 결과 대기 중</pre>
         </section>
       </aside>
     """
@@ -1286,10 +1389,10 @@ def _compare_camera_page() -> str:
         <div class="ornament" aria-hidden="true"><span></span></div>
       </header>
       <div class="result-actions">
-        <button id="compare-camera-start" class="result-action result-action-primary" type="button">카메라 측정 시작</button>
+        <button id="compare-camera-start" class="result-action result-action-primary" type="button">실시간 측정 시작</button>
         <a class="result-action" href="/">홈으로</a>
       </div>
-      {_capture_preview_panel(job_id="", skip_face=False, cute=True, compare_debug=True)}
+      {_capture_preview_panel(job_id="", skip_face=False, compare_live=True)}
     </div>
     """
     return result
@@ -3769,19 +3872,29 @@ def _render_page(
                 return;
               }}
               compareCameraStart.disabled = true;
-              prepareWorkflowUi(ui, false);
+              compareCameraStart.textContent = "실시간 측정 중";
+              ui.result.innerHTML = "";
+              ui.loading.hidden = true;
+              ui.loading.setAttribute("aria-busy", "true");
               ui.loading.dataset.compareCamera = "1";
-              startCaptureDebugPolling(ui.loading);
+              ui.preview.hidden = false;
+              ui.previewImage.src = "/video-feed?ts=" + Date.now();
+              ui.status.textContent = "카메라 연결 중입니다.";
               try {{
                 const response = await fetch("/api/compare-camera/start", {{
                   method: "POST",
                 }});
                 const payload = await response.json();
-                ui.loading.dataset.workflowResultJob = payload.job_id;
-                pollWorkflow(payload.job_id, ui.status, ui.result, ui.loading);
+                if (!response.ok) {{
+                  throw new Error(payload.message || "카메라 비교 모드를 시작하지 못했습니다");
+                }}
+                ui.status.textContent = payload.message || "실시간 랜드마크 측정 중입니다.";
+                startCaptureDebugPolling(ui.loading, {{ live: true }});
               }} catch (error) {{
                 ui.status.textContent = "카메라 비교 모드를 시작하지 못했습니다";
                 compareCameraStart.disabled = false;
+                compareCameraStart.textContent = "실시간 측정 시작";
+                ui.loading.setAttribute("aria-busy", "false");
               }}
             }});
           }}
@@ -3866,16 +3979,18 @@ def _render_page(
             }}
           }}
 
-          function startCaptureDebugPolling(loading) {{
+          function startCaptureDebugPolling(loading, options) {{
             const panel = document.querySelector(".capture-debug-panel");
             if (!panel || panel.dataset.polling === "1") {{
               return;
             }}
+            const live = Boolean(options && options.live);
             panel.dataset.polling = "1";
             const stateEl = document.getElementById("capture-debug-state");
             const messageEl = document.getElementById("capture-debug-message");
             const metricsEl = document.getElementById("capture-debug-metrics");
             const observationsEl = document.getElementById("capture-debug-observations");
+            const statusEl = document.getElementById("workflow-status");
             const tick = async () => {{
               try {{
                 const response = await fetch("/api/capture-debug?ts=" + Date.now());
@@ -3890,14 +4005,17 @@ def _render_page(
                   metricsEl.textContent = payload.metrics_text || "- 측정값 없음";
                 }}
                 if (observationsEl) {{
-                  observationsEl.textContent = payload.observations_text || "- 관찰값 없음";
+                  observationsEl.textContent = payload.observations_text || payload.rules_text || "- 판정 결과 없음";
+                }}
+                if (live && statusEl) {{
+                  statusEl.textContent = payload.message || "실시간 랜드마크 측정 중입니다.";
                 }}
               }} catch (error) {{
                 if (messageEl) {{
                   messageEl.textContent = "디버그 정보를 불러오지 못했습니다";
                 }}
               }}
-              const jobDone = loading.getAttribute("aria-busy") === "false";
+              const jobDone = !live && loading.getAttribute("aria-busy") === "false";
               if (!jobDone) {{
                 window.setTimeout(tick, 500);
               }} else {{

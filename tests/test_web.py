@@ -143,6 +143,42 @@ def test_compatibility_result_page_includes_workflow_loading_state() -> None:
     assert 'href="/api/jobs/test-job/download"' in html
 
 
+def test_compare_camera_page_uses_live_metric_dashboard() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import create_app
+
+    app = create_app()
+
+    response = app.test_client().get("/compare-camera")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "실시간 랜드마크 측정" in html
+    assert "실시간 metric" in html
+    assert "판정 결과" in html
+    assert "oracle-solo-card.png" not in html
+    assert "oracle-pair-card.png" not in html
+    assert "pollWorkflow(payload.job_id" not in html
+
+
+def test_compare_camera_start_returns_live_status(monkeypatch) -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import create_app
+
+    monkeypatch.setattr(
+        "oracle_report.web._start_compare_camera_stream",
+        lambda: {"status": "running", "message": "ok"},
+    )
+    app = create_app()
+
+    response = app.test_client().post("/api/compare-camera/start")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload == {"status": "running", "message": "ok"}
+    assert "job_id" not in payload
+
+
 def test_compatibility_api_returns_result_url(monkeypatch) -> None:
     pytest.importorskip("flask")
     from oracle_report.web import create_app
