@@ -178,7 +178,7 @@ def create_app() -> Flask:
                   <p>두 사람의 인연과 궁합을<br>AI가 정밀하게 분석해드려요!</p>
                   <span class="go">시작하기 <span class="arr">→</span></span>
                 </div>
-                <img class="mode-art mode-art-pair" src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+                <img class="mode-art mode-art-pair" src="/static/assets/oracle-couple-card.png" alt="" aria-hidden="true">
               </a>
             </div>
 
