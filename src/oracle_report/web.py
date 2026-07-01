@@ -11,7 +11,11 @@ os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 
 from dataclasses import dataclass
+from email.message import EmailMessage
+from email.utils import parseaddr
 from pathlib import Path
+import smtplib
+import ssl
 import threading
 import uuid
 
@@ -404,6 +408,25 @@ def create_app() -> Flask:
                     ),
                 },
             )
+        return result
+
+    @app.post("/api/jobs/<job_id>/email")
+    def job_email(job_id: str):
+        job = _get_job(job_id)
+        if job is None or job.status != "complete" or job.download_html == "":
+            result = jsonify({"status": "error", "message": "리포트가 아직 준비되지 않았습니다."}), 404
+        else:
+            payload = request.get_json(silent=True) or {}
+            recipient = str(payload.get("email", "")).strip()
+            try:
+                _send_report_email(recipient, job.download_filename, job.download_html)
+                result = jsonify({"status": "sent", "message": "리포트를 이메일로 보냈습니다."})
+            except ValueError as exc:
+                result = jsonify({"status": "error", "message": str(exc)}), 400
+            except RuntimeError as exc:
+                result = jsonify({"status": "error", "message": str(exc)}), 500
+            except Exception:
+                result = jsonify({"status": "error", "message": "이메일 발송 중 오류가 발생했습니다."}), 500
         return result
 
     @app.get("/compare-camera")
@@ -1288,7 +1311,9 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
         <a class="result-action" href="/personal">입력 다시 하기</a>
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
+        <button id="email-report-open" class="result-action result-action-mail" type="button" hidden>메일로 보내기</button>
       </div>
+      {_email_report_panel(job_id)}
       {_capture_preview_panel(job_id=job_id, skip_face=skip_face, cute=True)}
     </div>
     """
@@ -1320,9 +1345,28 @@ def _compatibility_result_page(job_id: str) -> str:
         <a class="result-action" href="/compatibility">입력 다시 하기</a>
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
+        <button id="email-report-open" class="result-action result-action-mail" type="button" hidden>메일로 보내기</button>
       </div>
+      {_email_report_panel(job_id)}
       {_capture_preview_panel(job_id=job_id, skip_face=False, cute=True)}
     </div>
+    """
+    return result
+
+
+def _email_report_panel(job_id: str) -> str:
+    result = f"""
+    <section id="email-report-panel" class="email-report-panel" data-email-job="{escape(job_id)}" hidden>
+      <form id="email-report-form" class="email-report-form">
+        <label>
+          받을 이메일
+          <input name="email" type="email" placeholder="example@email.com" required>
+        </label>
+        <button type="submit">보내기</button>
+        <button type="button" data-email-close>닫기</button>
+      </form>
+      <p id="email-report-status" class="email-report-status">리포트 HTML 파일을 첨부해서 보내요.</p>
+    </section>
     """
     return result
 
@@ -1521,6 +1565,78 @@ def _personal_result(workflow_result: PersonalWorkflowResult) -> str:
 def _compatibility_result(markdown: str, workflow_result) -> str:
     del markdown
     result = workflow_result.report_fragment_html
+    return result
+
+
+def _send_report_email(recipient: str, filename: str, html: str) -> None:
+    address = _validate_email_address(recipient)
+    host = os.getenv("ORACLE_SMTP_HOST", "").strip()
+    if host == "":
+        raise RuntimeError("SMTP 설정이 없습니다. ORACLE_SMTP_HOST를 .env에 설정해 주세요.")
+    try:
+        port = int(os.getenv("ORACLE_SMTP_PORT", "587"))
+    except ValueError as exc:
+        raise RuntimeError("ORACLE_SMTP_PORT는 숫자로 설정해 주세요.") from exc
+    user = os.getenv("ORACLE_SMTP_USER", "").strip()
+    password = os.getenv("ORACLE_SMTP_PASSWORD", "")
+    sender = os.getenv("ORACLE_MAIL_FROM", user).strip()
+    if sender == "":
+        raise RuntimeError("보내는 메일 주소가 없습니다. ORACLE_MAIL_FROM 또는 ORACLE_SMTP_USER를 설정해 주세요.")
+
+    message = EmailMessage()
+    message["Subject"] = os.getenv("ORACLE_MAIL_SUBJECT", "Oracle 리포트가 도착했어요")
+    message["From"] = sender
+    message["To"] = address
+    message.set_content(
+        "Oracle 리포트를 첨부 파일로 보내드립니다.\n"
+        "이 리포트는 재미와 참고를 위한 콘텐츠입니다."
+    )
+    message.add_attachment(
+        html.encode("utf-8"),
+        maintype="text",
+        subtype="html",
+        filename=filename,
+    )
+
+    use_ssl = _env_bool("ORACLE_SMTP_SSL", False)
+    use_tls = _env_bool("ORACLE_SMTP_TLS", True)
+    context = ssl.create_default_context()
+    if use_ssl:
+        with smtplib.SMTP_SSL(host, port, timeout=20, context=context) as smtp:
+            _smtp_login_if_configured(smtp, user, password)
+            smtp.send_message(message)
+    else:
+        with smtplib.SMTP(host, port, timeout=20) as smtp:
+            if use_tls:
+                smtp.starttls(context=context)
+            _smtp_login_if_configured(smtp, user, password)
+            smtp.send_message(message)
+
+
+def _validate_email_address(value: str) -> str:
+    display_name, address = parseaddr(value)
+    del display_name
+    if (
+        address == ""
+        or "@" not in address
+        or "\n" in value
+        or "\r" in value
+        or address != value.strip()
+    ):
+        raise ValueError("올바른 이메일 주소를 입력해 주세요.")
+    return address
+
+
+def _smtp_login_if_configured(smtp, user: str, password: str) -> None:
+    if user != "" or password != "":
+        smtp.login(user, password)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name, "").strip().lower()
+    result = default
+    if raw_value != "":
+        result = raw_value in ("1", "true", "yes", "y", "on")
     return result
 
 
@@ -3504,6 +3620,78 @@ def _render_page(
             background: linear-gradient(135deg, #42b883, #3bbb86);
             color: #ffffff;
           }}
+          .personal-result-shell .result-action-mail {{
+            min-width: 150px;
+            border-color: #ffb8c7;
+            background: linear-gradient(135deg, #fff6f8, #ffe6ec);
+            color: #ff6686;
+          }}
+          .email-report-panel {{
+            position: relative;
+            z-index: 3;
+            width: min(620px, 100%);
+            margin: -10px auto 22px;
+            padding: 18px 20px;
+            border: 1px solid #ffd8ce;
+            border-radius: 16px;
+            background:
+              radial-gradient(circle at 8% 12%, rgba(255, 196, 210, 0.2), transparent 28%),
+              rgba(255, 255, 255, 0.9);
+            box-shadow: 0 16px 34px -28px rgba(74, 47, 38, 0.5);
+          }}
+          .email-report-panel[hidden] {{
+            display: none;
+          }}
+          .email-report-form {{
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 10px;
+            align-items: end;
+          }}
+          .email-report-form label {{
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            color: #6f4d43;
+            font-family: "Gowun Batang", serif;
+            font-size: 14px;
+            font-weight: 700;
+          }}
+          .email-report-form input {{
+            min-height: 44px;
+            padding: 10px 14px;
+            border: 1px solid #ffd0c8;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.96);
+            color: #4a2f26;
+            font: inherit;
+          }}
+          .email-report-form button {{
+            min-height: 44px;
+            padding: 10px 18px;
+            border: 1px solid #ffc7d2;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #6f4d43;
+            font-family: "Gowun Batang", serif;
+            font-weight: 700;
+            cursor: pointer;
+          }}
+          .email-report-form button[type="submit"] {{
+            border-color: #ff7f9a;
+            background: #ff7f9a;
+            color: #ffffff;
+          }}
+          .email-report-form button:disabled {{
+            cursor: wait;
+            opacity: 0.68;
+          }}
+          .email-report-status {{
+            margin: 10px 0 0;
+            color: #8b6f64;
+            font-size: 13px;
+            text-align: center;
+          }}
           .workflow-loading {{
             display: flex;
             align-items: center;
@@ -4341,6 +4529,8 @@ def _render_page(
             pollWorkflow(resultJobId, resultUi.status, resultUi.result, resultUi.loading);
           }}
 
+          setupEmailReportPanel();
+
           const compareCameraStart = document.getElementById("compare-camera-start");
           if (compareCameraStart) {{
             compareCameraStart.addEventListener("click", async () => {{
@@ -4412,6 +4602,7 @@ def _render_page(
 
           async function pollWorkflow(jobId, status, result, loading) {{
             const downloadLink = document.getElementById("download-report-link");
+            const emailButton = document.getElementById("email-report-open");
             const preview = document.querySelector(".capture-preview");
             const keepPreview = loading.dataset.compareCamera === "1";
             const skipFace = loading.dataset.skipFace === "1";
@@ -4438,6 +4629,9 @@ def _render_page(
                 if (downloadLink) {{
                   downloadLink.hidden = false;
                 }}
+                if (emailButton) {{
+                  emailButton.hidden = false;
+                }}
                 done = true;
               }} else if (payload.status === "error") {{
                 result.innerHTML = payload.html;
@@ -4454,6 +4648,66 @@ def _render_page(
                 }}
               }}
             }}
+          }}
+
+          function setupEmailReportPanel() {{
+            const openButton = document.getElementById("email-report-open");
+            const panel = document.getElementById("email-report-panel");
+            const form = document.getElementById("email-report-form");
+            const status = document.getElementById("email-report-status");
+            if (!openButton || !panel || !form || !status) {{
+              return;
+            }}
+            const closeButton = panel.querySelector("[data-email-close]");
+            const submitButton = form.querySelector('button[type="submit"]');
+            openButton.addEventListener("click", () => {{
+              panel.hidden = !panel.hidden;
+              if (!panel.hidden) {{
+                const input = form.querySelector('input[name="email"]');
+                if (input) {{
+                  input.focus();
+                }}
+              }}
+            }});
+            if (closeButton) {{
+              closeButton.addEventListener("click", () => {{
+                panel.hidden = true;
+              }});
+            }}
+            form.addEventListener("submit", async (event) => {{
+              event.preventDefault();
+              const formData = new FormData(form);
+              const email = String(formData.get("email") || "").trim();
+              const jobId = panel.dataset.emailJob || "";
+              if (email === "" || jobId === "") {{
+                status.textContent = "받을 이메일 주소를 입력해 주세요.";
+                return;
+              }}
+              status.textContent = "메일을 보내는 중이에요...";
+              if (submitButton) {{
+                submitButton.disabled = true;
+              }}
+              try {{
+                const response = await fetch("/api/jobs/" + encodeURIComponent(jobId) + "/email", {{
+                  method: "POST",
+                  headers: {{
+                    "Content-Type": "application/json",
+                  }},
+                  body: JSON.stringify({{ email }}),
+                }});
+                const payload = await response.json();
+                if (!response.ok) {{
+                  throw new Error(payload.message || "메일 발송에 실패했습니다.");
+                }}
+                status.textContent = payload.message || "리포트를 이메일로 보냈습니다.";
+              }} catch (error) {{
+                status.textContent = String(error.message || error);
+              }} finally {{
+                if (submitButton) {{
+                  submitButton.disabled = false;
+                }}
+              }}
+            }});
           }}
 
           function startCaptureDebugPolling(loading, options) {{

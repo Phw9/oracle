@@ -346,6 +346,62 @@ def test_running_job_download_returns_not_found() -> None:
     assert response.status_code == 404
 
 
+def test_completed_job_sends_report_email(monkeypatch) -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    sent_args: dict[str, tuple[str, str, str]] = {}
+
+    def fake_send_report_email(recipient: str, filename: str, html: str) -> None:
+        sent_args["email"] = (recipient, filename, html)
+
+    monkeypatch.setattr(
+        "oracle_report.web._send_report_email",
+        fake_send_report_email,
+    )
+    app = create_app()
+    _set_job(
+        "email-job",
+        _WorkflowJob(
+            status="complete",
+            html="<section>fragment</section>",
+            download_html="<!doctype html><html><body>full report</body></html>",
+            download_filename="personal_report.html",
+        ),
+    )
+
+    response = app.test_client().post(
+        "/api/jobs/email-job/email",
+        json={"email": "reader@example.com"},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["status"] == "sent"
+    assert sent_args["email"] == (
+        "reader@example.com",
+        "personal_report.html",
+        "<!doctype html><html><body>full report</body></html>",
+    )
+
+
+def test_running_job_email_returns_not_found() -> None:
+    pytest.importorskip("flask")
+    from oracle_report.web import _WorkflowJob, _set_job, create_app
+
+    app = create_app()
+    _set_job("running-email-job", _WorkflowJob(status="running"))
+
+    response = app.test_client().post(
+        "/api/jobs/running-email-job/email",
+        json={"email": "reader@example.com"},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 404
+    assert payload["status"] == "error"
+
+
 def test_personal_page_uses_oracle_input_card_layout() -> None:
     pytest.importorskip("flask")
     from oracle_report.web import create_app
