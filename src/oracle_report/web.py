@@ -358,7 +358,7 @@ def create_app() -> Flask:
         result = _render_page(
             "두 사람 궁합 결과",
             body,
-            page_class="result-page",
+            page_class="result-page personal-result-page compatibility-result-page",
             show_heading=False,
         )
         return result
@@ -1249,18 +1249,31 @@ def _personal_result_page(job_id: str, skip_face: bool) -> str:
 
 def _compatibility_result_page(job_id: str) -> str:
     result = f"""
-    <div class="oracle-result-shell compatibility-result-shell">
-      <div class="brand">
+    <div class="oracle-result-shell personal-result-shell compatibility-result-shell">
+      <div class="input-topbar result-topbar" aria-label="페이지 이동">
+        <a class="back-link" href="/compatibility" aria-label="입력 화면으로 돌아가기">‹</a>
+        <span class="heart-mark" aria-hidden="true">♡</span>
+      </div>
+
+      <div class="brand personal-result-brand">
         <div class="logo">ORACLE</div>
         <div class="tag">두 사람 궁합 결과</div>
         <div class="ornament"></div>
       </div>
+
+      <div class="result-sky" aria-hidden="true">
+        <span class="result-cloud result-cloud-left"></span>
+        <span class="result-spark result-spark-left">✧</span>
+        <span class="result-spark result-spark-right">✧</span>
+        <img class="result-hero-ora" src="/static/assets/oracle-character.png" alt="">
+      </div>
+
       <div class="result-actions">
         <a class="result-action" href="/compatibility">입력 다시 하기</a>
         <a class="result-action" href="/">처음으로</a>
         <a id="download-report-link" class="result-action result-action-primary download-link" href="/api/jobs/{escape(job_id)}/download" hidden>리포트 다운로드</a>
       </div>
-      {_capture_preview_panel(job_id=job_id, skip_face=False)}
+      {_capture_preview_panel(job_id=job_id, skip_face=False, cute=True)}
     </div>
     """
     return result
