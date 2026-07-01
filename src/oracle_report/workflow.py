@@ -1501,18 +1501,11 @@ def _generate_distributed(
             priority = 0
         elif retries > 0:
             priority = 1
-        elif cat in (
-            "종합 형국", "타고난 성향과 심리 패턴",
-            "첫인상과 분위기", "타고난 인상과 기본 상",
-            "관계 구조", "관계 강점"
-        ):
-            priority = 2
-        elif cat in (
-            "총평 및 인생의 조언", "상호 보완", "갈등 관리", "실천 제안"
-        ):
-            priority = 3
         else:
-            priority = 4
+            try:
+                priority = 2 + categories.index(cat)
+            except ValueError:
+                priority = 100
         task_queue.put((priority, task_id, task))
         task_id += 1
 
