@@ -976,7 +976,7 @@ def _render_compatibility_report_body(view: _CompatibilityReportView) -> str:
   {_render_cute_compat_keywords(view)}
   {_render_cute_compat_section("01", "두 사람의 관계 분위기", view.pair_subtitle, view.pair_blocks, "/static/assets/oracle-pair-card.png")}
   {_render_cute_compat_section("02", "사주로 보는 상호 보완", view.saju_subtitle, view.saju_blocks, "/static/assets/oracle-character.png")}
-  {_render_cute_compat_action(view)}
+  
 
   <section class="saju-disclaimer compat-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -1058,20 +1058,7 @@ def _render_cute_compat_block(block: _ReportBlock, index: int) -> str:
     return result
 
 
-def _render_cute_compat_action(view: _CompatibilityReportView) -> str:
-    result = f"""
-  <section class="compat-cute-section compat-action-cute fade">
-    <div class="compat-section-head">
-      <h2><span>03</span>{escape(view.action_title)} <b aria-hidden="true">♡</b></h2>
-      <p>적절한 거리로 더 오래 가는 관계</p>
-    </div>
-    <div class="compat-action-body">
-      <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
-      <p>{_paragraphs(view.action_body)}</p>
-    </div>
-  </section>
-"""
-    return result
+
 
 
 def _render_cute_compat_score_heart(view: _CompatibilityReportView) -> str:
