@@ -67,6 +67,7 @@ def test_personal_report_hides_face_saju_synthesis_but_keeps_keywords() -> None:
     assert "개인 사주 비교 근거" not in html
     assert "균형 키워드" in html
     assert "cute-keyword-card" in html
+    assert html.index("균형 키워드") < html.index("관상 - 얼굴이 말하는 인상")
     assert "관상과 사주가 만나는 지점" not in html
 
 
@@ -145,6 +146,7 @@ def test_compatibility_report_html_hides_synthesis_but_keeps_action_and_keywords
     assert "액션 본문" in html
     assert "궁합 키워드" in html
     assert "cute-keyword-card" in html
+    assert html.index("궁합 키워드") < html.index("두 사람의 관계 분위기")
 
 
 def test_report_profile_shows_unknown_birth_time_without_helper_basis() -> None:
@@ -198,6 +200,7 @@ def test_saju_only_report_hides_synthesis_but_keeps_keywords() -> None:
     assert "나를 채워주는 키워드" in html
     assert "사주 키워드" in html
     assert "cute-keyword-card" in html
+    assert html.index("사주 키워드") < html.index("사주 - 타고난 기운의 설계도")
 
 
 def test_report_html_uses_auto_wrapping_for_block_bodies() -> None:

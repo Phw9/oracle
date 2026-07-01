@@ -752,9 +752,9 @@ def _render_cute_personal_report_body(view: _PersonalReportView) -> str:
   </section>
 
   {_render_saju_only_element_cards(view)}
+  {_render_cute_personal_keywords(view)}
   {_render_cute_face_blocks(view)}
   {_render_saju_only_blocks(view)}
-  {_render_cute_personal_keywords(view)}
 
   <section class="saju-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -802,8 +802,8 @@ def _render_saju_only_report_body(view: _PersonalReportView) -> str:
   </section>
 
   {_render_saju_only_element_cards(view)}
-  {_render_saju_only_blocks(view)}
   {_render_cute_personal_keywords(view)}
+  {_render_saju_only_blocks(view)}
 
   <section class="saju-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
@@ -857,10 +857,10 @@ def _render_compatibility_report_body(view: _CompatibilityReportView) -> str:
     {_render_cute_compat_profile(view.right, "두 번째 사람")}
   </section>
 
+  {_render_cute_compat_keywords(view)}
   {_render_cute_compat_section("01", "두 사람의 관계 분위기", view.pair_subtitle, view.pair_blocks, "/static/assets/oracle-pair-card.png")}
   {_render_cute_compat_section("02", "사주로 보는 상호 보완", view.saju_subtitle, view.saju_blocks, "/static/assets/oracle-character.png")}
   {_render_cute_compat_action(view)}
-  {_render_cute_compat_keywords(view)}
 
   <section class="saju-disclaimer compat-disclaimer fade">
     <div class="saju-disclaimer-icon">💡</div>
