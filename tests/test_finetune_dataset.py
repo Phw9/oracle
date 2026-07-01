@@ -13,7 +13,11 @@ from oracle_report.finetune.dataset import (
     topic_contains_hangul,
     write_jsonl_dataset,
 )
-from oracle_report.finetune.train_qlora import DEFAULT_MODEL_ID, _parse_args
+from oracle_report.finetune.train_qlora import (
+    DEFAULT_MODEL_ID,
+    _canonicalize_model_id,
+    _parse_args,
+)
 from oracle_report.finetune.validate import validate_adapter_dir, validate_dataset_file
 
 
@@ -125,7 +129,7 @@ def test_train_qlora_defaults_to_gemma4_e2b_text_style() -> None:
     args = _parse_args([])
 
     assert args.model_id == DEFAULT_MODEL_ID
-    assert args.model_id == "unsloth/gemma-4-E2B-it"
+    assert args.model_id == "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
     assert args.chat_template == "gemma-4"
     assert args.include_multimodal is False
     assert args.gpu_memory_utilization == 0.9
@@ -134,6 +138,28 @@ def test_train_qlora_defaults_to_gemma4_e2b_text_style() -> None:
     assert args.num_train_epochs == 1.0
     assert args.max_steps == -1
     assert args.dataset.as_posix() == "data/finetune/korean_cute_style_train.jsonl"
+
+
+def test_train_qlora_canonicalizes_common_gemma4_e2b_model_aliases() -> None:
+    assert (
+        _canonicalize_model_id("unsloth/gemma-4-E2B-it")
+        == "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
+    )
+    assert (
+        _canonicalize_model_id("unsloth/gemma-4-e2b-it-unsloth-bnb-4bit")
+        == "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
+    )
+
+
+def test_train_qlora_canonicalizes_model_alias_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "ORACLE_FINETUNE_MODEL_ID",
+        "unsloth/gemma-4-e2b-it-unsloth-bnb-4bit",
+    )
+
+    args = _parse_args([])
+
+    assert args.model_id == "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
 
 
 def test_shell_entrypoints_install_and_validate() -> None:

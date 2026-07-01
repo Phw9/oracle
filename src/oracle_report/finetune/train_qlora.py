@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-DEFAULT_MODEL_ID = "unsloth/gemma-4-E2B-it"
+DEFAULT_MODEL_ID = "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
 DEFAULT_DATASET_PATH = Path("data/finetune/korean_cute_style_train.jsonl")
 DEFAULT_OUTPUT_DIR = Path("runs/finetune/korean-cute-lora")
 DEFAULT_MAX_SEQ_LENGTH = 1024
@@ -17,6 +17,22 @@ DEFAULT_NUM_TRAIN_EPOCHS = 1.0
 DEFAULT_CHAT_TEMPLATE = "gemma-4"
 DEFAULT_GPU_MEMORY_UTILIZATION = 0.9
 DEFAULT_MIN_VRAM_GB = 8.0
+GEMMA4_E2B_MODEL_ALIASES = {
+    "unsloth/gemma-4-e2b-it": DEFAULT_MODEL_ID,
+    "unsloth/gemma-4-e2b-it-unsloth-bnb-4bit": DEFAULT_MODEL_ID,
+}
+
+
+def _canonicalize_model_id(model_id: str) -> str:
+    stripped_model_id = model_id.strip()
+    if not stripped_model_id:
+        canonical_model_id = DEFAULT_MODEL_ID
+    else:
+        canonical_model_id = GEMMA4_E2B_MODEL_ALIASES.get(
+            stripped_model_id.lower(),
+            stripped_model_id,
+        )
+    return canonical_model_id
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -123,6 +139,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Checkpoint path or true/false value accepted by Transformers.",
     )
     args = parser.parse_args(argv)
+    args.model_id = _canonicalize_model_id(args.model_id)
     return args
 
 

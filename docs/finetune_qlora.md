@@ -7,7 +7,12 @@ QLoRA adapter를 학습하는 흐름을 제공합니다.
 
 - 현재 런타임 GGUF: `unsloth/gemma-4-E2B-it-GGUF`
 - HF base model: `google/gemma-4-E2B-it`
-- 기본 QLoRA 입력 모델: `unsloth/gemma-4-E2B-it` with `load_in_4bit=True`
+- 기본 QLoRA 입력 모델: `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit`
+  with `load_in_4bit=True`
+
+`ORACLE_FINETUNE_MODEL_ID`에 `unsloth/gemma-4-E2B-it` 또는
+`unsloth/gemma-4-e2b-it-unsloth-bnb-4bit`처럼 기존 alias/소문자 값을 넣어도
+학습 스크립트가 위 canonical Hugging Face repo ID로 정규화합니다.
 
 GGUF 파일은 llama.cpp 추론용 산출물이므로 직접 QLoRA 학습하지 않습니다.
 학습은 4-bit Hugging Face 모델에서 adapter를 만들고, 필요하면 병합 또는 GGUF
