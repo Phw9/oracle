@@ -2920,8 +2920,7 @@ def _render_page(
           }}
           body.saju-report-ready .personal-result-shell > .result-topbar,
           body.saju-report-ready .personal-result-shell > .personal-result-brand,
-          body.saju-report-ready .personal-result-shell > .result-sky,
-          body.saju-report-ready .personal-result-shell > .result-actions {{
+          body.saju-report-ready .personal-result-shell > .result-sky {{
             display: none;
           }}
           .personal-result-shell {{
