@@ -1981,9 +1981,9 @@ def _render_page(
             margin: 0 -12px -14px 0;
           }}
           .mode .mode-art-pair {{
-            width: 136px;
-            height: 156px;
-            margin-right: -12px;
+            width: 226px;
+            height: 154px;
+            margin: 0 -20px -10px 0;
           }}
           .feature-row {{
             display: grid;
