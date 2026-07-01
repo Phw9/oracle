@@ -1532,9 +1532,32 @@ def _generate_distributed(
     if image_path and image_path.exists():
         image_base64 = base64.b64encode(image_path.read_bytes()).decode("ascii")
 
-    task_queue = queue.Queue()
+    task_queue = queue.PriorityQueue()
+    task_id = 0
+
+    def put_task(task):
+        nonlocal task_id
+        is_meta = task.get("is_metadata", False)
+        cat = task.get("target_category")
+        retries = task.get("retries", 0)
+        if is_meta:
+            priority = 0
+        elif retries > 0:
+            priority = 1
+        elif cat in (
+            "종합 형국", "타고난 성향과 심리 패턴", "총평 및 인생의 조언",
+            "타고난 인상과 기본 상", "강점으로 읽히는 복과 기세",
+            "첫인상과 분위기", "관계 강점",
+            "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
+        ):
+            priority = 2
+        else:
+            priority = 3
+        task_queue.put((priority, task_id, task))
+        task_id += 1
+
     for task in tasks:
-        task_queue.put(task)
+        put_task(task)
 
     scheduler = DistributedTaskScheduler(app_config.slave_addrs)
 
@@ -1683,7 +1706,7 @@ def _generate_distributed(
             speculative = False
 
             try:
-                task = task_queue.get(block=True, timeout=0.5)
+                _, _, task = task_queue.get(block=True, timeout=0.5)
                 if is_task_done(task):
                     task_queue.task_done()
                     continue
@@ -1713,7 +1736,7 @@ def _generate_distributed(
                             compute_score = float(score)
                         
                         if status_data.get("status") == "busy" and not speculative:
-                            task_queue.put(task)
+                            put_task(task)
                             task_queue.task_done()
                             time.sleep(5.0)
                             continue
@@ -1744,7 +1767,7 @@ def _generate_distributed(
                     )
                     yield_task = has_idle_faster_remote_slave or has_strictly_faster_slave
                     if yield_task:
-                        task_queue.put(task)
+                        put_task(task)
                         task_queue.task_done()
                         time.sleep(0.5)
                         continue
@@ -1838,7 +1861,7 @@ def _generate_distributed(
                     task["retries"] += 1
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Task {cat or 'metadata'} failed on {slave_url} (Error: {error_msg}). Retrying ({task['retries']}/3)...")
-                        task_queue.put(task)
+                        put_task(task)
                         time.sleep(1.0)
                     else:
                         print(f"[Distributed][Error] Task {cat or 'metadata'} failed on {slave_url} after 3 retries. Error: {error_msg}")
@@ -1865,7 +1888,7 @@ def _generate_distributed(
             speculative = False
 
             try:
-                task = task_queue.get(block=True, timeout=0.5)
+                _, _, task = task_queue.get(block=True, timeout=0.5)
                 if is_task_done(task):
                     task_queue.task_done()
                     continue
@@ -1899,7 +1922,7 @@ def _generate_distributed(
                     )
                     yield_task = has_idle_faster_remote_slave or has_strictly_faster_slave
                     if yield_task:
-                        task_queue.put(task)
+                        put_task(task)
                         task_queue.task_done()
                         time.sleep(0.5)
                         continue
@@ -1952,7 +1975,7 @@ def _generate_distributed(
                     task["retries"] += 1
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Local task {cat or 'metadata'} failed (Error: {error_msg}). Retrying ({task['retries']}/3)...")
-                        task_queue.put(task)
+                        put_task(task)
                         time.sleep(1.0)
                     else:
                         print(f"[Distributed][Error] Local task {cat or 'metadata'} failed after 3 retries. Error: {error_msg}")
