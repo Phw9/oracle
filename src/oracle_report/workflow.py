@@ -1632,7 +1632,7 @@ def _generate_distributed(
 
     def worker_loop(slave_url: str) -> None:
         consecutive_failures = 0
-        max_consecutive_failures = 3
+        max_consecutive_failures = 5
 
         is_local = False
         try:
@@ -1680,11 +1680,6 @@ def _generate_distributed(
                 if is_task_done(task):
                     task_queue.task_done()
                     continue
-                if not task.get("is_metadata", False) and not is_metadata_completed():
-                    put_task(task)
-                    task_queue.task_done()
-                    time.sleep(0.5)
-                    continue
             except queue.Empty:
                 task = find_unfinished_speculative_task(slave_url, is_local)
                 if task is None:
@@ -1723,7 +1718,7 @@ def _generate_distributed(
                 if meta_info.get("status") == "busy" and not speculative:
                     put_task(task)
                     task_queue.task_done()
-                    time.sleep(5.0)
+                    time.sleep(0.5)
                     continue
             else:
                 try:
@@ -1877,11 +1872,6 @@ def _generate_distributed(
                 _, _, task = task_queue.get(block=True, timeout=0.5)
                 if is_task_done(task):
                     task_queue.task_done()
-                    continue
-                if not task.get("is_metadata", False) and not is_metadata_completed():
-                    put_task(task)
-                    task_queue.task_done()
-                    time.sleep(0.5)
                     continue
             except queue.Empty:
                 task = find_unfinished_speculative_task("local", True)
