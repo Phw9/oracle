@@ -1677,7 +1677,7 @@ def _generate_distributed(
                 )
                 if is_core_category:
                     has_idle_faster_remote_slave = any(
-                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) >= compute_score and addr != slave_url)
+                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) > compute_score and addr != slave_url)
                         for addr, meta in scheduler.slave_metadata.items()
                     )
                     has_strictly_faster_slave = any(
