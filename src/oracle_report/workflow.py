@@ -70,6 +70,7 @@ _EMOJI_PATTERN = re.compile(
     "]+"
 )
 _T = TypeVar("_T")
+_LAST_STATUS_CHECK_TIMES: dict[str, float] = {}
 
 
 class TextGenerator(Protocol):
@@ -1612,17 +1613,21 @@ def _generate_distributed(
                 elif not is_my_local and worker_url != my_url:
                     my_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
                     if my_score == 5.0:
-                        try:
-                            status_url = f"{my_url.rstrip('/')}/api/distributed/status"
-                            res = requests.get(status_url, timeout=2.0)
-                            if res.status_code == 200:
-                                status_data = res.json()
-                                score = status_data.get("compute_score")
-                                if score is not None:
-                                    scheduler.slave_metadata[my_url]["compute_score"] = float(score)
-                                    my_score = float(score)
-                        except Exception:
-                            pass
+                        now = time.time()
+                        last_check = _LAST_STATUS_CHECK_TIMES.get(my_url, 0.0)
+                        if now - last_check >= 5.0:
+                            _LAST_STATUS_CHECK_TIMES[my_url] = now
+                            try:
+                                status_url = f"{my_url.rstrip('/')}/api/distributed/status"
+                                res = requests.get(status_url, timeout=2.0)
+                                if res.status_code == 200:
+                                    status_data = res.json()
+                                    score = status_data.get("compute_score")
+                                    if score is not None:
+                                        scheduler.slave_metadata[my_url]["compute_score"] = float(score)
+                                        my_score = float(score)
+                            except Exception:
+                                pass
                     other_score = scheduler.slave_metadata.get(worker_url, {}).get("compute_score", 5.0)
                     is_other_master = (worker_url == "local")
                     limit_passed = (my_score >= other_score) if is_other_master else (my_score > other_score)
@@ -1704,7 +1709,7 @@ def _generate_distributed(
                         if status_data.get("status") == "busy" and not speculative:
                             task_queue.put(task)
                             task_queue.task_done()
-                            time.sleep(1.0)
+                            time.sleep(5.0)
                             continue
                         score = status_data.get("compute_score")
                         if score is not None:
