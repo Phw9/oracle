@@ -81,6 +81,7 @@ class AppConfig:
     distributed_role: str | None = None
     distributed_split: bool = False
     distributed_warmup: bool = False
+    distributed_speculative: bool = False
     master_addr: str | None = None
     slave_addrs: tuple[str, ...] = field(default_factory=tuple)
 
@@ -157,6 +158,7 @@ def load_app_config() -> AppConfig:
         distributed_role=role,
         distributed_split=_read_bool("ORACLE_DISTRIBUTED_SPLIT", False),
         distributed_warmup=_read_bool("ORACLE_DISTRIBUTED_WARMUP", False),
+        distributed_speculative=_read_bool("ORACLE_DISTRIBUTED_SPECULATIVE", False),
         master_addr=os.getenv("ORACLE_MASTER_ADDR"),
         slave_addrs=slave_addrs,
     )

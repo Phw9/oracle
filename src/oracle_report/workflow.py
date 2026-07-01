@@ -1542,6 +1542,8 @@ def _generate_distributed(
                 task_queue.task_done()  # Increment queue completion safely exactly once
 
     def find_unfinished_speculative_task(my_url, is_my_local):
+        if not app_config.distributed_speculative:
+            return None
         # Speculative work stealing: find any task currently assigned to another slower node 
         # (or just any task) that has NOT completed yet.
         with assignments_lock:

@@ -209,6 +209,7 @@ Wrapper Options:
   --distributed-split      Legacy distributed option, accepted and ignored
   --distributed-warmup     Legacy distributed option, accepted and ignored
   --reasoning              Enable reasoning mode (think tags) for LLM
+  --speculative            Enable speculative work stealing in distributed inference
   --mock-capture           Enable mock capture with default landmark presets
   --master-addr ADDR       Legacy distributed option, accepted and ignored
   --slave-addrs ADDRS      Legacy distributed option, accepted and ignored
@@ -269,6 +270,10 @@ parse_args() {
         ;;
       --distributed-warmup)
         RUN_ORACLE_DISTRIBUTED_WARMUP=1
+        shift 1
+        ;;
+      --speculative)
+        RUN_ORACLE_DISTRIBUTED_SPECULATIVE=1
         shift 1
         ;;
       --master-addr)
@@ -447,6 +452,7 @@ apply_run_config() {
   export ORACLE_DISTRIBUTED_ROLE="${RUN_ORACLE_DISTRIBUTED_ROLE:-${ORACLE_DISTRIBUTED_ROLE:-}}"
   export ORACLE_DISTRIBUTED_SPLIT="${RUN_ORACLE_DISTRIBUTED_SPLIT:-${ORACLE_DISTRIBUTED_SPLIT:-0}}"
   export ORACLE_DISTRIBUTED_WARMUP="${RUN_ORACLE_DISTRIBUTED_WARMUP:-${ORACLE_DISTRIBUTED_WARMUP:-0}}"
+  export ORACLE_DISTRIBUTED_SPECULATIVE="${RUN_ORACLE_DISTRIBUTED_SPECULATIVE:-${ORACLE_DISTRIBUTED_SPECULATIVE:-0}}"
   export ORACLE_MASTER_ADDR="${RUN_ORACLE_MASTER_ADDR:-${ORACLE_MASTER_ADDR:-}}"
   export ORACLE_SLAVE_ADDRS="${RUN_ORACLE_SLAVE_ADDRS:-${ORACLE_SLAVE_ADDRS:-}}"
 

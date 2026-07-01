@@ -93,6 +93,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8501)
     serve.add_argument("--debug", action="store_true")
     serve.add_argument("--temperature", type=float, help="LLM generation temperature")
+    serve.add_argument("--speculative", action="store_true", help="Enable speculative work stealing in distributed inference")
 
     prompt = subparsers.add_parser("prompt", help="print workflow prompt inputs")
     _add_prompt_args(prompt)
@@ -165,6 +166,9 @@ def _run_capture_command(args: argparse.Namespace) -> int:
 
 def _run_serve_command(args: argparse.Namespace) -> int:
     from oracle_report.web import create_app
+
+    if args.speculative:
+        os.environ["ORACLE_DISTRIBUTED_SPECULATIVE"] = "1"
 
     app = create_app()
     app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
