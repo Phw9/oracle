@@ -1734,15 +1734,15 @@ def _generate_distributed(
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
                 if is_core_category:
-                    has_idle_remote_slave = any(
-                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) >= 20.0 and addr != slave_url)
+                    has_idle_faster_remote_slave = any(
+                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) >= compute_score and addr != slave_url)
                         for addr, meta in scheduler.slave_metadata.items()
                     )
-                    has_high_perf_slave = any(
-                        (meta.get("compute_score", 0.0) >= 20.0 and addr != slave_url)
+                    has_strictly_faster_slave = any(
+                        (addr != "local" and meta.get("compute_score", 0.0) > compute_score and addr != slave_url)
                         for addr, meta in scheduler.slave_metadata.items()
                     )
-                    yield_task = has_idle_remote_slave or (compute_score < 20.0 and has_high_perf_slave)
+                    yield_task = has_idle_faster_remote_slave or has_strictly_faster_slave
                     if yield_task:
                         task_queue.put(task)
                         task_queue.task_done()
@@ -1875,15 +1875,15 @@ def _generate_distributed(
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
                 if is_core_category:
-                    has_idle_remote_slave = any(
-                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) >= 20.0)
+                    has_idle_faster_remote_slave = any(
+                        (addr != "local" and meta.get("status") == "idle" and meta.get("compute_score", 0.0) >= local_score)
                         for addr, meta in scheduler.slave_metadata.items()
                     )
-                    has_high_perf_slave = any(
-                        meta.get("compute_score", 0.0) >= 20.0
-                        for meta in scheduler.slave_metadata.values()
+                    has_strictly_faster_slave = any(
+                        (addr != "local" and meta.get("compute_score", 0.0) > local_score)
+                        for addr, meta in scheduler.slave_metadata.items()
                     )
-                    yield_task = has_idle_remote_slave or (local_score < 20.0 and has_high_perf_slave)
+                    yield_task = has_idle_faster_remote_slave or has_strictly_faster_slave
                     if yield_task:
                         task_queue.put(task)
                         task_queue.task_done()
