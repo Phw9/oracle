@@ -1850,13 +1850,13 @@ def _generate_distributed(
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Task {cat or 'metadata'} failed on {slave_url} (Error: {error_msg}). Retrying ({task['retries']}/3)...")
                         put_task(task)
+                        task_queue.task_done()  # Balance the original get()
                         time.sleep(1.0)
                     else:
                         print(f"[Distributed][Error] Task {cat or 'metadata'} failed on {slave_url} after 3 retries. Error: {error_msg}")
-                        mark_task_done(task)
+                        mark_task_done(task)  # mark_task_done already calls task_done()
                         with results_lock:
                             results.append({"task": task, "success": False, "error": error_msg})
-                        task_queue.task_done()
 
     def local_worker_loop() -> None:
         from oracle_report.prompt_templates import render_distributed_prompt_template
@@ -1952,6 +1952,7 @@ def _generate_distributed(
                     if task["retries"] <= 3:
                         print(f"[Distributed][Retry] Local task {cat or 'metadata'} failed (Error: {error_msg}). Retrying ({task['retries']}/3)...")
                         put_task(task)
+                        task_queue.task_done()  # Balance the original get()
                         time.sleep(1.0)
                     else:
                         print(f"[Distributed][Error] Local task {cat or 'metadata'} failed after 3 retries. Error: {error_msg}")
