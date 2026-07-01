@@ -86,6 +86,7 @@ class _SajuScoreParts:
     element_complement: float
     temperature_complement: float
     clash_penalty: int
+    relation_bonus: int
 
 
 @dataclass(frozen=True)
@@ -141,13 +142,26 @@ def build_compatibility_score(
     saju_parts = _score_saju(left_manse, right_manse)
     face_parts = _score_face(left_matches, right_matches)
     mode_bonus = _score_mode_bonus(mode, saju_parts, face_parts)
+    fingerprint = _compatibility_fingerprint(
+        mode,
+        left_manse,
+        right_manse,
+        left_matches,
+        right_matches,
+    )
+    texture_bonus = _score_texture(fingerprint)
     total = _clamp_int(
-        round((saju_parts.score * 0.50) + (face_parts.score * 0.40) + mode_bonus),
-        65,
-        96,
+        round(
+            (saju_parts.score * 0.48)
+            + (face_parts.score * 0.38)
+            + mode_bonus
+            + texture_bonus,
+        ),
+        62,
+        98,
     )
     label = _score_label(total)
-    summary = _mode_summary(mode, total)
+    summary = _mode_summary(mode, total, fingerprint)
     result = CompatibilityScore(
         total=total,
         saju=saju_parts.score,
@@ -177,21 +191,22 @@ def _score_saju(
     over_penalty = _overconcentration_penalty(left_counts, right_counts)
     score = _clamp_int(
         round(
-            62
-            + (element_complement * 18)
-            + relation_bonus
-            + (temperature_complement * 8)
-            - clash_penalty
-            - over_penalty,
+            54
+            + (element_complement * 28)
+            + (relation_bonus * 1.2)
+            + (temperature_complement * 14)
+            - (clash_penalty * 1.6)
+            - (over_penalty * 2.2),
         ),
-        60,
-        96,
+        55,
+        98,
     )
     result = _SajuScoreParts(
         score=score,
         element_complement=element_complement,
         temperature_complement=temperature_complement,
         clash_penalty=clash_penalty,
+        relation_bonus=relation_bonus,
     )
     return result
 
@@ -205,10 +220,17 @@ def _score_face(
     similarity = _face_similarity(left_values, right_values)
     complement = _face_complement(left_values, right_values)
     stability = _face_stability(left_values, right_values)
+    feature_contrast = _face_feature_contrast(left_values, right_values)
     score = _clamp_int(
-        round(62 + (similarity * 18) + (complement * 9) + (stability * 7)),
-        60,
-        96,
+        round(
+            55
+            + (similarity * 19)
+            + (complement * 17)
+            + (stability * 12)
+            + (feature_contrast * 5),
+        ),
+        55,
+        98,
     )
     result = _FaceScoreParts(
         score=score,
@@ -223,7 +245,8 @@ def _element_complement(
     left_counts: Mapping[str, int],
     right_counts: Mapping[str, int],
 ) -> float:
-    scores = []
+    deficit_scores = []
+    contrast_scores = []
     for element in ELEMENTS:
         left_count = left_counts.get(element, 0)
         right_count = right_counts.get(element, 0)
@@ -231,8 +254,13 @@ def _element_complement(
         right_deficit = max(0.0, 2.0 - right_count) / 2.0
         left_supply = min(left_count / 3.0, 1.0)
         right_supply = min(right_count / 3.0, 1.0)
-        scores.append(((left_deficit * right_supply) + (right_deficit * left_supply)) / 2.0)
-    result = _average(scores, 0.45)
+        deficit_scores.append(
+            ((left_deficit * right_supply) + (right_deficit * left_supply)) / 2.0,
+        )
+        contrast_scores.append(min(abs(left_count - right_count) / 4.0, 1.0))
+    deficit_fill = _average(deficit_scores, 0.42)
+    contrast = _average(contrast_scores, 0.35)
+    result = _clamp((deficit_fill * 0.65) + (contrast * 0.35), 0.0, 1.0)
     return result
 
 
@@ -342,18 +370,32 @@ def _face_stability(
     return result
 
 
+def _face_feature_contrast(
+    left_values: Mapping[str, float],
+    right_values: Mapping[str, float],
+) -> float:
+    scores = []
+    for metric, tolerance in _FACE_SIMILARITY_TOLERANCES.items():
+        if metric not in left_values or metric not in right_values:
+            continue
+        difference = abs(left_values[metric] - right_values[metric])
+        scores.append(min(difference / (tolerance * 1.35), 1.0))
+    result = _average(scores, 0.50)
+    return result
+
+
 def _score_mode_bonus(
     mode: str,
     saju_parts: _SajuScoreParts,
     face_parts: _FaceScoreParts,
 ) -> int:
     if mode == "연인":
-        raw = 5 + (saju_parts.temperature_complement * 3) + (face_parts.complement * 2)
+        raw = 2 + (saju_parts.temperature_complement * 5) + (face_parts.complement * 4)
     elif mode == "직장동료":
-        raw = 5 + (saju_parts.element_complement * 3) + (face_parts.stability * 2)
+        raw = 2 + (saju_parts.element_complement * 5) + (face_parts.stability * 3)
     else:
         no_clash = 1.0 - min(saju_parts.clash_penalty / 8.0, 1.0)
-        raw = 5 + (face_parts.similarity * 3) + (no_clash * 2)
+        raw = 2 + (face_parts.similarity * 4) + (no_clash * 3)
     result = _clamp_int(round(raw), 0, 10)
     return result
 
@@ -370,33 +412,158 @@ def _score_label(total: int) -> str:
     return result
 
 
-def _mode_summary(mode: str, total: int) -> str:
+def _mode_summary(mode: str, total: int, fingerprint: int) -> str:
     summaries = {
         "연인": (
-            (91, "서로의 빈칸을 다정하게 채워주는 찰떡 로맨스 조합이에요."),
-            (83, "설렘과 안정감이 같이 살아나서, 맞춰갈수록 달달해지는 조합이에요."),
-            (74, "다른 리듬을 조금만 맞추면 편안한 온기가 살아나는 로맨스 조합이에요."),
-            (0, "속도를 천천히 맞추면 서로의 매력을 더 잘 발견할 수 있는 조합이에요."),
+            (
+                91,
+                (
+                    "서로의 빈칸을 다정하게 채워주는 찰떡 로맨스 조합이에요.",
+                    "눈빛만 맞아도 분위기가 살아나는 고득점 로맨스 케미예요.",
+                    "설렘과 안정감이 같이 올라와서 오래 보기 좋은 로맨스 조합이에요.",
+                ),
+            ),
+            (
+                83,
+                (
+                    "설렘과 안정감이 같이 살아나서, 맞춰갈수록 달달해지는 조합이에요.",
+                    "서로 다른 매력이 잘 섞여서 관계 온도가 포근하게 올라가는 조합이에요.",
+                    "한쪽이 흔들릴 때 다른 쪽이 살짝 잡아주는 달달한 보완형이에요.",
+                ),
+            ),
+            (
+                74,
+                (
+                    "다른 리듬을 조금만 맞추면 편안한 온기가 살아나는 로맨스 조합이에요.",
+                    "처음엔 속도 차이가 보여도, 맞춰갈수록 매력이 살아나는 연애 조합이에요.",
+                    "표현 방식을 천천히 맞추면 설렘이 안정감으로 이어질 수 있어요.",
+                ),
+            ),
+            (
+                0,
+                (
+                    "속도를 천천히 맞추면 서로의 매력을 더 잘 발견할 수 있는 조합이에요.",
+                    "서두르기보다 작은 약속부터 맞추면 관계가 훨씬 부드러워져요.",
+                    "차이를 바로 결론 내리지 않으면 의외의 설렘 포인트가 보일 수 있어요.",
+                ),
+            ),
         ),
         "친구": (
-            (91, "취향과 텐션이 잘 맞아 같이 있을수록 즐거움이 커지는 친구 조합이에요."),
-            (83, "서로의 장점을 자연스럽게 받아주며 편하게 오래 가기 좋은 친구 조합이에요."),
-            (74, "대화 리듬만 조금 맞추면 더 가볍고 즐겁게 붙는 친구 조합이에요."),
-            (0, "서로의 다른 습관을 존중하면 천천히 편해지는 친구 조합이에요."),
+            (
+                91,
+                (
+                    "취향과 텐션이 잘 맞아 같이 있을수록 즐거움이 커지는 친구 조합이에요.",
+                    "만나면 자연스럽게 웃음 포인트가 맞는 찰떡 친구 케미예요.",
+                    "가볍게 놀아도 깊게 기대도 되는 든든한 친구 조합이에요.",
+                ),
+            ),
+            (
+                83,
+                (
+                    "서로의 장점을 자연스럽게 받아주며 편하게 오래 가기 좋은 친구 조합이에요.",
+                    "취향은 달라도 대화가 잘 풀려서 오래 보기 좋은 친구 조합이에요.",
+                    "서로의 텐션을 받아주는 힘이 좋아 편안한 친구 케미가 보여요.",
+                ),
+            ),
+            (
+                74,
+                (
+                    "대화 리듬만 조금 맞추면 더 가볍고 즐겁게 붙는 친구 조합이에요.",
+                    "서로의 생활 리듬을 존중하면 편안함이 쌓이는 친구 조합이에요.",
+                    "농담의 선과 쉬는 타이밍만 맞추면 더 즐거워지는 친구 케미예요.",
+                ),
+            ),
+            (
+                0,
+                (
+                    "서로의 다른 습관을 존중하면 천천히 편해지는 친구 조합이에요.",
+                    "처음엔 텐션 차이가 보여도, 거리감을 맞추면 편해지는 친구 조합이에요.",
+                    "취향 차이를 인정하면 오히려 새로운 재미가 생기는 친구 케미예요.",
+                ),
+            ),
         ),
         "직장동료": (
-            (91, "한 명은 방향을 잡고 한 명은 실행력을 보태는, 업무 시너지가 기대되는 콤비예요."),
-            (83, "역할을 잘 나누면 아이디어와 실행이 착착 맞물리는 협업 조합이에요."),
-            (74, "업무 속도와 피드백 기준을 맞추면 안정적으로 성과를 만들 수 있는 조합이에요."),
-            (0, "역할과 마감 기준을 선명하게 잡으면 실수가 줄어드는 협업 조합이에요."),
+            (
+                91,
+                (
+                    "한 명은 방향을 잡고 한 명은 실행력을 보태는, 업무 시너지가 기대되는 콤비예요.",
+                    "기획과 실행이 착착 맞물려 결과물을 빠르게 만들 수 있는 협업 조합이에요.",
+                    "역할만 선명하면 서로의 장점이 바로 성과로 이어지는 업무 콤비예요.",
+                ),
+            ),
+            (
+                83,
+                (
+                    "역할을 잘 나누면 아이디어와 실행이 착착 맞물리는 협업 조합이에요.",
+                    "서로의 업무 스타일을 인정하면 속도와 완성도가 같이 올라가는 조합이에요.",
+                    "한쪽의 추진력과 다른 쪽의 조율력이 만나기 좋은 협업 케미예요.",
+                ),
+            ),
+            (
+                74,
+                (
+                    "업무 속도와 피드백 기준을 맞추면 안정적으로 성과를 만들 수 있는 조합이에요.",
+                    "회의 방식과 마감 기준만 맞추면 꽤 단단하게 굴러가는 업무 조합이에요.",
+                    "서로의 우선순위를 먼저 확인하면 협업 효율이 살아나는 콤비예요.",
+                ),
+            ),
+            (
+                0,
+                (
+                    "역할과 마감 기준을 선명하게 잡으면 실수가 줄어드는 협업 조합이에요.",
+                    "업무 방식 차이를 룰로 정리하면 생각보다 안정적으로 맞춰갈 수 있어요.",
+                    "피드백 타이밍만 맞추면 충돌보다 보완이 더 커지는 업무 조합이에요.",
+                ),
+            ),
         ),
     }
     candidates = summaries.get(mode, summaries["친구"])
-    result = candidates[-1][1]
-    for threshold, summary in candidates:
+    result_options = candidates[-1][1]
+    for threshold, options in candidates:
         if total >= threshold:
-            result = summary
+            result_options = options
             break
+    result = result_options[fingerprint % len(result_options)]
+    return result
+
+
+def _score_texture(fingerprint: int) -> int:
+    result = (fingerprint % 13) - 6
+    return result
+
+
+def _compatibility_fingerprint(
+    mode: str,
+    left_manse: ManseLookupResult,
+    right_manse: ManseLookupResult,
+    left_matches: Sequence[PhysiognomyRuleMatch],
+    right_matches: Sequence[PhysiognomyRuleMatch],
+) -> int:
+    tokens = [
+        mode,
+        _chart_signature(left_manse.reading.chart),
+        _chart_signature(right_manse.reading.chart),
+        _matches_signature(left_matches),
+        _matches_signature(right_matches),
+    ]
+    text = "|".join(tokens)
+    result = sum((index + 17) * ord(char) for index, char in enumerate(text))
+    return result
+
+
+def _chart_signature(chart: SajuChart) -> str:
+    result = ",".join(
+        f"{pillar.stem_index}:{pillar.branch_index}"
+        for pillar in _pillars(chart)
+    )
+    return result
+
+
+def _matches_signature(matches: Sequence[PhysiognomyRuleMatch]) -> str:
+    result = ",".join(
+        f"{match.metric}:{match.value:.4f}"
+        for match in sorted(matches, key=lambda item: item.metric)
+    )
     return result
 
 
