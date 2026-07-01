@@ -545,7 +545,7 @@ def create_app() -> Flask:
 def serve() -> None:
     config = load_app_config()
 
-    if config.distributed_warmup:
+    if config.distributed_warmup or config.distributed_role in ("master", "hybrid", "slave"):
         print("[Distributed] Starting initial LLM warmup and benchmarking...", flush=True)
         # 1. Warm up local engine
         try:
