@@ -3836,7 +3836,7 @@ def _render_page(
               }}
               if (payload.status === "complete") {{
                 result.innerHTML = payload.html;
-                if (skipFace) {{
+                if (skipFace || result.querySelector(".cute-personal-report")) {{
                   document.body.classList.add("saju-report-ready");
                 }}
                 status.textContent = "완료";

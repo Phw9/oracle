@@ -803,33 +803,54 @@ def _render_report_body(view: _PersonalReportView) -> str:
     if view.skip_face:
         result = _render_saju_only_report_body(view)
         return result
-    eyebrow_text = "Oracle · 사주 리포트" if view.skip_face else "Oracle · 관상 &amp; 사주 종합 리포트"
-    gwansang_html = "" if view.skip_face else _render_part("gwansang", "相", "관상 — 얼굴이 말하는 것", view.face_subtitle, view.face_blocks)
+    result = _render_cute_personal_report_body(view)
+    return result
+
+
+def _render_cute_personal_report_body(view: _PersonalReportView) -> str:
     result = f"""
-<div class="oracle-report">
-<div class="wrap">
-  <header class="fade">
-    <div class="eyebrow">{eyebrow_text}</div>
-    <div class="ilgan-wrap">
-      <span class="person-mark {escape(view.day_master_class)}">
-        <span class="person-hanja">{escape(view.day_master_hanja)}</span>
-        <span class="person-ko">{escape(view.day_master_label)}</span>
-      </span>
-    </div>
-    <div class="name">{escape(view.name)} 님</div>
-    <div class="meta">{escape(view.meta)}</div>
-    <p class="essence serif">{escape(view.essence)}</p>
+<div class="oracle-report saju-only-report cute-personal-report">
+<div class="saju-wrap">
+  <div class="saju-page-nav">
+    <a class="saju-round" href="/personal" aria-label="입력 화면으로 돌아가기">‹</a>
+    <a class="saju-round" href="/" aria-label="처음으로">♡</a>
+  </div>
+
+  <header class="saju-hero fade">
+    <div class="saju-brand"><span>✧</span>ORACLE<span>✧</span></div>
+    <div class="saju-brand-sub">관상 &amp; 사주 리포트</div>
+    <div class="saju-brand-line">※</div>
+    <span class="saju-cloud saju-cloud-left" aria-hidden="true"></span>
+    <span class="saju-spark saju-spark-left" aria-hidden="true">✧</span>
+    <span class="saju-spark saju-spark-right" aria-hidden="true">✧</span>
   </header>
-  {_render_element_balance(view)}
-  {_render_pillars(view)}
-  {gwansang_html}
-  {_render_part("saju", "命", "사주 — 타고난 기운의 설계도", view.saju_subtitle, view.saju_blocks)}
-  {_render_synthesis(view)}
-  {_render_tags(view.tags)}
-  <footer>
-    <div class="logo">ORACLE</div>
-    <p class="disc">{escape(view.disclaimer)}</p>
-  </footer>
+
+  <section class="saju-profile-card fade">
+    <div class="saju-day-mark {escape(view.day_master_class)}">
+      <span class="saju-day-hanja">{escape(view.day_master_hanja)}</span>
+      <span class="saju-day-label">{escape(view.day_master_label)}</span>
+    </div>
+    <div class="saju-profile-copy">
+      <h1>{escape(view.name)} 님</h1>
+      <div class="saju-meta">♧ {escape(view.meta)}</div>
+      <p>{escape(view.essence)}</p>
+    </div>
+    <img class="saju-hero-ora" src="/static/assets/oracle-character.png" alt="" aria-hidden="true">
+    <span class="saju-floating-heart one" aria-hidden="true">♡</span>
+    <span class="saju-floating-heart two" aria-hidden="true">♡</span>
+    <span class="saju-floating-heart three" aria-hidden="true">♡</span>
+  </section>
+
+  {_render_saju_only_element_cards(view)}
+  {_render_cute_face_blocks(view)}
+  {_render_saju_only_blocks(view)}
+  {_render_cute_personal_synthesis(view)}
+
+  <section class="saju-disclaimer fade">
+    <div class="saju-disclaimer-icon">💡</div>
+    <p>{escape(view.disclaimer)}</p>
+    <img src="/static/assets/oracle-pair-card.png" alt="" aria-hidden="true">
+  </section>
 </div>
 </div>
 """
@@ -1054,6 +1075,75 @@ def _render_saju_only_blocks(view: _PersonalReportView) -> str:
     return result
 
 
+def _render_cute_face_blocks(view: _PersonalReportView) -> str:
+    ora_images = (
+        "/static/assets/oracle-solo-card.png",
+        "/static/assets/oracle-character.png",
+        "/static/assets/oracle-pair-card.png",
+    )
+    blocks = []
+    for index, block in enumerate(view.face_blocks):
+        image = ora_images[index % len(ora_images)]
+        blocks.append(
+            f"""
+      <article class="saju-story-block cute-face-block">
+        <img src="{image}" alt="" aria-hidden="true">
+        <div>
+          <div class="saju-block-cat">{escape(block.category)}</div>
+          <h3>{escape(block.title)}</h3>
+          <p class="saju-block-summary">{escape(block.summary)}</p>
+          <p>{_paragraphs(block.body)}</p>
+        </div>
+      </article>
+""",
+        )
+    result = f"""
+  <section class="saju-card saju-story cute-face-story fade">
+    <div class="saju-section-head">
+      <h2><span aria-hidden="true">♡</span>관상 - 얼굴이 말하는 인상</h2>
+      <p>{escape(view.face_subtitle)}</p>
+    </div>
+    <div class="saju-story-list">
+      {''.join(blocks)}
+    </div>
+  </section>
+"""
+    return result
+
+
+def _render_cute_personal_synthesis(view: _PersonalReportView) -> str:
+    chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
+    convergence = "\n".join(
+        f"""
+        <div class="cute-convergence-row">
+          <span>{escape(item.face)}</span>
+          <b aria-hidden="true">×</b>
+          <span>{escape(item.saju)}</span>
+        </div>
+"""
+        for item in view.convergence
+    )
+    result = f"""
+  <section class="saju-card saju-summary-card cute-total-card fade">
+    <div class="saju-summary-copy">
+      <h2><span aria-hidden="true">♡</span>{escape(view.synth_title)}</h2>
+      <p>{_paragraphs(view.synth_body)}</p>
+      <div class="cute-convergence">
+        <h3>관상과 사주가 만나는 지점</h3>
+        {convergence}
+      </div>
+      <p>{_paragraphs(view.synth_summary)}</p>
+    </div>
+    <img src="/static/assets/oracle-solo-card.png" alt="" aria-hidden="true">
+    <div class="saju-keyword-band">
+      <h3>✧ 나를 채워주는 키워드 ✧</h3>
+      <div>{chips}</div>
+    </div>
+  </section>
+"""
+    return result
+
+
 def _render_saju_only_synthesis(view: _PersonalReportView) -> str:
     chips = "".join(f'<span class="saju-keyword">{escape(tag)}</span>' for tag in view.tags)
     result = f"""
@@ -1253,6 +1343,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:"Gowun Dodum"
 .saju-story-list{display:grid;gap:16px}.saju-story-block{display:grid;grid-template-columns:112px 1fr;gap:22px;align-items:center;min-height:146px;padding:18px 22px;border:1px solid var(--cute-line-soft);border-radius:12px;background:rgba(255,250,250,.76)}.saju-story-block img{width:104px;height:104px;object-fit:contain}.saju-block-cat{color:#d7835b;font-family:"Gowun Batang",serif;font-size:12px;font-weight:700;letter-spacing:.04em}.saju-story-block h3{margin-top:4px;color:var(--cute-ink);font-family:"Gowun Batang",serif;font-size:21px}.saju-story-block p{margin-top:8px;color:#5f504b;font-size:14.5px;line-height:1.72}.saju-story-block .saju-block-summary{color:#d36472;font-family:"Gowun Batang",serif;font-weight:700}
 .saju-summary-card{display:grid;grid-template-columns:1fr 178px;gap:20px;align-items:center;padding-bottom:0}.saju-summary-copy{text-align:center}.saju-summary-copy h2{font-family:"Gowun Batang",serif;font-size:24px;color:var(--cute-ink)}.saju-summary-copy h2 span{margin-right:10px;color:#ff8fab}.saju-summary-copy p{margin-top:18px;color:#5f504b;font-size:15px;line-height:1.75;text-align:left}.saju-summary-card>img{width:168px;height:168px;object-fit:contain;align-self:end}.saju-keyword-band{grid-column:1/-1;margin:24px -40px 0;padding:24px 34px;border-top:1px solid var(--cute-line-soft);background:rgba(255,246,248,.76);text-align:center}.saju-keyword-band h3{color:#7e6259;font-family:"Gowun Batang",serif;font-size:15px;font-weight:700}.saju-keyword-band>div{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}.saju-keyword{min-height:54px;display:flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid var(--cute-line);border-radius:14px;background:rgba(255,255,255,.74);color:#5b3b34;font-family:"Gowun Batang",serif;font-size:15px}
 .saju-disclaimer{display:grid;grid-template-columns:90px 1fr 190px;align-items:center;gap:22px;margin-top:22px;padding:22px 34px;background:linear-gradient(90deg,#fff5f7,#fffafa)}.saju-disclaimer-icon{color:#f5b45f;font-size:42px;text-align:center}.saju-disclaimer p{color:#6b544d;font-size:15px;line-height:1.75}.saju-disclaimer img{width:180px;height:130px;object-fit:contain;justify-self:center}
+.cute-personal-report .saju-brand-sub{color:#9a6647}.cute-personal-report .saju-profile-card{background:radial-gradient(circle at 88% 24%,rgba(255,239,242,.92),transparent 31%),radial-gradient(circle at 18% 58%,rgba(255,249,238,.9),transparent 34%),rgba(255,255,255,.82)}.cute-personal-report .saju-elements{margin-top:22px}.cute-face-story{background:linear-gradient(180deg,rgba(255,255,255,.84),rgba(255,250,251,.78))}.cute-face-story .saju-section-head h2 span{color:#ff8fab}.cute-face-block{background:linear-gradient(90deg,rgba(255,245,247,.86),rgba(255,255,255,.74));border-color:#ffd8df}.cute-face-block .saju-block-cat{color:#d96f83}.cute-face-block .saju-block-summary{color:#b96a7a}.cute-total-card{background:radial-gradient(circle at 92% 18%,rgba(255,238,243,.9),transparent 26%),rgba(255,255,255,.8)}.cute-convergence{margin:22px 0 4px;padding:18px 20px;border:1px solid var(--cute-line-soft);border-radius:14px;background:rgba(255,250,250,.74)}.cute-convergence h3{margin-bottom:12px;color:#d7835b;font-family:"Gowun Batang",serif;font-size:15px;text-align:center}.cute-convergence-row{display:grid;grid-template-columns:1fr 34px 1fr;align-items:center;gap:12px;padding:10px 0;border-top:1px dashed #f4dcd4;color:#5f504b;font-size:14px;line-height:1.62;text-align:left}.cute-convergence-row:first-of-type{border-top:0}.cute-convergence-row span:first-child{text-align:right;color:#9d6c74}.cute-convergence-row b{color:#f5b45f;font-family:"Gowun Batang",serif;text-align:center}.cute-convergence-row span:last-child{color:#5d7164}
 header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--line)}
 .eyebrow{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;margin-bottom:26px}
 .ilgan-wrap{margin:18px 0;display:flex;justify-content:center}
