@@ -1733,12 +1733,17 @@ def _generate_distributed(
                     "첫인상과 분위기", "관계 강점",
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
-                if is_core_category and compute_score < 20.0:
-                    other_high_perf_exists = any(
-                        meta.get("compute_score", 0.0) >= 20.0
-                        for meta in scheduler.slave_metadata.values()
+                if is_core_category:
+                    has_idle_remote_slave = any(
+                        (addr != "local" and meta.get("status") == "idle" and addr != slave_url)
+                        for addr, meta in scheduler.slave_metadata.items()
                     )
-                    if other_high_perf_exists:
+                    has_high_perf_slave = any(
+                        (meta.get("compute_score", 0.0) >= 20.0 and addr != slave_url)
+                        for addr, meta in scheduler.slave_metadata.items()
+                    )
+                    yield_task = has_idle_remote_slave or (compute_score < 20.0 and has_high_perf_slave)
+                    if yield_task:
                         task_queue.put(task)
                         task_queue.task_done()
                         time.sleep(0.5)
@@ -1869,12 +1874,17 @@ def _generate_distributed(
                     "첫인상과 분위기", "관계 강점",
                     "관계 구조", "상호 보완", "갈등 관리", "실천 제안"
                 )
-                if is_core_category and local_score < 20.0:
-                    other_high_perf_exists = any(
+                if is_core_category:
+                    has_idle_remote_slave = any(
+                        (addr != "local" and meta.get("status") == "idle")
+                        for addr, meta in scheduler.slave_metadata.items()
+                    )
+                    has_high_perf_slave = any(
                         meta.get("compute_score", 0.0) >= 20.0
                         for meta in scheduler.slave_metadata.values()
                     )
-                    if other_high_perf_exists:
+                    yield_task = has_idle_remote_slave or (local_score < 20.0 and has_high_perf_slave)
+                    if yield_task:
                         task_queue.put(task)
                         task_queue.task_done()
                         time.sleep(0.5)
