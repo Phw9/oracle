@@ -1513,6 +1513,10 @@ def _generate_distributed(
     face_llm_config = load_report_llm_config()
     report_llm_config = load_report_llm_config()
 
+    # Clear stale global state from previous runs
+    _LAST_STATUS_CHECK_TIMES.clear()
+    _LAST_COMPLETED_TIMES.clear()
+
     # Build the task list
     tasks = [{"is_metadata": True, "target_category": None, "retries": 0}]
     for cat in categories:
@@ -1524,6 +1528,7 @@ def _generate_distributed(
 
     task_queue = queue.PriorityQueue()
     task_id = 0
+    task_id_lock = threading.Lock()
 
     def put_task(task):
         nonlocal task_id
@@ -1539,8 +1544,9 @@ def _generate_distributed(
                 priority = 2 + categories.index(cat)
             except ValueError:
                 priority = 100
-        task_queue.put((priority, task_id, task))
-        task_id += 1
+        with task_id_lock:
+            task_queue.put((priority, task_id, task))
+            task_id += 1
 
     for task in tasks:
         put_task(task)
@@ -1609,15 +1615,37 @@ def _generate_distributed(
         return True
 
     def mark_task_done(task):
+        """Mark task as done. Returns True if this was the first completion, False if already done."""
         with completed_lock:
             key = (task["is_metadata"], task["target_category"])
             if key not in completed_tasks:
                 completed_tasks.add(key)
                 task_queue.task_done()  # Increment queue completion safely exactly once
+                return True
+            return False
 
     def find_unfinished_speculative_task(my_url, is_my_local):
         if not app_config.distributed_speculative:
             return None
+        # Pre-fetch own score OUTSIDE the lock to avoid blocking all workers
+        my_raw_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
+        if not is_my_local and my_raw_score == 5.0:
+            now = time.time()
+            last_check = _LAST_STATUS_CHECK_TIMES.get(my_url, 0.0)
+            if now - last_check >= 5.0:
+                _LAST_STATUS_CHECK_TIMES[my_url] = now
+                try:
+                    status_url = f"{my_url.rstrip('/')}/api/distributed/status"
+                    res = requests.get(status_url, timeout=2.0)
+                    if res.status_code == 200:
+                        status_data = res.json()
+                        score = status_data.get("compute_score")
+                        if score is not None:
+                            scheduler.slave_metadata[my_url]["compute_score"] = float(score)
+                            my_raw_score = float(score)
+                except Exception:
+                    pass
+
         # Speculative work stealing: find any task currently assigned to another slower node 
         # (or just any task) that has NOT completed yet.
         with assignments_lock:
@@ -1632,23 +1660,6 @@ def _generate_distributed(
                     if not is_task_done(assigned_task):
                         return copy.deepcopy(assigned_task)
                 elif not is_my_local and not is_other_local and worker_url != my_url:
-                    my_raw_score = scheduler.slave_metadata.get(my_url, {}).get("compute_score", 5.0)
-                    if my_raw_score == 5.0:
-                        now = time.time()
-                        last_check = _LAST_STATUS_CHECK_TIMES.get(my_url, 0.0)
-                        if now - last_check >= 5.0:
-                            _LAST_STATUS_CHECK_TIMES[my_url] = now
-                            try:
-                                status_url = f"{my_url.rstrip('/')}/api/distributed/status"
-                                res = requests.get(status_url, timeout=2.0)
-                                if res.status_code == 200:
-                                    status_data = res.json()
-                                    score = status_data.get("compute_score")
-                                    if score is not None:
-                                        scheduler.slave_metadata[my_url]["compute_score"] = float(score)
-                                        my_raw_score = float(score)
-                            except Exception:
-                                pass
                     my_score = get_virtual_score(my_url, my_raw_score)
                     other_score = get_virtual_score(worker_url, scheduler.slave_metadata.get(worker_url, {}).get("compute_score", 5.0))
                     if my_score > other_score:
@@ -1835,16 +1846,18 @@ def _generate_distributed(
                     print(f"Category: {cat or 'metadata'}")
                     print(f"Output:\n{output}")
                     print("-" * 50 + "\n", flush=True)
-                already_done = is_task_done(task)
-                if not already_done:
-                    mark_task_done(task)
+                # Atomic check-mark-append: mark_task_done returns True only for the first completer
+                if mark_task_done(task):
                     with results_lock:
                         results.append({"task": task, "success": True, "output": output})
             else:
-                consecutive_failures += 1
+                # Only count non-speculative failures for consecutive failure tracking (#2)
+                if not speculative:
+                    consecutive_failures += 1
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on {device_name} in {elapsed:.2f}s. Error: {error_msg} (Worker Score: {my_updated_score:.2f}, Master Score: {local_updated_score:.2f})")
                 if not speculative:
                     if is_task_done(task):
+                        task_queue.task_done()  # Balance the original get() (#1)
                         continue
                     task["retries"] += 1
                     if task["retries"] <= 3:
@@ -1871,7 +1884,14 @@ def _generate_distributed(
         except Exception:
             local_score = 5.0
 
+        consecutive_failures = 0
+        max_consecutive_failures = 10
+
         while True:
+            if consecutive_failures >= max_consecutive_failures:
+                print(f"[Distributed][Offline] Local worker failed consecutively {max_consecutive_failures} times. Stopping worker thread.")
+                break
+
             task = None
             speculative = False
 
@@ -1894,12 +1914,16 @@ def _generate_distributed(
 
             # Local worker directly processes its own retrieved tasks without yielding to remote slaves.
 
-            rendered = render_distributed_prompt_template(
-                name=prompt_name,
-                values=values,
-                target_category=cat,
-                is_metadata=is_meta,
-            )
+            # Wrap template rendering in try/except (#10)
+            try:
+                rendered = render_distributed_prompt_template(
+                    name=prompt_name,
+                    values=values,
+                    target_category=cat,
+                    is_metadata=is_meta,
+                )
+            except Exception as e:
+                rendered = f"[Failed to render prompt for local]: {e}"
 
             if app_config.debug:
                 prefix_tag = "SPECULATIVE" if speculative else "NORMAL"
@@ -1930,6 +1954,7 @@ def _generate_distributed(
             local_updated_score = scheduler.slave_metadata.get("local", {}).get("compute_score", 5.0)
 
             if success:
+                consecutive_failures = 0
                 with _COMPLETED_TIMES_LOCK:
                     _LAST_COMPLETED_TIMES["local"] = time.time()
                 print(f"[Distributed] Task '{cat or 'metadata'}' completed on local (127.0.0.1) in {elapsed:.2f}s (Local Score: {local_updated_score:.2f})")
@@ -1938,15 +1963,18 @@ def _generate_distributed(
                     print(f"Category: {cat or 'metadata'}")
                     print(f"Output:\n{output}")
                     print("-" * 50 + "\n", flush=True)
-                already_done = is_task_done(task)
-                if not already_done:
-                    mark_task_done(task)
+                # Atomic check-mark-append (#3)
+                if mark_task_done(task):
                     with results_lock:
                         results.append({"task": task, "success": True, "output": output})
             else:
+                # Only count non-speculative failures (#2)
+                if not speculative:
+                    consecutive_failures += 1
                 print(f"[Distributed] Task '{cat or 'metadata'}' failed on local (127.0.0.1) in {elapsed:.2f}s. Error: {error_msg} (Local Score: {local_updated_score:.2f})")
                 if not speculative:
                     if is_task_done(task):
+                        task_queue.task_done()  # Balance the original get() (#1)
                         continue
                     task["retries"] += 1
                     if task["retries"] <= 3:
@@ -1981,12 +2009,23 @@ def _generate_distributed(
             t.start()
             threads.append(t)
 
+    global_start_time = time.perf_counter()
+    global_timeout = 1800  # 30 minutes max
+
     while task_queue.unfinished_tasks > 0:
+        elapsed = time.perf_counter() - global_start_time
+        if elapsed > global_timeout:
+            print(f"[Distributed][Timeout] Global timeout of {global_timeout}s reached. Breaking.")
+            break
         active_workers = any(t.is_alive() for t in threads)
         if not active_workers:
             print("[Distributed][Fatal] All worker threads have terminated, but some tasks are still unfinished. Breaking to avoid deadlock.")
             break
         time.sleep(0.5)
+
+    # Wait for worker threads to finish before processing results (#9)
+    for t in threads:
+        t.join(timeout=5.0)
 
     meta_output = {}
     blocks_outputs = []
@@ -2021,7 +2060,7 @@ def _generate_distributed(
     final_dict = meta_output
     block_key = "saju_blocks"
     if "face" in prompt_name:
-        block_key = "pair_blocks" if ("couple" in prompt_name or "copule" in prompt_name) else "face_blocks"
+        block_key = "pair_blocks" if "couple" in prompt_name else "face_blocks"
 
     def clean_cat(c: object) -> str:
         if not isinstance(c, str):
@@ -2100,7 +2139,7 @@ def _parse_distributed_json(text: str) -> dict[str, object]:
 def _distributed_block_key(prompt_name: str) -> str:
     if prompt_name == "personal_face_analysis":
         result = "face_blocks"
-    elif prompt_name == "face_analysis_copule":
+    elif prompt_name == "face_analysis_couple":
         result = "pair_blocks"
     else:
         raise ValueError(f"unsupported distributed prompt: {prompt_name}")

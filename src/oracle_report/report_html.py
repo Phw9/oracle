@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import json
 import mimetypes
 import re
@@ -508,6 +509,7 @@ def _default_compatibility_saju_blocks(
     left_manse: ManseLookupResult,
     right_manse: ManseLookupResult,
 ) -> tuple[Mapping[str, str], ...]:
+    print("[Report] Using default fallback block for category: compatibility_saju_blocks")
     left_summary = " ".join(left_manse.reading.summary_lines)
     right_summary = " ".join(right_manse.reading.summary_lines)
     result = (
@@ -741,6 +743,7 @@ def _pillar_views(
 
 
 def _default_saju_blocks(reading) -> tuple[Mapping[str, str], ...]:
+    print("[Report] Using default fallback block for category: saju_blocks")
     chart = reading.chart
     counts_text = _element_counts_text(reading.element_counts)
     day_element = STEM_ELEMENTS[chart.day.stem_index]
@@ -1372,12 +1375,14 @@ def _paragraphs(text: str) -> str:
 
 
 def _normalize_inline_text(text: str) -> str:
+    text = html.unescape(text)
     normalized_text = text.replace("\\r\\n", " ")
     normalized_text = normalized_text.replace("\\n", " ")
     normalized_text = normalized_text.replace("\\r", " ")
     normalized_text = normalized_text.replace("\r\n", " ")
     normalized_text = normalized_text.replace("\n", " ")
     normalized_text = normalized_text.replace("\r", " ")
+    normalized_text = normalized_text.replace("안불 기운시키", "안정시키")
     result = " ".join(normalized_text.split())
     return result
 
