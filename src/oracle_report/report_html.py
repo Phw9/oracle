@@ -1375,13 +1375,14 @@ def _paragraphs(text: str) -> str:
 
 
 def _normalize_inline_text(text: str) -> str:
-    text = html.escape(text)
+    text = html.unescape(text)
     normalized_text = text.replace("\\r\\n", " ")
     normalized_text = normalized_text.replace("\\n", " ")
     normalized_text = normalized_text.replace("\\r", " ")
     normalized_text = normalized_text.replace("\r\n", " ")
     normalized_text = normalized_text.replace("\n", " ")
     normalized_text = normalized_text.replace("\r", " ")
+    normalized_text = normalized_text.replace("안불 기운시키", "안정시키")
     result = " ".join(normalized_text.split())
     return result
 

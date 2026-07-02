@@ -329,6 +329,57 @@ def test_compatibility_report_html_keeps_six_saju_blocks() -> None:
     assert "사주 제목 6" in html
 
 
+def test_compatibility_report_html_does_not_double_escape_entities() -> None:
+    repository = ManseRepository()
+    left = BirthProfile(
+        name="송유진",
+        birth_datetime=datetime(1995, 3, 15, 12, 0),
+        gender="남성",
+    )
+    right = BirthProfile(
+        name="나혁주",
+        birth_datetime=datetime(1997, 5, 20, 12, 0),
+        gender="여성",
+    )
+    body = (
+        "송유진님은 '개척자' 역할을 맡으시면, "
+        "나혁주님은 &amp;#x27;설계자&amp;#x27; 역할로 전체 시스템을 안불 기운시키면 완벽해요. "
+        "<script>alert('xss')</script>"
+    )
+    generated_text = json.dumps(
+        {
+            "essence": "궁합 핵심",
+            "saju_blocks": [
+                {
+                    "category": "역할 분담",
+                    "title": "개척자와 설계자",
+                    "summary": "작은따옴표와 엔티티를 정상 표시합니다.",
+                    "body": body,
+                },
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    html = render_compatibility_report_html(
+        left,
+        right,
+        "직장동료",
+        repository.lookup(left),
+        repository.lookup(right),
+        "얼굴 관찰 fixture",
+        generated_text,
+    )
+
+    assert "&amp;#x27;" not in html
+    assert "&#x27;개척자&#x27;" in html
+    assert "&#x27;설계자&#x27;" in html
+    assert "안불 기운시키면" not in html
+    assert "전체 시스템을 안정시키면" in html
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;" in html
+
+
 def test_profile_hanja_marks_use_readable_text_color() -> None:
     repository = ManseRepository()
     left = BirthProfile(
