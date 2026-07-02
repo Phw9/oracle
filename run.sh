@@ -19,11 +19,15 @@ RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS="${RUN_ORACLE_REPORT_LLM_TIMEOUT_SECONDS:-
 RUN_ORACLE_START_LLAMA_SERVER="${RUN_ORACLE_START_LLAMA_SERVER:-1}"
 RUN_ORACLE_LLAMA_MODEL_PATH=""
 RUN_ORACLE_LLAMA_SERVER_BIN="${RUN_ORACLE_LLAMA_SERVER_BIN:-llama-server}"
+RUN_ORACLE_PREFER_LOCAL_LLAMA_SERVER="${RUN_ORACLE_PREFER_LOCAL_LLAMA_SERVER:-0}"
+RUN_ORACLE_REQUIRE_MANAGED_LLAMA_SERVER="${RUN_ORACLE_REQUIRE_MANAGED_LLAMA_SERVER:-0}"
 RUN_LLAMA_CONTEXT_SIZE="${RUN_LLAMA_CONTEXT_SIZE:-8192}"
 RUN_LLAMA_PARALLEL="${RUN_LLAMA_PARALLEL:-}"
 KVFIX_LLAMA_CONTEXT_SIZE=20480
 
 RUN_ORACLE_CAMERA_INDEX="${RUN_ORACLE_CAMERA_INDEX:-0}"
+RUN_ORACLE_CAMERA_BACKEND="${RUN_ORACLE_CAMERA_BACKEND:-auto}"
+RUN_ORACLE_CAMERA_AUTO_DETECT="${RUN_ORACLE_CAMERA_AUTO_DETECT:-1}"
 RUN_ORACLE_FRAME_WIDTH="${RUN_ORACLE_FRAME_WIDTH:-640}"
 RUN_ORACLE_FRAME_HEIGHT="${RUN_ORACLE_FRAME_HEIGHT:-480}"
 RUN_ORACLE_CAMERA_FPS="${RUN_ORACLE_CAMERA_FPS:-15}"
@@ -54,9 +58,13 @@ PACKAGED_MODEL_SHA256="$GEMMA4_E2B_Q2_MODEL_SHA256"
 LLAMA_THREADS=""
 LLAMA_NGL=""
 LLAMA_BATCH_SIZE=""
+LLAMA_UBATCH_SIZE=""
+LLAMA_FLASH_ATTN=""
+LLAMA_POLL=""
 LLAMA_EXTRA_ARGS=""
 declare -a LLAMA_EXTRA_ARGS_ARR=()
 PYTHON_ENV="auto"
+RUN_PROFILE="default"
 POSITIONAL_ARGS=()
 RUN_LLAMA_CONTEXT_SIZE_EXPLICIT=0
 LLAMA_SERVER_STARTED=0
@@ -166,6 +174,69 @@ cleanup_llama_server() {
   LLAMA_SERVER_PID=""
 }
 
+process_command_line() {
+  local pid
+  local cmd
+  pid="$1"
+  cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  if [[ -z "$cmd" ]] && ps -W >/dev/null 2>&1; then
+    cmd="$(ps -W 2>/dev/null | awk -v pid="$pid" '
+      $1 == pid || $4 == pid {
+        for (i = 8; i <= NF; i++) {
+          if (i > 8) {
+            printf " "
+          }
+          printf "%s", $i
+        }
+        printf "\n"
+        exit
+      }
+    ')"
+  fi
+  printf '%s\n' "$cmd"
+}
+
+stop_recorded_llama_server() {
+  local recorded_pid
+  local recorded_cmd
+  local attempt
+
+  if [[ ! -f "$LLAMA_PID_FILE" ]]; then
+    return 1
+  fi
+
+  recorded_pid="$(cat "$LLAMA_PID_FILE" 2>/dev/null || true)"
+  if [[ -z "$recorded_pid" ]]; then
+    rm -f "$LLAMA_PID_FILE"
+    return 1
+  fi
+
+  if ! process_running "$recorded_pid"; then
+    rm -f "$LLAMA_PID_FILE"
+    return 1
+  fi
+
+  recorded_cmd="$(process_command_line "$recorded_pid")"
+  if [[ "$recorded_cmd" != *llama-server* ]]; then
+    rm -f "$LLAMA_PID_FILE"
+    return 1
+  fi
+
+  log "stopping previously managed llama.cpp server pid=$recorded_pid"
+  kill "$recorded_pid" >/dev/null 2>&1 || true
+  for attempt in $(seq 1 30); do
+    if ! process_running "$recorded_pid"; then
+      break
+    fi
+    sleep 0.2
+  done
+  if process_running "$recorded_pid"; then
+    log "forcing previously managed llama.cpp server stop pid=$recorded_pid"
+    kill -KILL "$recorded_pid" >/dev/null 2>&1 || true
+  fi
+  rm -f "$LLAMA_PID_FILE"
+}
+
 on_run_exit() {
   local status
   status="$?"
@@ -183,6 +254,7 @@ print_help() {
 Usage: $0 [options] [command] [command_args...]
 
 Commands:
+  hwonly [cmd] [args...]   Laptop run profile: GPU offload and camera auto-detect
   debug <cmd> [args...]    Run in debug mode (saves outputs to runs/debug/)
   kvfix <cmd> [args...]    Run with fixed prompt cache slots enabled (ctx default: 20480)
   release <cmd> [args...]  Run in release mode (temp output dir, deleted after run)
@@ -205,6 +277,9 @@ Wrapper Options:
   -c, --ctx-size SIZE      Context size for llama.cpp (default: 8192)
   --parallel N             Number of llama.cpp slots
   -b, --batch-size SIZE    Batch size for llama.cpp
+  -ub, --ubatch-size SIZE  Physical batch size for llama.cpp
+  --flash-attn MODE        Flash attention mode: on, off, or auto
+  --poll N                 llama.cpp polling level (0-100)
   --distributed-role ROLE  Legacy distributed option, accepted and ignored
   --distributed-split      Legacy distributed option, accepted and ignored
   --distributed-warmup     Legacy distributed option, accepted and ignored
@@ -258,6 +333,18 @@ parse_args() {
         ;;
       -b|--batch-size)
         LLAMA_BATCH_SIZE="$2"
+        shift 2
+        ;;
+      -ub|--ubatch-size)
+        LLAMA_UBATCH_SIZE="$2"
+        shift 2
+        ;;
+      --flash-attn)
+        LLAMA_FLASH_ATTN="$2"
+        shift 2
+        ;;
+      --poll)
+        LLAMA_POLL="$2"
         shift 2
         ;;
       --distributed-role)
@@ -320,6 +407,38 @@ parse_args() {
         ;;
     esac
   done
+}
+
+apply_run_profile() {
+  if [[ "${POSITIONAL_ARGS[0]:-}" == "hwonly" ]]; then
+    RUN_PROFILE="hwonly"
+    POSITIONAL_ARGS=("${POSITIONAL_ARGS[@]:1}")
+    log "Using hwonly laptop run profile"
+    if [[ -z "$LLAMA_NGL" ]]; then
+      LLAMA_NGL="99"
+    fi
+    if [[ -z "${RUN_LLAMA_PARALLEL:-}" ]]; then
+      RUN_LLAMA_PARALLEL="1"
+    fi
+    if [[ -z "$LLAMA_BATCH_SIZE" ]]; then
+      LLAMA_BATCH_SIZE="2048"
+    fi
+    if [[ -z "$LLAMA_UBATCH_SIZE" ]]; then
+      LLAMA_UBATCH_SIZE="512"
+    fi
+    if [[ -z "$LLAMA_FLASH_ATTN" ]]; then
+      LLAMA_FLASH_ATTN="on"
+    fi
+    if [[ -z "$LLAMA_POLL" ]]; then
+      LLAMA_POLL="100"
+    fi
+    RUN_ORACLE_CAMERA_INDEX="${RUN_ORACLE_CAMERA_INDEX:-0}"
+    RUN_ORACLE_CAMERA_BACKEND="${RUN_ORACLE_CAMERA_BACKEND:-auto}"
+    RUN_ORACLE_CAMERA_AUTO_DETECT="${RUN_ORACLE_CAMERA_AUTO_DETECT:-1}"
+    RUN_ORACLE_SHOW_PREVIEW="${RUN_ORACLE_SHOW_PREVIEW:-0}"
+    RUN_ORACLE_PREFER_LOCAL_LLAMA_SERVER=1
+    RUN_ORACLE_REQUIRE_MANAGED_LLAMA_SERVER=1
+  fi
 }
 
 apply_kvfix_mode() {
@@ -392,12 +511,44 @@ setup_python_env() {
   fail "Python environment not found. Run ./build.sh first, then run ./run.sh."
 }
 
+load_dotenv_file() {
+  local env_file
+  local line
+  local key
+  local value
+  env_file="$1"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    case "$line" in
+      "" | "#"*)
+        continue
+        ;;
+    esac
+    if [[ "$line" == export[[:space:]]* ]]; then
+      line="${line#export }"
+    fi
+    if [[ "$line" != *=* ]]; then
+      continue
+    fi
+    key="${line%%=*}"
+    value="${line#*=}"
+    if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      continue
+    fi
+    if [[ "${#value}" -ge 2 ]]; then
+      if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+    export "$key=$value"
+  done < "$env_file"
+}
+
 load_env() {
   if [[ -f "$ROOT_DIR/.env" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    source "$ROOT_DIR/.env"
-    set +a
+    load_dotenv_file "$ROOT_DIR/.env"
   else
     fail ".env not found. Run ./build.sh first or restore .env from .env.example."
   fi
@@ -426,6 +577,8 @@ apply_run_config() {
   export ORACLE_START_LLAMA_SERVER="$RUN_ORACLE_START_LLAMA_SERVER"
   export ORACLE_LLAMA_MODEL_PATH="${ORACLE_LLAMA_MODEL_PATH:-$RUN_ORACLE_LLAMA_MODEL_PATH}"
   export ORACLE_LLAMA_SERVER_BIN="$RUN_ORACLE_LLAMA_SERVER_BIN"
+  export ORACLE_PREFER_LOCAL_LLAMA_SERVER="$RUN_ORACLE_PREFER_LOCAL_LLAMA_SERVER"
+  export ORACLE_REQUIRE_MANAGED_LLAMA_SERVER="$RUN_ORACLE_REQUIRE_MANAGED_LLAMA_SERVER"
   export LLAMA_CONTEXT_SIZE="$RUN_LLAMA_CONTEXT_SIZE"
   if [[ -n "${RUN_LLAMA_PARALLEL:-}" ]]; then
     export LLAMA_PARALLEL="$RUN_LLAMA_PARALLEL"
@@ -437,6 +590,8 @@ apply_run_config() {
   export ORACLE_FRAME_WIDTH="$RUN_ORACLE_FRAME_WIDTH"
   export ORACLE_FRAME_HEIGHT="$RUN_ORACLE_FRAME_HEIGHT"
   export ORACLE_CAMERA_FPS="$RUN_ORACLE_CAMERA_FPS"
+  export ORACLE_CAMERA_BACKEND="$RUN_ORACLE_CAMERA_BACKEND"
+  export ORACLE_CAMERA_AUTO_DETECT="$RUN_ORACLE_CAMERA_AUTO_DETECT"
   export ORACLE_MIN_FACE_SECONDS="$RUN_ORACLE_MIN_FACE_SECONDS"
   export ORACLE_FACE_MIN_SIZE_PX="$RUN_ORACLE_FACE_MIN_SIZE_PX"
   export ORACLE_FACE_DETECTION_SCALE="$RUN_ORACLE_FACE_DETECTION_SCALE"
@@ -559,15 +714,8 @@ raise SystemExit(0 if ok else 1)
 PY
 }
 
-find_llama_server() {
-  if [[ -n "${ORACLE_LLAMA_SERVER_BIN:-}" ]] &&
-    command -v "$ORACLE_LLAMA_SERVER_BIN" >/dev/null 2>&1; then
-    command -v "$ORACLE_LLAMA_SERVER_BIN"
-  elif command_exists llama-server; then
-    command -v llama-server
-  elif command_exists llama-server.exe; then
-    command -v llama-server.exe
-  elif [[ -d "$ORACLE_LLAMA_CPP_DIR" ]]; then
+find_local_llama_server() {
+  if [[ -d "$ORACLE_LLAMA_CPP_DIR" ]]; then
     local found_bin
     found_bin="$(find "$ORACLE_LLAMA_CPP_DIR" -type f \( -name 'llama-server' -o -name 'llama-server.exe' \) -executable | head -n 1)"
     if [[ -n "$found_bin" ]]; then
@@ -575,6 +723,25 @@ find_llama_server() {
     else
       return 1
     fi
+  else
+    return 1
+  fi
+}
+
+find_llama_server() {
+  if [[ "${ORACLE_PREFER_LOCAL_LLAMA_SERVER:-0}" == "1" ]] &&
+    find_local_llama_server; then
+    return
+  fi
+  if [[ -n "${ORACLE_LLAMA_SERVER_BIN:-}" ]] &&
+    command -v "$ORACLE_LLAMA_SERVER_BIN" >/dev/null 2>&1; then
+    command -v "$ORACLE_LLAMA_SERVER_BIN"
+  elif command_exists llama-server; then
+    command -v llama-server
+  elif command_exists llama-server.exe; then
+    command -v llama-server.exe
+  elif find_local_llama_server; then
+    return
   else
     return 1
   fi
@@ -772,8 +939,26 @@ ensure_model_file() {
 start_llama_server() {
   ORACLE_LLM_BASE_URL="${ORACLE_LLM_BASE_URL:-http://127.0.0.1:8080/v1}"
   if server_ready; then
-    log "llama.cpp server already reachable"
-    return
+    if [[ "${ORACLE_REQUIRE_MANAGED_LLAMA_SERVER:-0}" == "1" ]]; then
+      if stop_recorded_llama_server; then
+        local wait_attempt
+        for wait_attempt in $(seq 1 30); do
+          if ! server_ready; then
+            break
+          fi
+          sleep 0.2
+        done
+        if server_ready; then
+          fail "hwonly requires its own managed llama.cpp server, but another server is already reachable at $ORACLE_LLM_BASE_URL"
+        fi
+        log "restarting managed llama.cpp server for hwonly GPU profile"
+      else
+        fail "hwonly requires its own managed llama.cpp server, but another server is already reachable at $ORACLE_LLM_BASE_URL. Stop the existing server first."
+      fi
+    else
+      log "llama.cpp server already reachable"
+      return
+    fi
   fi
 
   if [[ "${ORACLE_START_LLAMA_SERVER:-1}" != "1" ]]; then
@@ -823,6 +1008,18 @@ start_llama_server() {
 
   if [[ -n "$LLAMA_BATCH_SIZE" ]]; then
     server_args+=(-b "$LLAMA_BATCH_SIZE")
+  fi
+
+  if [[ -n "$LLAMA_UBATCH_SIZE" ]]; then
+    server_args+=(-ub "$LLAMA_UBATCH_SIZE")
+  fi
+
+  if [[ -n "$LLAMA_FLASH_ATTN" ]]; then
+    server_args+=(-fa "$LLAMA_FLASH_ATTN")
+  fi
+
+  if [[ -n "$LLAMA_POLL" ]]; then
+    server_args+=(--poll "$LLAMA_POLL")
   fi
 
   if [[ "${#LLAMA_EXTRA_ARGS_ARR[@]}" -gt 0 ]]; then
@@ -1001,6 +1198,7 @@ needs_camera_device() {
 main() {
   # Parse options
   parse_args "$@"
+  apply_run_profile
 
   local requested_cmd="${POSITIONAL_ARGS[0]:-}"
   local requested_subcmd="${POSITIONAL_ARGS[1]:-}"

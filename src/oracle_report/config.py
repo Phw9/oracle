@@ -17,6 +17,7 @@ _LLM_BASE_URL_ENV_NAMES = (
     "ORACLE_LLM_BASE_URL",
     "ORACLE_REPORT_LLM_BASE_URL",
 )
+_CAMERA_BACKENDS = frozenset(("auto", "default", "v4l2", "dshow", "msmf"))
 
 _MOCK_LANDMARK_METRICS_JSON = (
     '{"third_balance_error":0.008,"face_aspect_ratio":1.32,'
@@ -56,6 +57,7 @@ class CaptureConfig:
     eye_min_count: int
     eyebrow_min_edge_density: float
     camera_auto_detect: bool = True
+    camera_backend: str = "auto"
     mock_capture_enabled: bool = False
     mock_landmark_metrics_json: str = ""
     mock_pair_left_landmark_metrics_json: str = ""
@@ -119,6 +121,7 @@ def load_capture_config() -> CaptureConfig:
             0.018,
         ),
         camera_auto_detect=_read_bool("ORACLE_CAMERA_AUTO_DETECT", True),
+        camera_backend=_read_camera_backend(),
         mock_capture_enabled=mock_capture_enabled,
         mock_landmark_metrics_json=mock_landmark_metrics_json,
         mock_pair_left_landmark_metrics_json=pair_left_metrics_json,
@@ -249,6 +252,18 @@ def _read_bool(name: str, default: bool) -> bool:
     result = default
     if raw_value is not None and raw_value.strip() != "":
         result = raw_value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return result
+
+
+def _read_camera_backend() -> str:
+    raw_value = os.getenv("ORACLE_CAMERA_BACKEND", "auto")
+    result = raw_value.strip().lower()
+    if result == "":
+        result = "auto"
+    if result not in _CAMERA_BACKENDS:
+        raise ValueError(
+            "ORACLE_CAMERA_BACKEND must be one of: auto, default, v4l2, dshow, msmf.",
+        )
     return result
 
 

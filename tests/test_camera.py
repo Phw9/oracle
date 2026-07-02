@@ -10,6 +10,7 @@ from oracle_report.vision import camera
 from oracle_report.vision.camera import (
     _camera_candidate_indices,
     _configure_capture,
+    build_capture_processors,
     draw_overlay,
     mirror_face_boxes,
     mirror_landmark_points,
@@ -25,10 +26,11 @@ class FakeCv2:
 
 
 class FakeCapture:
-    def __init__(self, backend_name: str) -> None:
+    def __init__(self, backend_name: str, read_ok: bool = True) -> None:
         self._backend_name = backend_name
         self.set_calls: list[tuple[int, int]] = []
         self._opened = True
+        self._read_ok = read_ok
         self.released = False
 
     def getBackendName(self) -> str:
@@ -43,6 +45,13 @@ class FakeCapture:
     def isOpened(self) -> bool:
         return self._opened
 
+    def read(self):
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+        if not self._read_ok:
+            frame = None
+        result = (self._read_ok, frame)
+        return result
+
     def release(self) -> None:
         self.released = True
 
@@ -54,14 +63,34 @@ class FakeCv2Open:
     CAP_PROP_FPS = 5
     CAP_PROP_BUFFERSIZE = 38
 
-    def __init__(self, open_indices: set[int]) -> None:
+    def __init__(self, open_indices: set[int], readable_indices: set[int] | None = None) -> None:
         self.open_indices = open_indices
+        self.readable_indices = open_indices if readable_indices is None else readable_indices
         self.calls: list[int] = []
 
     def VideoCapture(self, camera_index: int, backend=None):
         self.calls.append(camera_index)
-        capture = FakeCapture("V4L2")
+        capture = FakeCapture("V4L2", read_ok=camera_index in self.readable_indices)
         capture._opened = camera_index in self.open_indices
+        return capture
+
+
+class FakeCv2WindowsOpen:
+    CAP_DSHOW = 700
+    CAP_MSMF = 1400
+    CAP_PROP_FRAME_WIDTH = 3
+    CAP_PROP_FRAME_HEIGHT = 4
+    CAP_PROP_FPS = 5
+    CAP_PROP_BUFFERSIZE = 38
+
+    def __init__(self, open_backend: int) -> None:
+        self.open_backend = open_backend
+        self.calls: list[tuple[int, int | None]] = []
+
+    def VideoCapture(self, camera_index: int, backend=None):
+        self.calls.append((camera_index, backend))
+        capture = FakeCapture("DSHOW")
+        capture._opened = backend == self.open_backend
         return capture
 
 
@@ -201,6 +230,32 @@ def test_open_camera_falls_back_to_next_device(monkeypatch) -> None:
     assert capture.isOpened() is True
 
 
+def test_open_camera_skips_open_device_when_frame_read_fails(monkeypatch) -> None:
+    fake_cv2 = FakeCv2Open({0, 1}, readable_indices={1})
+
+    monkeypatch.setattr(camera.os, "name", "posix")
+    monkeypatch.setattr(camera, "_import_cv2", lambda: fake_cv2)
+
+    cv2, capture = camera.open_camera(_capture_config())
+
+    assert cv2 is fake_cv2
+    assert fake_cv2.calls[:3] == [0, 0, 1]
+    assert capture.isOpened() is True
+
+
+def test_open_camera_prefers_windows_directshow_backend(monkeypatch) -> None:
+    fake_cv2 = FakeCv2WindowsOpen(FakeCv2WindowsOpen.CAP_DSHOW)
+
+    monkeypatch.setattr(camera.os, "name", "nt")
+    monkeypatch.setattr(camera, "_import_cv2", lambda: fake_cv2)
+
+    cv2, capture = camera.open_camera(_capture_config())
+
+    assert cv2 is fake_cv2
+    assert fake_cv2.calls[0] == (0, FakeCv2WindowsOpen.CAP_DSHOW)
+    assert capture.isOpened() is True
+
+
 def test_open_camera_reports_permission_hint_for_inaccessible_video_devices(monkeypatch) -> None:
     fake_cv2 = FakeCv2Open(set())
 
@@ -219,6 +274,40 @@ def test_open_camera_reports_permission_hint_for_inaccessible_video_devices(monk
     assert "attempted indices: 0, 1, 2, 3, 4, 5" in message
     assert "/dev/video0" in message
     assert "video group membership" in message
+
+
+def test_build_capture_processors_can_use_opencv_mode(monkeypatch) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "1")
+
+    detector, analyzer = build_capture_processors(_capture_config())
+
+    assert detector.__class__.__name__ == "HaarFaceDetector"
+    assert analyzer.__class__.__name__ == "OpenCvFaceQualityAnalyzer"
+
+
+def test_build_capture_processors_falls_back_when_mediapipe_solutions_missing(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ORACLE_FACE_ANALYSIS_MODE", "2")
+
+    class MissingSolutionsDetector:
+        def __init__(self, *args, **kwargs) -> None:
+            raise RuntimeError("installed mediapipe package is missing solutions.face_mesh")
+
+    monkeypatch.setattr(
+        camera,
+        "_build_mediapipe_capture_processors",
+        lambda config: (_raise_missing_solutions(), None),
+    )
+
+    detector, analyzer = build_capture_processors(_capture_config())
+
+    assert detector.__class__.__name__ == "HaarFaceDetector"
+    assert analyzer.__class__.__name__ == "OpenCvFaceQualityAnalyzer"
+
+
+def _raise_missing_solutions():
+    raise RuntimeError("installed mediapipe package is missing solutions.face_mesh")
 
 
 def _capture_config() -> CaptureConfig:

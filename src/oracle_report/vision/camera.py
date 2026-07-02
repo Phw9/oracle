@@ -16,6 +16,12 @@ from oracle_report.vision.quality import OpenCvFaceQualityAnalyzer
 
 
 _GSTREAMER_BACKEND_NAME = "GSTREAMER"
+_CAMERA_BACKEND_AUTO = "auto"
+_CAMERA_BACKEND_DEFAULT = "default"
+_CAMERA_BACKEND_DSHOW = "dshow"
+_CAMERA_BACKEND_MSMF = "msmf"
+_CAMERA_BACKEND_V4L2 = "v4l2"
+_CAMERA_READ_PROBE_ATTEMPTS = 5
 _VIDEO_CAPTURE_BUFFER_SIZE = 1
 _OVERLAY_HEIGHT_PX = 54
 _OVERLAY_TEXT_POSITION = (24, 14)
@@ -39,12 +45,17 @@ def open_camera(config: CaptureConfig) -> tuple[Any, Any]:
     attempted_indices = []
     for camera_index in _camera_candidate_indices(config):
         attempted_indices.append(camera_index)
-        candidate = _open_video_capture(cv2, camera_index)
-        if candidate.isOpened():
-            capture = candidate
-            selected_index = camera_index
+        for backend_id in _camera_backend_ids(cv2, config.camera_backend):
+            candidate = _create_video_capture(cv2, camera_index, backend_id)
+            if candidate.isOpened():
+                _configure_capture(cv2, candidate, config)
+                if _capture_has_readable_frame(candidate):
+                    capture = candidate
+                    selected_index = camera_index
+                    break
+            _release_capture(candidate)
+        if capture is not None:
             break
-        _release_capture(candidate)
     if capture is None or selected_index is None:
         access_hint = _build_camera_access_hint()
         raise RuntimeError(
@@ -52,7 +63,6 @@ def open_camera(config: CaptureConfig) -> tuple[Any, Any]:
             f"attempted indices: {', '.join(str(index) for index in attempted_indices)}"
             f"{access_hint}"
         )
-    _configure_capture(cv2, capture, config)
     result = (cv2, capture)
     return result
 
@@ -77,6 +87,28 @@ def _release_capture(capture: Any) -> None:
         capture.release()
 
 
+def _capture_has_readable_frame(capture: Any) -> bool:
+    result = False
+    if hasattr(capture, "read"):
+        for _ in range(_CAMERA_READ_PROBE_ATTEMPTS):
+            ok, frame = capture.read()
+            if ok and _frame_has_pixels(frame):
+                result = True
+                break
+    else:
+        result = True
+    return result
+
+
+def _frame_has_pixels(frame: Any) -> bool:
+    result = False
+    if frame is not None:
+        shape = getattr(frame, "shape", ())
+        if len(shape) >= 2 and shape[0] > 0 and shape[1] > 0:
+            result = True
+    return result
+
+
 def _build_camera_access_hint() -> str:
     if os.name != "posix":
         return ""
@@ -96,14 +128,55 @@ def _discover_video_device_paths() -> list[str]:
     return result
 
 
-def _open_video_capture(cv2: Any, camera_index: int) -> Any:
-    if os.name == "posix" and hasattr(cv2, "CAP_V4L2"):
-        capture = cv2.VideoCapture(camera_index, cv2.CAP_V4L2)
-        if not capture.isOpened():
-            capture.release()
-            capture = cv2.VideoCapture(camera_index)
+def _camera_backend_ids(cv2: Any, camera_backend: str) -> tuple[int | None, ...]:
+    backend_ids: list[int | None] = []
+    if camera_backend == _CAMERA_BACKEND_AUTO:
+        _append_auto_camera_backend_ids(cv2, backend_ids)
+    elif camera_backend == _CAMERA_BACKEND_DEFAULT:
+        backend_ids.append(None)
+    elif camera_backend == _CAMERA_BACKEND_DSHOW:
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_DSHOW")
+        backend_ids.append(None)
+    elif camera_backend == _CAMERA_BACKEND_MSMF:
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_MSMF")
+        backend_ids.append(None)
+    elif camera_backend == _CAMERA_BACKEND_V4L2:
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_V4L2")
+        backend_ids.append(None)
     else:
+        backend_ids.append(None)
+    result = _deduplicate_backend_ids(backend_ids)
+    return result
+
+
+def _append_auto_camera_backend_ids(cv2: Any, backend_ids: list[int | None]) -> None:
+    if os.name == "nt":
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_DSHOW")
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_MSMF")
+    elif os.name == "posix":
+        _append_cv2_backend_id(cv2, backend_ids, "CAP_V4L2")
+    backend_ids.append(None)
+
+
+def _append_cv2_backend_id(cv2: Any, backend_ids: list[int | None], name: str) -> None:
+    if hasattr(cv2, name):
+        backend_ids.append(getattr(cv2, name))
+
+
+def _deduplicate_backend_ids(backend_ids: list[int | None]) -> tuple[int | None, ...]:
+    result_list: list[int | None] = []
+    for backend_id in backend_ids:
+        if backend_id not in result_list:
+            result_list.append(backend_id)
+    result = tuple(result_list)
+    return result
+
+
+def _create_video_capture(cv2: Any, camera_index: int, backend_id: int | None) -> Any:
+    if backend_id is None:
         capture = cv2.VideoCapture(camera_index)
+    else:
+        capture = cv2.VideoCapture(camera_index, backend_id)
     result = capture
     return result
 
@@ -145,6 +218,27 @@ def build_default_quality_analyzer(
 
 
 def build_capture_processors(config: CaptureConfig):
+    mode = os.getenv("ORACLE_FACE_ANALYSIS_MODE", "2").strip()
+    if mode == "1":
+        result = _build_opencv_capture_processors(config)
+    else:
+        try:
+            result = _build_mediapipe_capture_processors(config)
+        except RuntimeError as exc:
+            if not _is_mediapipe_unavailable_error(exc):
+                raise
+            result = _build_opencv_capture_processors(config)
+    return result
+
+
+def _build_opencv_capture_processors(config: CaptureConfig):
+    detector = build_default_face_detector(config)
+    analyzer = build_default_quality_analyzer(config)
+    result = (detector, analyzer)
+    return result
+
+
+def _build_mediapipe_capture_processors(config: CaptureConfig):
     from oracle_report.vision.landmarks import (
         MediaPipeLandmarkFaceDetector,
         MediaPipeLandmarkQualityAnalyzer,
@@ -157,6 +251,15 @@ def build_capture_processors(config: CaptureConfig):
     )
     analyzer = MediaPipeLandmarkQualityAnalyzer(detector)
     result = (detector, analyzer)
+    return result
+
+
+def _is_mediapipe_unavailable_error(error: RuntimeError) -> bool:
+    message = str(error)
+    result = (
+        "mediapipe is required" in message
+        or "missing solutions.face_mesh" in message
+    )
     return result
 
 

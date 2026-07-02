@@ -8,6 +8,11 @@ VENV_DIR="${ORACLE_VENV_DIR:-$ROOT_DIR/.venv}"
 DEPS_DIR="${ORACLE_DEPS_DIR:-$ROOT_DIR/.deps}"
 DEFAULT_LLAMA_CPP_DIR="${ORACLE_LLAMA_CPP_DIR:-$ROOT_DIR/llama.cpp}"
 LLAMA_CPP_DIR=""
+CUDA_COMPILER=""
+CUDA_TOOLKIT_ROOT=""
+CUDA_ARCHITECTURES=""
+CMAKE_SELECTED_GENERATOR=""
+declare -a CMAKE_GENERATOR_FLAGS=()
 
 GEMMA3_1B_Q4_MODEL_PATH="$ROOT_DIR/models/gemma-3-1b-it-Q4_0.gguf"
 GEMMA4_E2B_Q2_MODEL_PATH="$ROOT_DIR/models/gemma-4-E2B-it-UD-Q2_K_XL.gguf"
@@ -46,6 +51,12 @@ is_linux() {
   [[ "$(uname -s)" == "Linux" ]]
 }
 
+is_windows() {
+  local os_name
+  os_name="$(uname -s)"
+  [[ "$os_name" == MINGW* || "$os_name" == MSYS* || "$os_name" == CYGWIN* ]]
+}
+
 sudo_cmd() {
   if [[ "$(id -u)" -eq 0 ]]; then
     printf ''
@@ -62,6 +73,8 @@ Usage: $0 [profile] [options]
 
 Profiles:
   hwonly                  Build for this laptop: CPU-only llama.cpp, local .venv,
+                          and no systemd service generation
+  hwonlygpu               Build for this laptop with CUDA llama.cpp, local .venv,
                           and no systemd service generation
 
 Options:
@@ -119,6 +132,10 @@ parse_args() {
         BUILD_PROFILE="hwonly"
         shift
         ;;
+      hwonlygpu)
+        BUILD_PROFILE="hwonlygpu"
+        shift
+        ;;
       *)
         log "Warning: Unknown option $1"
         shift
@@ -128,10 +145,18 @@ parse_args() {
 }
 
 apply_build_profile() {
-  if [[ "$BUILD_PROFILE" == "hwonly" ]]; then
-    log "Using hwonly laptop build profile"
+  if [[ "$BUILD_PROFILE" == "hwonly" || "$BUILD_PROFILE" == "hwonlygpu" ]]; then
+    if [[ "$BUILD_PROFILE" == "hwonlygpu" ]]; then
+      log "Using hwonlygpu laptop build profile"
+    else
+      log "Using hwonly laptop build profile"
+    fi
     if [[ "$FORCE_CUDA_EXPLICIT" != "1" ]]; then
-      FORCE_CUDA="0"
+      if [[ "$BUILD_PROFILE" == "hwonlygpu" ]]; then
+        FORCE_CUDA="1"
+      else
+        FORCE_CUDA="0"
+      fi
     fi
     if [[ "$PYTHON_ENV_EXPLICIT" != "1" ]]; then
       if command_exists uv; then
@@ -145,23 +170,182 @@ apply_build_profile() {
 }
 
 detect_cuda() {
-  if command_exists nvcc; then
-    return 0
-  fi
-  local p
-  for p in /usr/local/cuda/bin /usr/local/cuda-*/bin; do
-    if [[ -x "$p/nvcc" ]]; then
-      export PATH="$p:$PATH"
-      if [[ -d "${p%/bin}/lib64" ]]; then
-        export LD_LIBRARY_PATH="${p%/bin}/lib64:${LD_LIBRARY_PATH:-}"
+  local cuda_compiler
+  cuda_compiler="$(find_cuda_compiler || true)"
+  [[ -n "$cuda_compiler" ]]
+}
+
+detect_cuda_toolkit_path() {
+  local cuda_root
+  for cuda_root in \
+    "${CUDA_PATH:-}" \
+    "${CUDA_HOME:-}" \
+    /usr/local/cuda \
+    /usr/local/cuda-* \
+    "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/v* \
+    "/mnt/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/v*; do
+    if [[ -z "$cuda_root" || ! -d "$cuda_root" ]]; then
+      continue
+    fi
+    if [[ -x "$cuda_root/bin/nvcc" || -x "$cuda_root/bin/nvcc.exe" ]]; then
+      export PATH="$cuda_root/bin:$PATH"
+      if [[ -d "$cuda_root/lib64" ]]; then
+        export LD_LIBRARY_PATH="$cuda_root/lib64:${LD_LIBRARY_PATH:-}"
       fi
       return 0
     fi
   done
-  if command_exists nvidia-smi; then
-    return 0
-  fi
   return 1
+}
+
+find_cuda_compiler() {
+  local compiler
+  compiler=""
+  if command_exists nvcc; then
+    compiler="$(command -v nvcc)"
+  elif command_exists nvcc.exe; then
+    compiler="$(command -v nvcc.exe)"
+  fi
+  if [[ -z "$compiler" ]]; then
+    detect_cuda_toolkit_path || true
+    if command_exists nvcc; then
+      compiler="$(command -v nvcc)"
+    elif command_exists nvcc.exe; then
+      compiler="$(command -v nvcc.exe)"
+    fi
+  fi
+  printf '%s\n' "$compiler"
+  [[ -n "$compiler" ]]
+}
+
+cmake_path() {
+  local raw_path
+  local result
+  raw_path="$1"
+  result="$raw_path"
+  if is_windows && command_exists cygpath; then
+    result="$(cygpath -w "$raw_path")"
+  fi
+  printf '%s\n' "$result"
+}
+
+require_cuda_toolkit() {
+  local raw_compiler
+  local raw_toolkit_root
+  raw_compiler="$(find_cuda_compiler || true)"
+  if [[ -z "$raw_compiler" ]]; then
+    fail "CUDA Toolkit with nvcc is required for CUDA build. Install NVIDIA CUDA Toolkit and re-run ./build.sh hwonlygpu."
+  fi
+  raw_toolkit_root="$(cd "$(dirname "$raw_compiler")/.." && pwd -P)"
+  CUDA_COMPILER="$(cmake_path "$raw_compiler")"
+  CUDA_TOOLKIT_ROOT="$(cmake_path "$raw_toolkit_root")"
+}
+
+detect_cuda_architectures() {
+  local configured_architectures
+  local detected_architecture
+  local result
+  configured_architectures="${ORACLE_CUDA_ARCHITECTURES:-${CMAKE_CUDA_ARCHITECTURES:-}}"
+  result=""
+  if [[ -n "${configured_architectures//[[:space:]]/}" ]]; then
+    result="$configured_architectures"
+  elif command_exists nvidia-smi; then
+    detected_architecture="$(
+      nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null |
+        head -n 1 |
+        tr -d '[:space:].'
+    )"
+    if [[ "$detected_architecture" =~ ^[0-9]+$ ]]; then
+      result="$detected_architecture"
+    fi
+  fi
+  printf '%s\n' "$result"
+  [[ -n "$result" ]]
+}
+
+require_cuda_architectures() {
+  CUDA_ARCHITECTURES="$(detect_cuda_architectures || true)"
+  if [[ -z "$CUDA_ARCHITECTURES" ]]; then
+    fail "Could not detect CUDA GPU architecture. Set ORACLE_CUDA_ARCHITECTURES, for example ORACLE_CUDA_ARCHITECTURES=89 for RTX 4050."
+  fi
+}
+
+cmake_generator_available() {
+  local generator_name
+  generator_name="$1"
+  cmake --help | grep -Fq "$generator_name"
+}
+
+configure_windows_cuda_cmake() {
+  CMAKE_GENERATOR_FLAGS=()
+  CMAKE_SELECTED_GENERATOR=""
+  if ! is_windows || [[ -z "$CUDA_TOOLKIT_ROOT" ]]; then
+    return
+  fi
+  if cmake_generator_available "Visual Studio 17 2022"; then
+    CMAKE_SELECTED_GENERATOR="Visual Studio 17 2022"
+    CMAKE_GENERATOR_FLAGS+=(
+      -G "$CMAKE_SELECTED_GENERATOR"
+      -A x64
+      -T "cuda=$CUDA_TOOLKIT_ROOT"
+    )
+  elif [[ -n "${CMAKE_GENERATOR:-}" ]]; then
+    if [[ "$CMAKE_GENERATOR" == Visual\ Studio* ]]; then
+      CMAKE_GENERATOR_FLAGS+=(-T "cuda=$CUDA_TOOLKIT_ROOT")
+    fi
+  elif command_exists ninja; then
+    CMAKE_GENERATOR_FLAGS+=(-G Ninja)
+  else
+    CMAKE_GENERATOR_FLAGS+=(-T "cuda=$CUDA_TOOLKIT_ROOT")
+  fi
+}
+
+prepare_windows_cuda_cmake_cache() {
+  if ! is_windows || [[ -z "$CUDA_TOOLKIT_ROOT" ]]; then
+    return
+  fi
+  local build_dir
+  local cache_path
+  build_dir="$LLAMA_CPP_DIR/build"
+  cache_path="$build_dir/CMakeCache.txt"
+  if [[ ! -f "$cache_path" ]]; then
+    return
+  fi
+  if [[ -n "$CMAKE_SELECTED_GENERATOR" ]] &&
+    ! grep -Fxq "CMAKE_GENERATOR:INTERNAL=$CMAKE_SELECTED_GENERATOR" "$cache_path"; then
+    clear_windows_cuda_cmake_cache "$build_dir" "$cache_path"
+    return
+  fi
+  if grep -Eq '^CMAKE_GENERATOR_TOOLSET:INTERNAL=.*cuda=' "$cache_path" ||
+    grep -Eq '^CMAKE_GENERATOR:INTERNAL=Ninja$' "$cache_path"; then
+    return
+  fi
+  clear_windows_cuda_cmake_cache "$build_dir" "$cache_path"
+}
+
+clear_windows_cuda_cmake_cache() {
+  local build_dir
+  local build_dir_abs
+  local cache_path
+  local cmake_files_dir
+  local llama_dir_abs
+  build_dir="$1"
+  cache_path="$2"
+  build_dir_abs="$(cd "$build_dir" && pwd -P)"
+  llama_dir_abs="$(cd "$LLAMA_CPP_DIR" && pwd -P)"
+  case "$build_dir_abs" in
+    "$llama_dir_abs"/*)
+      log "clearing stale CMake cache before applying Windows CUDA toolset"
+      rm -f "$cache_path"
+      cmake_files_dir="$build_dir/CMakeFiles"
+      if [[ -d "$cmake_files_dir" ]]; then
+        rm -rf "$cmake_files_dir"
+      fi
+      ;;
+    *)
+      fail "refusing to clear CMake cache outside llama.cpp build dir: $build_dir_abs"
+      ;;
+  esac
 }
 
 install_apt_packages() {
@@ -419,15 +603,29 @@ llama_cuda_cache_enabled() {
   [[ -f "$cache_path" ]] && grep -Eq '^GGML_CUDA(:[A-Z]+)?=ON$' "$cache_path"
 }
 
+llama_cuda_cache_disabled() {
+  local cache_path="$LLAMA_CPP_DIR/build/CMakeCache.txt"
+  if [[ ! -f "$cache_path" ]]; then
+    return 0
+  fi
+  ! grep -Eq '^GGML_CUDA(:[A-Z]+)?=ON$' "$cache_path"
+}
+
 ensure_llama_cpp() {
   if command_exists llama-server; then
-    log "llama-server already installed on PATH"
-    return
+    if [[ "${FORCE_CUDA:-0}" == "1" ]]; then
+      log "CUDA build requested; building local llama.cpp even though llama-server is on PATH"
+    else
+      log "llama-server already installed on PATH"
+      return
+    fi
   fi
 
   if llama_server_built; then
     if [[ "${FORCE_CUDA:-0}" == "0" ]] && llama_cuda_cache_enabled; then
       log "llama.cpp was built with CUDA; reconfiguring CPU-only build"
+    elif [[ "${FORCE_CUDA:-0}" == "1" ]] && llama_cuda_cache_disabled; then
+      log "llama.cpp was built without CUDA; reconfiguring CUDA build"
     else
       log "llama.cpp already built at $LLAMA_CPP_DIR"
       return
@@ -471,24 +669,36 @@ ensure_llama_cpp() {
 
   local use_cuda=0
   if [[ "${FORCE_CUDA:-auto}" == "1" ]]; then
+    require_cuda_toolkit
+    require_cuda_architectures
     use_cuda=1
   elif [[ "${FORCE_CUDA:-auto}" == "0" ]]; then
     use_cuda=0
   else
     if detect_cuda; then
+      require_cuda_toolkit
+      require_cuda_architectures
       use_cuda=1
     fi
   fi
 
   if [[ "$use_cuda" -eq 1 ]]; then
     log "CUDA detected or requested. Building llama.cpp with CUDA support (-DGGML_CUDA=ON)..."
-    cmake_flags+=(-DGGML_CUDA=ON)
+    cmake_flags+=(
+      -DGGML_CUDA=ON
+      "-DCMAKE_CUDA_COMPILER=$CUDA_COMPILER"
+      "-DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCHITECTURES"
+    )
+    configure_windows_cuda_cmake
+    prepare_windows_cuda_cmake_cache
   else
     log "Building llama.cpp in CPU-only mode..."
     cmake_flags+=(-DGGML_CUDA=OFF)
   fi
 
-  cmake -S "$LLAMA_CPP_DIR" -B "$LLAMA_CPP_DIR/build" "${cmake_flags[@]}"
+  cmake -S "$LLAMA_CPP_DIR" -B "$LLAMA_CPP_DIR/build" \
+    "${CMAKE_GENERATOR_FLAGS[@]}" \
+    "${cmake_flags[@]}"
 
   log "building llama-server"
   local jobs="${BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '2')}"
@@ -505,12 +715,44 @@ ensure_env_file() {
   fi
 }
 
+load_dotenv_file() {
+  local env_file
+  local line
+  local key
+  local value
+  env_file="$1"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    case "$line" in
+      "" | "#"*)
+        continue
+        ;;
+    esac
+    if [[ "$line" == export[[:space:]]* ]]; then
+      line="${line#export }"
+    fi
+    if [[ "$line" != *=* ]]; then
+      continue
+    fi
+    key="${line%%=*}"
+    value="${line#*=}"
+    if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      continue
+    fi
+    if [[ "${#value}" -ge 2 ]]; then
+      if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+    export "$key=$value"
+  done < "$env_file"
+}
+
 load_env() {
   if [[ -f "$ROOT_DIR/.env" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    source "$ROOT_DIR/.env"
-    set +a
+    load_dotenv_file "$ROOT_DIR/.env"
   fi
 }
 
